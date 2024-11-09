@@ -1,3 +1,54 @@
+/**
+ * @file saveAmclTumResult.cpp
+ * @author Jiajie Zhang
+ * @brief Save AMCL localization results in TUM format for evaluation
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * @details This node subscribes to AMCL localization results and saves them in 
+ *          TUM RGB-D benchmark format for trajectory evaluation. 
+ *          Key functionality includes:
+ *
+ * 1. Data Recording:
+ *    - Subscribes to "/amcl_pose" topic
+ *    - Extracts timestamp, position and orientation
+ *    - Writes to output file in TUM format:
+ *      timestamp tx ty tz qx qy qz qw
+ *
+ * 2. File Handling:
+ *    - Opens output file in append mode
+ *    - Sets fixed precision for floating point numbers
+ *    - Ensures proper file closure on shutdown
+ *
+ * 3. Data Format:
+ *    - Timestamps in seconds with nanosecond precision
+ *    - Position in meters (x, y, z)
+ *    - Orientation as quaternion (x, y, z, w)
+ *    - Space-separated values
+ * 
+ * File Output Example:
+ * ```
+ * 1305031102.175304 -1.826588 0.475166 0.000000 0.000000 0.000000 0.098224 0.995164
+ * 1305031102.275304 -1.827245 0.474217 0.000000 0.000000 0.000000 0.098345 0.995152
+ * ```
+ *
+ * Usage:
+ * ```bash
+ * ros2 run localization_using_area_graph save_amcl_result
+ * ```
+ *
+ * @note Output file location: 
+ *       /home/xiefujing/research/area_graph/ws/robotPoseResult/AmclTumResult.txt
+ *
+ * @warning Ensure write permissions for output directory
+ *          Existing file will be appended to, not overwritten
+ *
+ * @see https://vision.in.tum.de/data/datasets/rgbd-dataset/file_formats
+ *      For TUM format specification
+ *
+ * @copyright Copyright (c) 2024, ShanghaiTech University
+ *            All rights reserved.
+ */
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"

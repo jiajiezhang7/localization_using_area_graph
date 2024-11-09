@@ -1,12 +1,74 @@
 /**
  * @file cloudInitializer.hpp
- * @author Jiajie Zhang
- * @brief porting from ROS1 to ROS2
+ * @author Jiajie Zhang (ROS2 port)
+ *         Fujing Xie (original ROS1 implementation)
+ *         Sören Schwertfeger (original ROS1 implementation)
+ * @brief Global localization initialization for Area Graph based indoor localization
  * @version 0.1
  * @date 2024-11-09
  * 
- * @copyright Copyright (c) 2024
+ * @details Global localization class that provides initial pose estimation in Area Graph maps.
+ *          This class inherits from CloudBase and implements:
+ *          
+ *          1. Pose Initialization:
+ *             - WiFi/barometer based coarse initialization
+ *             - Uniform pose sampling around initial guess
+ *             - Scoring function for pose evaluation
+ *             - Best pose selection mechanism
+ *
+ *          2. Score Functions:
+ *             - Distance based scoring
+ *             - Outside/inside point ratio evaluation 
+ *             - Turkey weight robust scoring
+ *             - Hybrid scoring approaches
+ *
+ *          3. Rescue Functions:
+ *             - Recovery from localization failures
+ *             - Multi-hypothesis tracking
+ *             - Passage and corridor handling
+ *             - Initial ICP refinement
+ *
+ *          4. Data Management:
+ *             - Point cloud filtering and organization
+ *             - Map intersection calculations
+ *             - Score recording and analysis
+ *             - Result visualization
+ *
+ * Class Variables:
+ * @var MaxRobotPose      Best estimated robot pose matrix
+ * @var MaxScore          Highest pose evaluation score
+ * @var numofIntersection Ray intersection count per point
+ * @var inRayDis         Ray intersection distances
+ * @var inRayRange       Range measurements for rays
+ * @var match_with_outside Outside area matching flags
  * 
+ * Public Methods:
+ * @fn setLaserCloudin() Sets input point cloud data
+ * @fn setMapPC()        Sets reference map point cloud
+ * @fn showImgIni()      Visualizes initialization status
+ * @fn rescueRobot()     Performs recovery localization
+ * @fn scoreParticles()  Evaluates pose particles
+ * @fn checkingGuess()   Validates pose hypotheses
+ *
+ * Key Features:
+ * - Robust to partial map observations
+ * - Handles symmetric environments
+ * - Efficient pose sampling strategy
+ * - Multi-modal pose distribution handling
+ *
+ * @note Implements global localization as described in paper Section III.D
+ *       "Guess Scoring" and III.E "Weight Function"
+ *
+ * @see cloudBase.hpp for base functionality
+ * @see utility.hpp for common utilities
+ *
+ * @warning Requires:
+ * - Dense point cloud input (e.g., 64 beam LiDAR)
+ * - WiFi/barometer rough position estimate
+ * - Well-defined Area Graph map
+ * 
+ * @copyright Copyright (c) 2024, ShanghaiTech University
+ *            All rights reserved.
  */
 #pragma once
 #ifndef _CLOUD_INITIALIZER_HPP_

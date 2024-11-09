@@ -1,12 +1,67 @@
 /**
  * @file cloudHandler.hpp
- * @author Jiajie Zhang
- * @brief porting form ROS1 to ROS2
+ * @author Jiajie Zhang (ROS2 port)
+ *         Fujing Xie (original ROS1 implementation)
+ *         Sören Schwertfeger (original ROS1 implementation)
+ * @brief Point cloud processing and localization using Area Graph map representation
  * @version 0.1
  * @date 2024-11-09
  * 
- * @copyright Copyright (c) 2024
+ * @details Core handler class for AGLoc system that processes 3D LiDAR point clouds 
+ *          and performs localization within an Area Graph map. Key functionalities:
+ *          
+ *          - Point Cloud Processing:
+ *            * Clutter removal and filtering
+ *            * 3D to 2D projection for wall detection
+ *            * Downsampling based on corridorness metric
+ *            * Ray intersection with Area Graph polygons
+ *
+ *          - Localization:
+ *            * Global localization using pose scoring
+ *            * Pose tracking via weighted point-to-line ICP
+ *            * Area detection and transition handling
+ *            * Corridorness optimization for long hallways
+ *
+ *          - ROS2 Integration:
+ *            * Point cloud subscription and processing
+ *            * Transform broadcasting and handling
+ *            * Parameter management
+ *            * Visualization publishing
+ *
+ * Main changes from ROS1:
+ *          - Updated message handling for ROS2
+ *          - QoS profile configuration
+ *          - Modernized parameter handling
+ *          - Updated transform system to TF2
+ *          - Improved thread safety
+ *
+ * @note This class inherits from CloudBase and uses CloudInitializer for
+ *       initial pose estimation. It implements the core AGLoc algorithm described in:
+ *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
  * 
+ * @dependencies
+ *          - CloudBase - Base class providing common functionality
+ *          - CloudInitializer - Global localization implementation
+ *          - PCL - Point Cloud processing
+ *          - Eigen - Matrix operations
+ *          - OpenCV - Visualization
+ *          - Message Filters - Point cloud synchronization
+ *
+ * @usage Example usage:
+ * ```cpp
+ * auto node = std::make_shared<CloudHandler>();
+ * rclcpp::spin(node);
+ * ```
+ *
+ * @warning This implementation assumes:
+ *          - 3D LiDAR with dense point clouds (e.g., 64 beams)
+ *          - Area Graph map with well-defined polygons
+ *          - Sufficient wall visibility for localization
+ * 
+ * @see cloudBase.hpp, cloudInitializer.hpp, utility.hpp
+ *
+ * @copyright Copyright (c) 2024, ShanghaiTech University
+ *            All rights reserved.
  */
 #pragma once
 #ifndef _CLOUD_HANDLER_HPP_
