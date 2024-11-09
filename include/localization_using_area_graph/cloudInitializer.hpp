@@ -1,3 +1,13 @@
+/**
+ * @file cloudInitializer.hpp
+ * @author Jiajie Zhang
+ * @brief porting from ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #pragma once
 #ifndef _CLOUD_INITIALIZER_HPP_
 #define _CLOUD_INITIALIZER_HPP_

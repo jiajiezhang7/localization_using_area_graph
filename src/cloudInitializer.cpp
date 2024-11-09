@@ -1,3 +1,13 @@
+/**
+ * @file cloudInitializer.cpp
+ * @author Jiaji eZhang
+ * @brief porting form ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #include "cloudInitializer.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>

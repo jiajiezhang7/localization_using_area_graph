@@ -1,3 +1,13 @@
+/**
+ * @file cloudBase.cpp
+ * @author Jiajie Zhang 
+ * @brief porting from ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #include "cloudBase.hpp"
 
 void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {

@@ -1,3 +1,20 @@
+/**
+ * @file utility.hpp
+ * @author Jiajie Zhang
+ * @brief porting from ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * main changes:
+ * 将原来的单个头文件拆分为.hpp和.cpp两个文件，这符合C++的最佳实践
+ * 将ParamServer从纯参数类改为继承自rclcpp::Node的节点类
+ * 添加了ROS2风格的参数声明和获取机制
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
+
+
 #pragma once
 #ifndef _UTILITY_LIDAR_ODOMETRY_H_
 #define _UTILITY_LIDAR_ODOMETRY_H_
@@ -64,8 +81,9 @@
 #include <ceres/ceres.h>
 
 // Custom message headers
-#include "areaGraphDataParser/msg/agindex.hpp"  
-#include "areaGraphDataParser/msg/area_index.hpp"
+// TODO 这里的include文件名似乎有错，因为这两个头文件似乎不在这里的路径下
+#include "area_graph_data_parser/msg/agindex.hpp"  
+#include "area_graph_data_parser/msg/area_index.hpp"
 
 using namespace std;
 

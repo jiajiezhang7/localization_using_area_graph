@@ -1,3 +1,17 @@
+/**
+ * @file utility.cpp
+ * @author Jiajie Zhang
+ * @brief porting from ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * 添加了参数声明和获取的详细实现
+ * 将原来在头文件中的函数实现都移到该cpp文件中
+ * 添加了ROS2日志机制替代原来的cout
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #include "utility.hpp"
 
 ParamServer::ParamServer(const std::string& node_name) 

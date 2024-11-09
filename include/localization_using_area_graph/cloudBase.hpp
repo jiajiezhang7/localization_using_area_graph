@@ -1,3 +1,13 @@
+/**
+ * @file cloudBase.hpp
+ * @author Jiajie Zhang
+ * @brief porting from ROS1 to ROS2
+ * @version 0.1
+ * @date 2024-11-09
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #pragma once
 #ifndef _CLOUD_BASE_HPP_
 #define _CLOUD_BASE_HPP_
