@@ -1,18 +1,57 @@
 /**
- * @file utility.hpp
- * @author Jiajie Zhang
- * @brief porting from ROS1 to ROS2
- * @version 0.1
- * @date 2024-11-09
- * 
- * main changes:
- * 将原来的单个头文件拆分为.hpp和.cpp两个文件，这符合C++的最佳实践
- * 将ParamServer从纯参数类改为继承自rclcpp::Node的节点类
- * 添加了ROS2风格的参数声明和获取机制
- * 
- * @copyright Copyright (c) 2024
- * 
- */
+* @file utility.hpp
+* @author Jiajie Zhang (ROS2 port)
+*         Fujing Xie (original ROS1 implementation)
+*         Sören Schwertfeger (original ROS1 implementation)
+* @brief Utility functions and common definitions for Area Graph-based indoor localization
+* @version 0.1
+* @date 2024-11-09
+* 
+* @details Core utilities and helper functions for AGLoc system, including:
+*          - Point type definitions
+*          - Geometric calculations
+*          - Parameter handling
+*          - Transformation utilities
+*          - Common data structures
+* 
+* Main changes from ROS1 to ROS2:
+*          - Updated message types and headers
+*          - Replaced ROS1 time handling with ROS2
+*          - Updated transform handling using tf2
+*          - Modernized parameter server access
+*          - Updated logging macros
+*          - Replaced boost dependencies with std
+*          - Added ROS2 QoS settings
+*          - Updated visualization markers
+* 
+* @implementation_details
+*        Core utility functions:
+*        - calPedal: Calculate pedal point on line
+*        - calIntersection: Calculate intersection of two lines
+*        - inBetween: Check if point lies between two points
+*        - inRay: Ray tracing calculations
+*        - calWeightTurkey: Calculate robust weights
+*        - checkParallel: Check line parallelism
+*        - getPCA: Principal Component Analysis
+*        - Distance calculations
+* 
+* @dependencies
+*        - ROS2 core libraries
+*        - PCL library
+*        - OpenCV
+*        - Eigen
+*        - Standard C++ libraries
+* 
+* @note Part of the AGLoc system described in:
+*       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
+*       IEEE Robotics and Automation Letters, 2023
+* 
+* @usage This header provides common utilities used throughout the AGLoc system
+*        Include this header in files requiring basic AGLoc functionality
+* 
+* @copyright Copyright (c) 2024, ShanghaiTech University
+*            All rights reserved.
+*/
 
 
 #pragma once

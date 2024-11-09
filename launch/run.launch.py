@@ -62,7 +62,7 @@ def generate_launch_description():
         ),
         
         Node(
-            package='areaGraphDataParser',
+            package='area_graph_data_parser',
             executable='data_process',
             name='data_process',
             output='screen',

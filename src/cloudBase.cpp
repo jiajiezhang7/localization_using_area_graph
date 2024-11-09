@@ -1,11 +1,39 @@
 /**
  * @file cloudBase.cpp
- * @author Jiajie Zhang 
- * @brief porting from ROS1 to ROS2
+ * @author Jiajie Zhang (ROS2 port)
+ *         Fujing Xie (original ROS1 implementation)
+ *         Sören Schwertfeger (original ROS1 implementation)
+ * @brief Implementation of cloudBase class for Area Graph-based LiDAR localization
+ *        ROS2 implementation of the core AGLoc functionality
  * @version 0.1
  * @date 2024-11-09
  * 
- * @copyright Copyright (c) 2024
+ * @details Implements the following key functionalities:
+ *          - Point cloud data processing and organization
+ *          - Clutter removal and point cloud subsampling
+ *          - Area Graph intersection calculations
+ *          - Point cloud registration and pose estimation
+ *          - Memory management for point cloud data structures
+ *          - ROS2 node handling and message processing
+ * 
+ * @note This implementation corresponds to the methods described in:
+ *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
+ *       IEEE Robotics and Automation Letters, 2023
+ * 
+ * @implementation_details
+ *        - Converts ROS1 message types to ROS2
+ *        - Updates timing and transform handling for ROS2
+ *        - Implements ROS2 parameter handling
+ *        - Maintains compatibility with original algorithm design
+ * 
+ * @dependencies
+ *        - ROS2 core libraries
+ *        - PCL library for point cloud processing
+ *        - Area Graph data structures
+ *        - TF2 for coordinate transformations
+ * 
+ * @copyright Copyright (c) 2024, ShanghaiTech University
+ *            All rights reserved.
  * 
  */
 #include "cloudBase.hpp"
@@ -195,7 +223,7 @@ void CloudBase::liosamPathCB(const nav_msgs::msg::Path::SharedPtr pathMsg) {
     pubTransformedLiosamPath->publish(TransformedLiosamPath);
 }
 
-void CloudBase::AGindexCB(const areaGraphDataParser::msg::AGindex::SharedPtr msg) {
+void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg) {
     AG_index = *msg;
     AGindexReceived = true;
 }

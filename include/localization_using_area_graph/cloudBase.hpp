@@ -1,11 +1,28 @@
 /**
  * @file cloudBase.hpp
- * @author Jiajie Zhang
- * @brief porting from ROS1 to ROS2
+ * @author Jiajie Zhang (ROS2 port)
+ *         Fujing Xie (original ROS1 implementation)
+ *         Sören Schwertfeger (original ROS1 implementation)
+ * @brief Base class for Area Graph-based LiDAR localization system (AGLoc)
+ *        Provides core functionality for indoor localization using Area Graph map representation
+ *        Including global localization and pose tracking with clutter removal
  * @version 0.1
  * @date 2024-11-09
  * 
- * @copyright Copyright (c) 2024
+ * @details This class implements the base functionality for:
+ *          - Point cloud processing and clutter removal
+ *          - Area Graph map handling
+ *          - Ray tracing and intersection calculation
+ *          - Point-to-line ICP registration
+ *          - Corridorness detection and scoring
+ *          Ported from ROS1 to ROS2 maintaining full functionality
+ * 
+ * @note Part of the AGLoc system as described in:
+ *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
+ *       Published in IEEE Robotics and Automation Letters, 2023
+ * 
+ * @copyright Copyright (c) 2024, ShanghaiTech University
+ *            All rights reserved.
  * 
  */
 #pragma once
@@ -23,7 +40,7 @@ public:
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental;
-    rclcpp::Subscription<areaGraphDataParser::msg::AGindex>::SharedPtr subAGindex;
+    rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;
 
     // Headers
     std_msgs::msg::Header cloudHeader;
@@ -148,7 +165,7 @@ public:
     std::vector<double> Vec_pedaly;
     std::vector<Eigen::Vector3f> corridorGuess;
     std::vector<Eigen::Vector3f> roomGuess;
-    areaGraphDataParser::msg::AGindex AG_index;
+    area_graph_data_parser::msg::AGindex AG_index;
     
     // Counters
     int numTotalHistogram;
@@ -173,7 +190,7 @@ public:
                     std_msgs::msg::Header* cloudHeader);
     void setEveryFrame();
     void mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
-    void AGindexCB(const areaGraphDataParser::msg::AGindex::SharedPtr msg);
+    void AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg);
     bool areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex);
     geometry_msgs::msg::PoseStamped transformLiosamPath(const nav_msgs::msg::Path& pathMsg);
     geometry_msgs::msg::Pose transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg);
@@ -253,7 +270,7 @@ private:
             "/lio_sam/mapping/odometry_incremental", qos,
             std::bind(&CloudBase::liosamOdometryIncrementalCB, this, std::placeholders::_1));
             
-        subAGindex = this->create_subscription<areaGraphDataParser::msg::AGindex>(
+        subAGindex = this->create_subscription<area_graph_data_parser::msg::AGindex>(
             "/AGindex", qos,
             std::bind(&CloudBase::AGindexCB, this, std::placeholders::_1));
     }
