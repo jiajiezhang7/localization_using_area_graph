@@ -6,7 +6,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory('localizationUsingAreaGraph')
+    pkg_dir = get_package_share_directory('localization_using_area_graph')
     
     # Declare parameters
     params_file = os.path.join(pkg_dir, 'config', 'params.yaml')
@@ -54,7 +54,7 @@ def generate_launch_description():
         
         # Main nodes
         Node(
-            package='localizationUsingAreaGraph',
+            package='localization_using_area_graph',
             executable='cloud_handler',
             name='cloud_handler',
             parameters=[LaunchConfiguration('params_file')],
