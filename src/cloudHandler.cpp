@@ -174,13 +174,14 @@ CloudHandler::CloudHandler()
     initializePublishers();
     initializeSubscribers();
 
-    // Open log files
-    robotPoseTum.open("/home/xiefujing/research/area_graph/ws/robotPoseResult/robotPoseTum.txt", 
+    // TODO 机器人位姿结果保存
+    robotPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/robotPoseTum.txt", 
                       std::ios::ate);
     robotPoseTum << std::fixed;
     robotPoseTum.precision(6);
     
-    LiosamPoseTum.open("/home/xiefujing/research/area_graph/ws/robotPoseResult/LiosamPoseTum.txt", 
+    // TODO LIO—SAM位姿结果保存
+    LiosamPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/LiosamPoseTum.txt", 
                        std::ios::ate);
     LiosamPoseTum << std::fixed;
     LiosamPoseTum.precision(6);

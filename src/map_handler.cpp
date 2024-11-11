@@ -46,20 +46,21 @@ void MapHandler::loadMapData()
         // Get package share directory
         std::string pkg_dir = ament_index_cpp::get_package_share_directory("localization_using_area_graph");
         
+        // TODO 硬编码路径问题
         // Load main map data
-        std::string map_file = pkg_dir + "/../../../map/picking_list_star_center.txt";
+        std::string map_file = "/home/jay/AGLoc_ws/map/picking_list_star_center.txt";
         if (!loadMapDataFromFile(map_file, map_points_)) {
             throw std::runtime_error("Failed to load main map file");
         }
 
         // Load initialization map data
-        std::string init_file = pkg_dir + "/../../../map/picking_list_star_center_initialization.txt";
+        std::string init_file = pkg_dir + "/home/jay/AGLoc_ws/map/picking_list_star_center_initialization.txt";
         if (!loadMapDataFromFile(init_file, map_init_points_)) {
             throw std::runtime_error("Failed to load initialization map file");
         }
 
         // Load corridor map data
-        std::string corridor_file = pkg_dir + "/../../../map/corridor_enlarge.txt";
+        std::string corridor_file = pkg_dir + "/home/jay/AGLoc_ws/map/corridor_enlarge.txt";
         if (!loadMapDataFromFile(corridor_file, map_corridor_points_)) {
             throw std::runtime_error("Failed to load corridor map file");
         }

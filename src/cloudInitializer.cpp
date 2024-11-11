@@ -196,7 +196,8 @@ void CloudInitializer::rescueRobot() {
     std::ostringstream ts;
     ts.precision(2);
     ts << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
-    std::string filename = "/home/xiefujing/research/area_graph/ws/frameResult/" + 
+    // TODO 全局定位结果保存路径
+    std::string filename = "/home/jay/AGLoc_ws/frameResult" + 
                           ts.str() + "rescueRoom.txt";
                           
     rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);

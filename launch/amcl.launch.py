@@ -82,7 +82,8 @@ def generate_launch_description():
             name='map_server',
             output='screen',
             parameters=[{
-                'yaml_filename': '/home/xiefujing/research/area_graph/gmapping_map/0510gmappingAreaGraph.yaml'
+                # TODO 路径硬编码问题
+                'yaml_filename': '/home/jay/AGLoc_ws/gmapping_map/0510gmappingAreaGraph.yaml'
             }]
         ),
 

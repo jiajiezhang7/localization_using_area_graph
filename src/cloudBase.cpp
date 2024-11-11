@@ -113,8 +113,8 @@ CloudBase::CloudBase() : ParamServer("cloud_base_node") {
     initializeSubscribers();
     allocateMemory();
 
-    // Open output files
-    GTstream.open("/home/xiefujing/research/area_graph/ws/GT/GTliosam2023-05-24-20-54-47.txt", 
+    // 通过LIO-SAM得到的GT数据保存路径
+    GTstream.open("/home/jay/AGLoc_ws/GT/GTliosam2023-05-24-20-54-47.txt", 
                   std::ofstream::app);
     GTstream.setf(std::ios::fixed);
     GTstream.precision(2);
