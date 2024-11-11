@@ -27,6 +27,9 @@ find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(area_graph_data_parser REQUIRED)
+find_package(yaml_cpp REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
 
 # Include directories
 include_directories(
@@ -61,14 +64,14 @@ target_link_libraries(utility
   OpenMP::OpenMP_CXX
 )
 
-# Create the main executable
+# Create executables for all nodes
+## Main AGLoc node
 add_executable(cloud_handler
   src/cloudHandler.cpp
   src/cloudBase.cpp
   src/cloudInitializer.cpp
 )
 
-# Link utility library to main executable
 target_link_libraries(cloud_handler
   utility
   ${PCL_LIBRARIES}
@@ -77,23 +80,92 @@ target_link_libraries(cloud_handler
   OpenMP::OpenMP_CXX
 )
 
-ament_target_dependencies(cloud_handler
-  rclcpp
-  std_msgs
-  sensor_msgs
-  geometry_msgs
-  nav_msgs
-  visualization_msgs
-  tf2
-  tf2_ros
-  cv_bridge
-  image_transport
-  area_graph_data_parser
+## AMCL TF broadcaster
+add_executable(amcl_odom_tf_broadcaster
+  src/amcl_odom_tf_broadcaster_node.cpp
+  src/amcl_odom_tf_broadcaster.cpp
 )
+
+target_link_libraries(amcl_odom_tf_broadcaster
+  utility
+)
+
+## Particle Generator
+add_executable(particle_generator
+  src/particle_generator_node.cpp
+  src/particle_generator.cpp
+)
+
+target_link_libraries(particle_generator
+  utility
+)
+
+## Data Sender
+add_executable(data_sender
+  src/data_sender_node.cpp
+  src/data_sender.cpp
+)
+
+target_link_libraries(data_sender
+  utility
+  rosbag2_cpp::rosbag2_cpp
+  rosbag2_storage::rosbag2_storage
+)
+
+## Map Handler
+add_executable(map_handler
+  src/map_handler_node.cpp
+  src/map_handler.cpp
+)
+
+target_link_libraries(map_handler
+  utility
+)
+
+## Destination Receiver
+add_executable(destination_receiver
+  src/destination_receiver_node.cpp
+  src/destination_receiver.cpp
+)
+
+target_link_libraries(destination_receiver
+  utility
+  yaml-cpp
+)
+
+# Add dependencies to all executables
+foreach(target
+    cloud_handler
+    amcl_odom_tf_broadcaster
+    particle_generator
+    data_sender
+    map_handler
+    destination_receiver)
+  ament_target_dependencies(${target}
+    rclcpp
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    visualization_msgs
+    tf2
+    tf2_ros
+    cv_bridge
+    image_transport
+    area_graph_data_parser
+  )
+endforeach()
 
 # Install targets
 install(
-  TARGETS cloud_handler utility
+  TARGETS
+    cloud_handler
+    utility
+    amcl_odom_tf_broadcaster
+    particle_generator
+    data_sender
+    map_handler
+    destination_receiver
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
