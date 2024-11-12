@@ -30,7 +30,6 @@
 #define _CLOUD_BASE_HPP_
 
 #include "utility.hpp"
-
 class CloudBase : public ParamServer {
 public:
     // ROS2 Subscribers
@@ -40,6 +39,7 @@ public:
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental;
+    // 订阅AG_index话题 -- 来自 area_graph_data_parser
     rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;
 
     // Headers
@@ -180,7 +180,10 @@ public:
 
     
 
-    CloudBase() : ParamServer("cloud_base_node");
+    // 将默认构造函数改为接受节点名的构造函数
+    explicit CloudBase(const std::string& node_name);
+    // 添加虚析构函数
+    virtual ~CloudBase() = default;
     // BASE functions
     void mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
     void organizePointcloud();
@@ -194,12 +197,11 @@ public:
     bool areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex);
     geometry_msgs::msg::PoseStamped transformLiosamPath(const nav_msgs::msg::Path& pathMsg);
     geometry_msgs::msg::Pose transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg);
-
     // VIRTUAL functions
-    virtual void calClosestMapPoint(int inside_index);
-    virtual bool checkMap(int ring, int horizonIndex, int& last_index, double& minDist, int inside_index);
-    virtual void allocateMemory();
-    virtual void resetParameters();
+    virtual void calClosestMapPoint(int inside_index) = 0;
+    virtual bool checkMap(int ring, int horizonIndex, int& last_index, double& minDist, int inside_index) = 0;
+    virtual void allocateMemory() = 0;
+    virtual void resetParameters() = 0;
 
     // Core processing functions
     void initializedUsingMassCenter();
@@ -266,9 +268,6 @@ private:
             "/lio_sam/mapping/path", qos,
             std::bind(&CloudBase::liosamPathCB, this, std::placeholders::_1));
             
-        subLiosamodometry_incremental = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/lio_sam/mapping/odometry_incremental", qos,
-            std::bind(&CloudBase::liosamOdometryIncrementalCB, this, std::placeholders::_1));
             
         subAGindex = this->create_subscription<area_graph_data_parser::msg::AGindex>(
             "/AGindex", qos,

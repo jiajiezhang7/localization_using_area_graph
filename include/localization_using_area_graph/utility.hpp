@@ -60,7 +60,6 @@
 
 // ROS2 headers
 #include <rclcpp/rclcpp.hpp>
-#include <pcl_conversions/pcl_conversions.h>
 #include <std_msgs/msg/header.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -76,6 +75,7 @@
 // PCL headers 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/search/impl/search.hpp>
 #include <pcl/range_image/range_image.h>
 #include <pcl/kdtree/kdtree_flann.h>
@@ -120,15 +120,14 @@
 #include <ceres/ceres.h>
 
 // Custom message headers
-// TODO 这里的include文件名似乎有错，因为这两个头文件似乎不在这里的路径下
-#include "area_graph_data_parser/msg/agindex.hpp"  
+#include "area_graph_data_parser/msg/a_gindex.hpp"  
 #include "area_graph_data_parser/msg/area_index.hpp"
 
 using namespace std;
 
 struct VelodynePointXYZIRT {
     PCL_ADD_POINT4D
-    PCL_ADD_INTENSITY;
+    PCL_ADD_INTENSITY
     uint16_t ring;
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;

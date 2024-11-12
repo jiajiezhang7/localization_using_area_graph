@@ -81,7 +81,7 @@
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
  */
-#include "cloudInitializer.hpp"
+#include "localization_using_area_graph/cloudInitializer.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
 #include <thread>
@@ -154,36 +154,44 @@ void CloudInitializer::setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_) {
     *map_pc = *map_pc_;
 }
 
-CloudInitializer::~CloudInitializer() {
-    RCLCPP_INFO(this->get_logger(), "CloudInitializer is being deleted");
-}
 
 void CloudInitializer::getInitialExtGuess(
-    const sensor_msgs::msg::PointCloud::SharedPtr laserCloudMsg) {
-        
+    const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+    
     RCLCPP_WARN(this->get_logger(), "CloudInitializer GETTING INITIAL GUESS");
 
-    int GuessSize = laserCloudMsg->points.size(); 
+    // 将ROS2 PointCloud2消息转换为PCL点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::fromROSMsg(*laserCloudMsg, *cloud);
+
+    // 获取点云大小 - 使用转换后的PCL点云的size
+    int GuessSize = cloud->points.size();
+
+    // 清空corridorGuess向量为新的数据做准备
     corridorGuess.clear();
-    
+
+    // 遍历所有点,构建guess
     for (int i = 0; i < GuessSize; i++) {
         Eigen::Vector3f tempGuess;
-        // z means which area this guess belongs to
-        tempGuess << laserCloudMsg->points[i].x,
-                    laserCloudMsg->points[i].y,
-                    laserCloudMsg->points[i].z;
+        // z表示这个guess属于哪个区域 - 保持原来的逻辑不变
+        tempGuess << cloud->points[i].x,
+                    cloud->points[i].y,
+                    cloud->points[i].z;
         corridorGuess.push_back(tempGuess);
     }
-    
+
+    // 设置准备标志
     bGuessReady = true;
-    
+
+    // 计算救援时间
     auto startTime = this->now();
     rescueRobot();
     robotPose = MaxRobotPose;
     auto endTime = this->now();
-    
+
+    // 输出处理信息
     RCLCPP_INFO(this->get_logger(), 
-                "Number of guesses: %d, Rescue robot run time: %f ms", 
+                "Number of guesses: %d, Rescue robot run time: %f ms",
                 GuessSize,
                 (endTime - startTime).seconds() * 1000);
 }
@@ -212,7 +220,7 @@ void CloudInitializer::rescueRobot() {
     auto startC = std::chrono::high_resolution_clock::now();
     
     if (!initialization_imu) {
-        int try_time = 360/rescue_angle_interval;
+        size_t try_time = static_cast<size_t>(360/rescue_angle_interval);
         auto organizedCloudInDS = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         
         // Downsample point cloud
@@ -227,8 +235,8 @@ void CloudInitializer::rescueRobot() {
                     organizedCloudInDS->points.size());
 
         // Try different angles
-        for(int i = 0; i < try_time; i++) {
-            for(int j = 0; j < corridorGuess.size(); j++) {
+        for(size_t i = 0; i < try_time; i++) {
+            for(size_t j = 0; j < corridorGuess.size(); j++) {
                 auto startTime = this->now();
                 
                 // Publish current guess
@@ -253,7 +261,7 @@ void CloudInitializer::rescueRobot() {
                 // Set initial pose for this guess
                 Eigen::Vector3f tempinitialExtTrans;
                 tempinitialExtTrans << corridorGuess[j][0], corridorGuess[j][1], 0;
-                setInitialPose(int(initialYawAngle + i * rescue_angle_interval) % 360,
+                setInitialPose(static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
                              tempinitialExtTrans);
                              
                 // Transform point cloud
@@ -292,7 +300,7 @@ void CloudInitializer::rescueRobot() {
                     Eigen::Vector3d eulerAngle = quaternion.matrix().eulerAngles(1,2,0);
                     result_angle = eulerAngle[1]/M_PI*180;
                 } else {
-                    result_angle = int(initialYawAngle + i * rescue_angle_interval) % 360;
+                    result_angle = static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
                 }
 
                 initialized = false;
@@ -328,7 +336,7 @@ void CloudInitializer::rescueRobot() {
                     
                     showImgIni(robotPose(0,3), 
                               robotPose(1,3),
-                              int(initialYawAngle + i * rescue_angle_interval) % 360);
+                              static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
                 }
 
                 if(pause_iter) {
@@ -381,7 +389,7 @@ void CloudInitializer::rescueRobot() {
 
 bool CloudInitializer::insideOldArea(int mapPCindex) {
     int throughTimes = 0;
-    for(int i = mapPCindex; i < map_pc->points.size(); i++) {
+    for(size_t i = static_cast<size_t>(mapPCindex); i < map_pc->points.size(); i++) {
         // End of this area
         if((int)map_pc->points[i].intensity % 3 == 2) {
             break;
@@ -493,10 +501,10 @@ void CloudInitializer::initializationICP(int insideAGIndex) {
         Vec_pcy.clear();
         Vec_pedalx.clear();
         Vec_pedaly.clear();
-        RCLCPP_WARN(get_logger(), "Useful POINTS SIZE 1 = %d", UsefulPoints1->points.size());
+        RCLCPP_WARN(get_logger(), "Useful POINTS SIZE 1 = %zu", UsefulPoints1->points.size());
 
         calClosestMapPoint(insideAGIndex);
-        RCLCPP_WARN(get_logger(), "Useful POINTS SIZE 2 = %d", UsefulPoints1->points.size());
+        RCLCPP_WARN(get_logger(), "Useful POINTS SIZE 2 = %zu", UsefulPoints1->points.size());
 
         if(use_weight) {
             mapCenter = mapCenter/weightSumTurkey;
@@ -636,7 +644,7 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     outsidePC->clear();
     outsidePC->points.resize(transformed_pc_size);
 
-    for(int i = 0; i < transformed_pc_size; i++) {
+    for(size_t i = 0; i < transformed_pc_size; i++) {
         bool findIntersection = false;
         double minDist = 0;
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
@@ -681,7 +689,7 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
 }
 
 
-void CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint, 
+bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint, 
                                    const pcl::PointXYZI &PosePoint,
                                    int horizonIndex,
                                    double & minDist,
@@ -706,7 +714,7 @@ void CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,
         start_index = 0;
     }
 
-    for(int i = start_index; i < map_pc->size() + start_index; i++) {
+    for(size_t i = start_index; i < map_pc->size() + start_index; i++) {
         bool bOnRay = false;
         inRay(PosePoint, PCPoint,
               map_pc->points[i % mapSize],
@@ -756,17 +764,14 @@ void CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,
         }
     }
 
-    if(bMatchWithPass && min_error > 1) {
-        return true;
-    }
-    return false;
+    return bMatchWithPass && (min_error > 1);
 }
 
 void CloudInitializer::scoreParticlesDist() {
     std::ostringstream ts;
     ts.precision(2);
     ts << std::fixed << rclcpp::Time(cloudHeader.stamp).seconds();
-    std::string filename = "/home/xiefujing/research/area_graph/ws/frameResult/" +
+    std::string filename = "/home/jay/AGLoc_ws/frameResult/" +
                           ts.str() + "rescueRoom.txt";
                           
     rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
@@ -838,7 +843,7 @@ void CloudInitializer::scoreParticles() {
         downSizeFurthestRing.setInputCloud(furthestRing);
         downSizeFurthestRing.filter(*organizedCloudInRecord);
 
-        for(int i = 0; i < try_time; i++) {
+        for(size_t i = 0; i < static_cast<size_t>(try_time); i++) {
             for(size_t j = 0; j < corridorGuess.size(); j++) {
                 insideScore = 0;
                 outsideScore = 0;
@@ -847,9 +852,10 @@ void CloudInitializer::scoreParticles() {
                 numofOutsidePoints = 0;
 
                 Eigen::Vector3f tempinitialExtTrans = corridorGuess[j];
-                setInitialPose((initialYawAngle + i * rescue_angle_interval) % 360,
-                             tempinitialExtTrans);
-                             
+                double currentAngle = initialYawAngle + i * rescue_angle_interval;
+                int discreteAngle = static_cast<int>(currentAngle) % 360;
+                setInitialPose(discreteAngle, tempinitialExtTrans);
+                                        
                 pcl::transformPointCloud(*organizedCloudInRecord, 
                                        *transformed_pc,
                                        robotPose);
@@ -867,7 +873,7 @@ void CloudInitializer::scoreParticles() {
 
                 if(bGenerateResultFile) {
                     rescueRoomStream << rclcpp::Time(mapHeader.stamp).seconds() << ","
-                                   << (initialYawAngle + i * rescue_angle_interval) % 360 << ","
+                                   << static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)) << ","
                                    << corridorGuess[j](0) << "," 
                                    << corridorGuess[j](1) << ","
                                    << robotPose(0,3) << "," 

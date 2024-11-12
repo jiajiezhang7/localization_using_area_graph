@@ -36,7 +36,8 @@
  *            All rights reserved.
  * 
  */
-#include "cloudBase.hpp"
+#include "localization_using_area_graph/cloudBase.hpp"
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
     robotPoseTum << pose_stamped.header.stamp.sec + pose_stamped.header.stamp.nanosec * 1e-9 
@@ -107,7 +108,8 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
     return false;
 }
 
-CloudBase::CloudBase() : ParamServer("cloud_base_node") {
+CloudBase::CloudBase(const std::string& node_name)
+    : ParamServer(node_name) {
     initializeVariables();
     initializePublishers();
     initializeSubscribers();
@@ -168,8 +170,11 @@ geometry_msgs::msg::PoseStamped CloudBase::transformLiosamPath(const nav_msgs::m
     return this_pose_stamped;
 }
 
+void CloudBase::mapInitCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+    // 添加实现或移除订阅器
+    RCLCPP_INFO(this->get_logger(), "Map init callback received");
+}
 
-//  -------------------------以上部分已修改，
 geometry_msgs::msg::Pose CloudBase::transformLiosamPathnew(
     const nav_msgs::msg::Odometry::SharedPtr pathMsg) {
     // [[ 0.99968442 -0.02004835 -0.01513714]
@@ -222,7 +227,7 @@ void CloudBase::liosamPathCB(const nav_msgs::msg::Path::SharedPtr pathMsg) {
     TransformedLiosamPath.poses.push_back(this_pose_stamped);
     pubTransformedLiosamPath->publish(TransformedLiosamPath);
 }
-
+// 接受到AGindex后的回调处理
 void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg) {
     AG_index = *msg;
     AGindexReceived = true;
@@ -380,7 +385,7 @@ void CloudBase::initializedUsingMassCenter() {
     double center_x = 0;
     double center_y = 0;
     
-    for(int i = 0; i < transformed_pc->points.size(); i++) {
+    for(size_t i = 0; i < transformed_pc->points.size(); i++) {
         center_x += transformed_pc->points[i].x;
         center_y += transformed_pc->points[i].y;
     }
@@ -405,7 +410,7 @@ void CloudBase::checkMapinRay(int ring, int horizonIndex, int& last_index) {
     PosePoint.y = robotPose(1,3);
     PosePoint.z = 0;
 
-    double pc_distance = calDistance(PCPoint, PosePoint);
+    // double pc_distance = calDistance(PCPoint, PosePoint);
     int mapCorridorEnlargeSize = mapCorridorEnlarge_pc->points.size();
 
     for(int j = last_index; j < mapCorridorEnlargeSize + last_index; j++) {
@@ -496,18 +501,6 @@ void CloudBase::organizePointcloud() {
         N_SCAN = 1;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

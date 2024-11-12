@@ -71,8 +71,8 @@
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
  */
-#include "cloudHandler.hpp"
-#include "utility.hpp"
+#include "localization_using_area_graph/cloudHandler.hpp"
+#include "localization_using_area_graph/utility.hpp"
 
 // Corridorness downsample rate calculation
 double CloudHandler::corridornessDSRate(double maxPercentage) {
@@ -114,7 +114,7 @@ void CloudHandler::gettingInsideWhichArea() {
     int insideTime = 0;
     int temp = -1;
     
-    for(int i = 0; i < map_pc->points.size(); i++) {
+    for(size_t i = 0; i < map_pc->points.size(); i++) {
         bool binside = false;
         
         // Check start of new area
@@ -129,7 +129,7 @@ void CloudHandler::gettingInsideWhichArea() {
             insideAreaID = temp;
             
             // Collect area points for visualization
-            for(int j = i; j < i + 100000; j++) {
+            for(size_t j = i; j < static_cast<size_t>(i + 100000) && j < map_pc->points.size(); j++) {
                 if((int)map_pc->points[j].intensity % 3 == 2) {
                     break;
                 }
@@ -194,39 +194,10 @@ CloudHandler::CloudHandler()
 }
 
 void CloudHandler::getInitialExtGuess(
-    const sensor_msgs::msg::PointCloud::SharedPtr laserCloudMsg) {
+    const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     getGuessOnce = true;
 }
 
-// Helper function for initialization
-void CloudHandler::initializeSubscribers() {
-    auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-
-    // Subscribe to LiDAR pointcloud
-    subLaserCloud = create_subscription<sensor_msgs::msg::PointCloud2>(
-        pointCloudTopic, qos,
-        std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
-
-    // Subscribe to initial guess
-    subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud>(
-        "/particles_for_init", qos,
-        std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));
-
-    // Subscribe to LIO-SAM odometry
-    subLiosamOdometry = create_subscription<nav_msgs::msg::Odometry>(
-        "/lio_sam/mapping/odometry", qos,
-        std::bind(&CloudHandler::liosamOdometryIncrementalCB, this, std::placeholders::_1));
-}
-
-void CloudHandler::initializePublishers() {
-    auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-
-    pubinsideAreaPC = create_publisher<sensor_msgs::msg::PointCloud2>(
-        "insideAreaPC", qos);
-        
-    pubTransformedLiosamPath = create_publisher<nav_msgs::msg::Path>(
-        "TransformedLiosamPath", qos);
-}
 
 void CloudHandler::liosamOdometryIncrementalCB(
     const nav_msgs::msg::Odometry::SharedPtr odomMsg) {
@@ -313,7 +284,7 @@ void CloudHandler::cloudHandlerCB(
                                             &cloudInitializer, 
                                             std::placeholders::_1);
                                             
-        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud>(
+        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
         // Publish furthest ring
@@ -338,7 +309,7 @@ void CloudHandler::cloudHandlerCB(
                                             &cloudInitializer, 
                                             std::placeholders::_1);
                                             
-        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud>(
+        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
         // Publish furthest ring
@@ -355,7 +326,7 @@ void CloudHandler::cloudHandlerCB(
                     robotPose(0,3), robotPose(1,3));
         
         bRescueRobot = false;
-        subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud>(
+        subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/none", 10, std::bind(&CloudHandler::getInitialExtGuess, 
                                  this, std::placeholders::_1));
         return;
@@ -366,7 +337,7 @@ void CloudHandler::cloudHandlerCB(
             robotPose = cloudInitializer.MaxRobotPose;
             errorUpThred = 3;
             
-            cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud>(
+            cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess, 
                                      &cloudInitializer, 
                                      std::placeholders::_1));
@@ -456,11 +427,11 @@ void CloudHandler::cloudHandlerCB(
     }
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finishC - startC);
-    sumFrameRunTime += duration.count();
+    sumFrameRunTime += std::chrono::duration_cast<std::chrono::steady_clock::duration>(duration);
     numofFrame++;
     
     RCLCPP_DEBUG(get_logger(), "Average cloudhandler run time: %f ns", 
-                 static_cast<double>(sumFrameRunTime) / numofFrame);
+                 std::chrono::duration_cast<std::chrono::duration<double>>(sumFrameRunTime - std::chrono::steady_clock::now()).count() / numofFrame);
 }
 
 
@@ -630,7 +601,7 @@ bool CloudHandler::checkWholeMap(int pc_index,
     }
     
     // Search through map points
-    for(int i = start_index; i < map_pc->size() + start_index; i++) {
+    for(size_t i = start_index; i < map_pc->size() + start_index; i++) {
         // Check passage handling
         if(bAllPassageOpen) {
             if((int)map_pc->points[i % mapSize].intensity > 2 && 
@@ -731,7 +702,7 @@ void CloudHandler::filterUsefulPoints() {
     outsideAreaIndexRecord.resize(transformed_pc->points.size(), 0);
     outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);
 
-    for(int i = 0; i < transformed_pc->points.size(); i++) {
+    for(size_t i = 0; i < transformed_pc->points.size(); i++) {
         // Check for NaN points
         if(std::isnan(transformed_pc->points[i].x) || 
            std::isnan(transformed_pc->points[i].y) ||
@@ -895,11 +866,11 @@ void CloudHandler::mergeMapHistogram() {
     std::vector<double> histogram(interval, 0);
     
     // Initialize metrics
-    double corridor_ness = 0;
+    // double corridor_ness = 0;
     int total_hit_points = 0;
 
     // Process map points
-    for(int i = 0; i < map_pc->points.size(); i++) {
+    for(size_t i = 0; i < map_pc->points.size(); i++) {
         double angle = std::atan2(map_pc->points[i].y - map_pc->points[(i+1) % map_pc->points.size()].y,
                                 map_pc->points[i].x - map_pc->points[(i+1) % map_pc->points.size()].x);
         
@@ -916,7 +887,7 @@ void CloudHandler::mergeMapHistogram() {
     int max_index = 0;
     int total_points = 0;
     
-    for(int i = 0; i < histogram.size(); i++) {
+    for(size_t i = 0; i < histogram.size(); i++) {
         total_points += histogram[i];
         if(histogram[i] > max_value) {
             max_value = histogram[i];
@@ -926,7 +897,7 @@ void CloudHandler::mergeMapHistogram() {
 
     // Find map lines with max angle
     std::vector<int> mapLineIndex;
-    for(int i = 0; i < map_pc->points.size(); i++) {
+    for(size_t i = 0; i < map_pc->points.size(); i++) {
         double angle = std::atan2(map_pc->points[i].y - map_pc->points[(i+1) % map_pc->points.size()].y,
                                 map_pc->points[i].x - map_pc->points[(i+1) % map_pc->points.size()].x);
         angle = (angle + M_PI/2) / M_PI * 180;
@@ -951,9 +922,9 @@ void CloudHandler::mergeMapHistogram() {
         int minus_times = 0;
 
         // Process points
-        for(int i = 0; i < usefulIndex.size(); i++) {
+        for(size_t i = 0; i < usefulIndex.size(); i++) {
             bool find = false;
-            for(int j = 0; j < mapLineIndex.size(); j++) {
+            for(size_t j = 0; j < mapLineIndex.size(); j++) {
                 if(mapLineIndex[j] == int(UsefulPoints1->points[usefulIndex[i]].intensity)) {
                     find = true;
                     double distance = organizedCloudIn->points[usefulIndex[i]].intensity;
@@ -1188,10 +1159,8 @@ int main(int argc, char** argv) {
     if(rcutils_logging_set_logger_level(
         cloudHandler->get_logger().get_name(),
         RCUTILS_LOG_SEVERITY_INFO)) {
-        rcutils_logging_console_output_handler(
-            RCUTILS_LOG_SEVERITY_INFO,
-            "CloudHandler",
-            "Logger level set to INFO");
+        auto logger = rclcpp::get_logger("CloudHandler");
+        RCLCPP_INFO(logger, "Logger level set to INFO");
     }
 
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");

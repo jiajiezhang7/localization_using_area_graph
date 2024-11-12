@@ -134,9 +134,25 @@ void ParticleGenerator::agmapCallback(const sensor_msgs::msg::PointCloud2::Share
 }
 
 bool ParticleGenerator::checkIntersection(const Eigen::Vector2d& point,
-                                        const std::vector<Eigen::Vector2d>& polygon) 
-{
-    // TODO: Implement point in polygon check
-    // This could use Boost.Geometry or other geometry library
-    return true;  // placeholder
+                                        const std::vector<Eigen::Vector2d>& polygon) {
+    if (polygon.size() < 3) return false;
+    
+    int intersections = 0;
+    size_t j = polygon.size() - 1;
+    
+    // 使用射线投射算法
+    for (size_t i = 0; i < polygon.size(); i++) {
+        // 检查点是否在多边形边界上
+        if ((polygon[i][1] > point[1]) != (polygon[j][1] > point[1])) {
+            double slope = (polygon[j][0] - polygon[i][0]) * (point[1] - polygon[i][1]) /
+                         (polygon[j][1] - polygon[i][1]) + polygon[i][0];
+            
+            if (point[0] < slope)
+                intersections++;
+        }
+        j = i;
+    }
+    
+    // 奇数个交点表示点在多边形内部
+    return (intersections % 2) == 1;
 }

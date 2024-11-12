@@ -63,8 +63,8 @@ def generate_launch_description():
         
         Node(
             package='area_graph_data_parser',
-            executable='data_process',
-            name='data_process',
+            executable='topology_publisher',
+            name='topology_publisher',
             output='screen',
         ),
     ])

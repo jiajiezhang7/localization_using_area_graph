@@ -80,7 +80,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 
 class CloudInitializer : public CloudBase {
 public:
@@ -106,7 +106,7 @@ public:
     std::ofstream rescueRoomStream;
 
     // ROS2 Subscriptions and Publishers
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud>::SharedPtr subInitialGuess;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotGuessMarker;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotPoseAfterICP;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubCurrentMaxRobotPose;
@@ -115,8 +115,8 @@ public:
     geometry_msgs::msg::PointStamped robotGuess;
 
     // Constructor and Destructor
-    CloudInitializer();
-    ~CloudInitializer();
+    explicit CloudInitializer();
+    ~CloudInitializer() override = default;
 
     // Core functionality methods
     void setLaserCloudin(pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing_,
@@ -129,7 +129,7 @@ public:
     void checkingGuess();
 
     // Point cloud processing methods
-    void checkWholeMap(const pcl::PointXYZI& PCPoint,
+    bool checkWholeMap(const pcl::PointXYZI& PCPoint,
                       const pcl::PointXYZI& PosePoint,
                       int horizonIndex,
                       double& minDist,
@@ -150,10 +150,13 @@ public:
     void initializationICP(int insideAGIndex);
     bool checkICPmovingDist(Eigen::Matrix4f robotPoseGuess);
     bool insideOldArea(int mapPCindex);
-
-private:
     // Callback methods
-    void getInitialExtGuess(const sensor_msgs::msg::PointCloud::SharedPtr laserCloudMsg);
+    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
+private:
+
+    // 添加成员变量
+    double intersectionx;
+    double intersectiony;
 
     // Publisher initialization
     void initializePublishers() {
@@ -173,7 +176,7 @@ private:
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
-        subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud>(
+        subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudInitializer::getInitialExtGuess, this, std::placeholders::_1));
     }

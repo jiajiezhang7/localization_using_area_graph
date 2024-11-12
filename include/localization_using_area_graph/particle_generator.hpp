@@ -14,7 +14,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <shapely_geometry.hpp> // 需要实现或找到替代的几何库
+#include <pcl/common/geometry.h>
+#include <pcl/common/common.h>
 #include <vector>
 #include <random>
 

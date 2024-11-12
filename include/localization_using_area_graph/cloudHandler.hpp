@@ -35,33 +35,6 @@
  *          - Updated transform system to TF2
  *          - Improved thread safety
  *
- * @note This class inherits from CloudBase and uses CloudInitializer for
- *       initial pose estimation. It implements the core AGLoc algorithm described in:
- *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
- * 
- * @dependencies
- *          - CloudBase - Base class providing common functionality
- *          - CloudInitializer - Global localization implementation
- *          - PCL - Point Cloud processing
- *          - Eigen - Matrix operations
- *          - OpenCV - Visualization
- *          - Message Filters - Point cloud synchronization
- *
- * @usage Example usage:
- * ```cpp
- * auto node = std::make_shared<CloudHandler>();
- * rclcpp::spin(node);
- * ```
- *
- * @warning This implementation assumes:
- *          - 3D LiDAR with dense point clouds (e.g., 64 beams)
- *          - Area Graph map with well-defined polygons
- *          - Sufficient wall visibility for localization
- * 
- * @see cloudBase.hpp, cloudInitializer.hpp, utility.hpp
- *
- * @copyright Copyright (c) 2024, ShanghaiTech University
- *            All rights reserved.
  */
 #pragma once
 #ifndef _CLOUD_HANDLER_HPP_
@@ -79,13 +52,14 @@
 // Message filters for ROS2
 #include "message_filters/subscriber.h"
 #include "message_filters/synchronizer.h"
-#include "message_filters/sync_policies/approximate_time.hpp"
+// 并没有直接使用消息同步机制，允许各个消息独立处理
+#include "message_filters/sync_policies/approximate_time.h"
 
 class CloudHandler : public CloudBase {
 public:
     // ROS2 Subscribers
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subLaserCloud;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud>::SharedPtr subInitialGuess;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamOdometry;
 
     // ROS2 Publishers
@@ -105,8 +79,8 @@ public:
     bool getGuessOnce;
     int globalImgTimes;
 
-    // Constructor and main functionality
-    CloudHandler();
+    explicit CloudHandler();
+    ~CloudHandler() override = default;
 
     // Point cloud processing methods
     void filterUsefulPoints();
@@ -139,10 +113,12 @@ public:
     void resetParameters() override;
 
 private:
+
+
     // Callback methods
     void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
     void liosamOdometryIncrementalCB(const nav_msgs::msg::Odometry::SharedPtr odomMsg);
-    void getInitialExtGuess(const sensor_msgs::msg::PointCloud::SharedPtr laserCloudMsg);
+    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
 
     // Initialize publishers and subscribers
     void initializePublishers() {
@@ -159,25 +135,32 @@ private:
             pointCloudTopic, qos,
             std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
             
-        subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud>(
+        subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));
             
         subLiosamOdometry = this->create_subscription<nav_msgs::msg::Odometry>(
             "/lio_sam/mapping/odometry", qos,
             std::bind(&CloudHandler::liosamOdometryIncrementalCB, this, std::placeholders::_1));
+
+        subLiosamodometry_incremental = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/lio_sam/mapping/odometry_incremental", qos,
+            std::bind(&CloudHandler::liosamOdometryIncrementalCB, 
+                     this, 
+                     std::placeholders::_1));
     }
 
     // Initialize variables
     void initializeVariables() {
+        // Initialize time tracking
+        sumFrameRunTime = std::chrono::steady_clock::now();
         insideAreaStartIndex = 0;
         insideAreaID = 0;
         numofFrame = 0;
         getGuessOnce = false;
         globalImgTimes = 0;
         
-        // Initialize time tracking
-        sumFrameRunTime = std::chrono::steady_clock::now();
+
     }
 
 protected:

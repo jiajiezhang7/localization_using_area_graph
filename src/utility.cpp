@@ -55,7 +55,7 @@
  *            All rights reserved.
  */
 
-#include "utility.hpp"
+#include "localization_using_area_graph/utility.hpp"
 
 ParamServer::ParamServer(const std::string& node_name) 
     : Node(node_name), 
@@ -149,16 +149,22 @@ void ParamServer::get_parameters() {
     this->get_parameter("mapExtrinsicTrans", mapextTransV);
 
     if(!extRotV.empty()) {
+        // 创建临时vector来存储转换后的float数据
+        std::vector<float> extRotVFloat(extRotV.begin(), extRotV.end());
         initialExtRot = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
-            extRotV.data(), 3, 3);
+            extRotVFloat.data(), 3, 3);
     }
+    
     if(!extTransV.empty()) {
+        std::vector<float> extTransVFloat(extTransV.begin(), extTransV.end());
         initialExtTrans = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
-            extTransV.data(), 3, 1);
+            extTransVFloat.data(), 3, 1);
     }
+    
     if(!mapextTransV.empty()) {
+        std::vector<float> mapextTransVFloat(mapextTransV.begin(), mapextTransV.end());
         mapExtTrans = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
-            mapextTransV.data(), 3, 1);
+            mapextTransVFloat.data(), 3, 1);
     }
 
     this->get_parameter("initialYawAngle", initialYawAngle);
@@ -347,8 +353,9 @@ void ParamServer::getPCA(Eigen::Vector3f& eigen_values,
     eigen_vector = pca.getEigenVectors();
     RCLCPP_INFO(this->get_logger(), "pca eigen_values %f",
                 eigen_values(1)/eigen_values(0));
-    RCLCPP_INFO(this->get_logger(), "pca eigen_vector\n%s",
-                eigen_vector.format(Eigen::IOFormat()).c_str());
+    std::stringstream ss;
+    ss << eigen_vector.format(Eigen::IOFormat());
+    RCLCPP_INFO(this->get_logger(), "pca eigen_vector\n%s", ss.str().c_str());
     bPCA = true;
 }
 
