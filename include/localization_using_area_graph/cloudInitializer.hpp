@@ -85,8 +85,9 @@
 class CloudInitializer : public CloudBase {
 public:
     // Transform and scoring variables
-    Eigen::Matrix4f MaxRobotPose;
-    double MaxScore;
+    Eigen::Matrix4f MaxRobotPose;                    // 最佳位姿估计
+    double MaxScore;                                 // 最佳得分
+    bool bGuessReady;                                // 粒子初始化就绪标志
 
     // Vectors for ray intersection calculation
     std::vector<int> numofIntersection;     // Record ray intersections with map
@@ -98,7 +99,7 @@ public:
     int numofInsidePoints;
     int numofOutsidePoints;
     double turkeyScore;
-    bool bGuessReady;
+
     int rescueTimes;
     double rescueRunTime;
 

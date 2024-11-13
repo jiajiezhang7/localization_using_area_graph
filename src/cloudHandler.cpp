@@ -186,8 +186,9 @@ CloudHandler::CloudHandler()
     LiosamPoseTum << std::fixed;
     LiosamPoseTum.precision(6);
 
-    // Initialize memory and set initial pose
+
     allocateMemory();
+    // 从params.yaml初始化固定位姿
     setInitialPose(initialYawAngle, initialExtTrans);
 
     RCLCPP_WARN(get_logger(), "CLOUD HANDLER READY");
@@ -276,8 +277,8 @@ void CloudHandler::cloudHandlerCB(
         errorLowThredCurr = errorLowThredInit;
     }
 
-    // Handle rescue robot test mode
-    if(bTestRescue) {
+    // 模式1 测试全局定位的效果 --- 每帧都用于执行全局定位
+    if(bTestRescue) {  
         RCLCPP_WARN(get_logger(), "TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE");
         
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
@@ -297,7 +298,7 @@ void CloudHandler::cloudHandlerCB(
         resetParameters();
         return;
     }
-    // Handle rescue robot mode
+    // 模式2 Handle rescue robot mode 论文中所描述的模式 --- 全局定位（仅执行一次解决机器人绑架）+位姿跟踪
     else if(bRescueRobot) {
         if(!getGuessOnce) {
             return;
@@ -331,7 +332,7 @@ void CloudHandler::cloudHandlerCB(
                                  this, std::placeholders::_1));
         return;
     }
-    // Normal operation mode
+    // 模式3 仅PoseTracking模式 -- 使用 params.yaml中的固定初始位姿，只执行后续的位姿跟踪
     else {
         if(getGuessOnce) {
             robotPose = cloudInitializer.MaxRobotPose;
@@ -349,7 +350,8 @@ void CloudHandler::cloudHandlerCB(
 
         RCLCPP_WARN(get_logger(), "NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML");
         
-        // Transform pointcloud
+        // 直接使用 robotPose 进行跟踪，没有任何评估或优化步骤
+        // TODO 这里的robotPose的值从哪里来？
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);
         RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]", 
                     robotPose(0,3), robotPose(1,3));

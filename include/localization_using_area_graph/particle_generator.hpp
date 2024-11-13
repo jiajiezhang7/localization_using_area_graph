@@ -26,15 +26,16 @@ public:
 
 private:
     // Parameters
-    double step_;              // particle generation step size
-    double radius_;           // search radius
+    double step_;              // particle generation step size 粒子采样步长
+    double radius_;           // search radius 搜索半径
     bool bRescueRobot_;      // rescue robot mode flag
     std::vector<std::vector<Eigen::Vector2d>> AGmaps_; // Area Graph map data
     
     // Publishers & Subscribers
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr particle_pub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr agmap_sub_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr particle_pub_;        // 发布采样得到的
+
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;       // 订阅雷达点云话题
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr agmap_sub_;       // 订阅 ag_map (/pubAGMapTransformedPC)
 
     // Callbacks
     void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);

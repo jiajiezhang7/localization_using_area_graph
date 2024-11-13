@@ -160,11 +160,10 @@ void CloudInitializer::getInitialExtGuess(
     
     RCLCPP_WARN(this->get_logger(), "CloudInitializer GETTING INITIAL GUESS");
 
+    // 处理 particle_generator 提供的初始粒子
     // 将ROS2 PointCloud2消息转换为PCL点云
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromROSMsg(*laserCloudMsg, *cloud);
-
-    // 获取点云大小 - 使用转换后的PCL点云的size
     int GuessSize = cloud->points.size();
 
     // 清空corridorGuess向量为新的数据做准备

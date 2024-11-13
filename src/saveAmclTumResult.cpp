@@ -38,7 +38,7 @@
  * ```
  *
  * @note Output file location: 
- *       /home/xiefujing/research/area_graph/ws/robotPoseResult/AmclTumResult.txt
+ *       /home/jay/AGLoc_ws/robotPoseResult/AmclTumResult.txt
  *
  * @warning Ensure write permissions for output directory
  *          Existing file will be appended to, not overwritten
@@ -61,7 +61,7 @@ public:
         // Initialize output file stream
         ofs_.setf(std::ios::fixed);
         ofs_.precision(6);
-        ofs_.open("/home/xiefujing/research/area_graph/ws/robotPoseResult/AmclTumResult.txt", 
+        ofs_.open("/home/jay/AGLoc_ws/robotPoseResult/AmclTumResult.txt", 
                   std::ofstream::app);
 
         if(!ofs_.is_open()) {

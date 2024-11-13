@@ -33,9 +33,9 @@
 class CloudBase : public ParamServer {
 public:
     // ROS2 Subscribers
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMap;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapInit;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMap;               //订阅 /mapPC     --- from map_handler
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;             //订阅 /mapPC_AG  --- from topology_publisher (area_graph_data_parser)
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapInit;           //订阅 /AGindex   --- from topology_publisher (area_graph_data_parser)
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental;
@@ -182,18 +182,22 @@ public:
 
     // 将默认构造函数改为接受节点名的构造函数
     explicit CloudBase(const std::string& node_name);
+    
     // 添加虚析构函数
     virtual ~CloudBase() = default;
-    // BASE functions
+
+    // 处理map相关info的回调函数
     void mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
+    void mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
+    void AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg);
+
     void organizePointcloud();
     void setInitialPose(double initialYawAngle, Eigen::Vector3f initialExtTrans);
     void pubPclCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud,
                     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub,
                     std_msgs::msg::Header* cloudHeader);
     void setEveryFrame();
-    void mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
-    void AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg);
+
     bool areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex);
     geometry_msgs::msg::PoseStamped transformLiosamPath(const nav_msgs::msg::Path& pathMsg);
     geometry_msgs::msg::Pose transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg);

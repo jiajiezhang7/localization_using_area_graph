@@ -1,9 +1,14 @@
 /**
  * @file map_handler.cpp
- * @brief Implementation of MapHandler class
+ * @brief 加载并发布Area Graph地图数据
  * @author Jiajie Zhang
  * @date 2024-11-09
  */
+
+// 关键点：
+    // - 加载三种地图文件：主地图、初始化地图、走廊扩展地图
+    // - 将地图数据转换为ROS消息并定期发布
+    // - 发布地图可视化markers
 
 #include "localization_using_area_graph/map_handler.hpp"
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -42,6 +47,7 @@ void MapHandler::initializePublishers()
 
 void MapHandler::loadMapData()
 {
+    // 加载三个不同用途的地图文件
     try {
         // Get package share directory
         std::string pkg_dir = ament_index_cpp::get_package_share_directory("localization_using_area_graph");
@@ -71,6 +77,7 @@ void MapHandler::loadMapData()
     }
 }
 
+// 这个函数，把所谓的三个不同形式的map文件，读取为了一系列 3d points
 bool MapHandler::loadMapDataFromFile(const std::string& filename, 
                                    std::vector<Eigen::Vector3d>& points)
 {

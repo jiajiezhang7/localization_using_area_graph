@@ -1,10 +1,15 @@
 /**
  * @file data_sender.cpp
- * @brief Implementation of DataSender class
+ * @brief 根据指定的时间戳,读取并发布LiDAR数据
  * @author Jiajie Zhang
  * @date 2024-11-09
  */
 
+
+// 关键点：
+    // - 订阅 "doneInit" 话题，等待全局定位完成的信号
+    // - 发布 "/hesai/pandar" 话题的点云数据
+    
 #include "localization_using_area_graph/data_sender.hpp"
 #include <rclcpp/serialization.hpp>
 

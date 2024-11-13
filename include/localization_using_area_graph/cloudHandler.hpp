@@ -70,7 +70,7 @@ public:
 
     // Map related indices
     int insideAreaStartIndex;  // MAP PC index
-    int insideAreaID;          // data structure AGindex index
+    int insideAreaID;          // data structure AGindex
 
     // Processing variables
     std::vector<bool> vbHistogramRemain;

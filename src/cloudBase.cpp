@@ -545,11 +545,11 @@ void CloudBase::setInitialPose(double initialYawAngle, Eigen::Vector3f initialEx
     Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
     transform_initial.translation() << initialExtTrans[0], initialExtTrans[1], initialExtTrans[2];
     
-    // Rotate around Z axis
+    
     transform_initial.rotate(
         Eigen::AngleAxisf(initialYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ())
     );
-    
+    // 仅PoseTracking模式下，直接将yaml中的参数转换为初始位姿矩阵
     robotPose = transform_initial.matrix();
     
     RCLCPP_DEBUG(this->get_logger(), "Initial robot pose set with yaw angle: %f", initialYawAngle);

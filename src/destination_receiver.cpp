@@ -1,10 +1,14 @@
 /**
  * @file destination_receiver.cpp
- * @brief Implementation of DestinationReceiver class
+ * @brief 核心功能：接收RViz中设置的目标点
  * @author Jiajie Zhang
  * @date 2024-11-09
  */
 
+// 关键点：
+    // - 订阅 "/goal_pose" 话题
+    // - 将目标点保存到yaml文件
+    
 #include "localization_using_area_graph/destination_receiver.hpp"
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <cstdio>    // for remove

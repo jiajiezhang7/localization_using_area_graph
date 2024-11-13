@@ -32,7 +32,7 @@ private:
     // Publishers
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr markers_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr map_line_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pointcloud_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pointcloud_pub_;      // 發佈 mapPC話題
 
     // Timer for periodic publishing
     rclcpp::TimerBase::SharedPtr timer_;

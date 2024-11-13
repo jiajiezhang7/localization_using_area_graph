@@ -1,9 +1,14 @@
 /**
  * @file particle_generator.cpp
- * @brief Implementation of ParticleGenerator class
+ * @brief 核心功能：为全局定位生成初始粒子猜测
  * @author Jiajie Zhang
  * @date 2024-11-09
  */
+
+// 关键点：
+    // - 根据WiFi定位的粗略位置生成候选粒子
+    // - 对每个粒子检查是否在Area Graph的有效区域内
+    // - 发布 "/particles_for_init" 话题
 
 #include "localization_using_area_graph/particle_generator.hpp"
 
@@ -22,13 +27,17 @@ ParticleGenerator::ParticleGenerator()
 void ParticleGenerator::initializeParameters() 
 {
     // Declare and get parameters
-    this->declare_parameter("step", 2.0);
-    this->declare_parameter("radius", 6.0);
+    this->declare_parameter("step", 2.0);  // 粒子采样步长
+    this->declare_parameter("radius", 6.0);  //搜索半径
     this->declare_parameter("bRescueRobot", false);
-    
-    step_ = this->get_parameter("step").as_double();
-    radius_ = this->get_parameter("radius").as_double();
+
+    // 读取参数值
+    step_ = this->get_parameter("particle_generator_step").as_double();
+    radius_ = this->get_parameter("particle_generator_radius").as_double();
     bRescueRobot_ = this->get_parameter("bRescueRobot").as_bool();
+
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters - step: %.2f, radius: %.2f", 
+                step_, radius_);
 }
 
 void ParticleGenerator::initializePublishersSubscribers() 
@@ -36,15 +45,16 @@ void ParticleGenerator::initializePublishersSubscribers()
     // Create QoS profile
     auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
     
-    // Create publisher
+    // 发布用于初始化的采样粒子
     particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud>(
         "/particles_for_init", qos);
         
-    // Create subscribers
+    // 订阅 LiDAR 点云话题
     lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/hesai/pandar", qos,
         std::bind(&ParticleGenerator::lidarCallback, this, std::placeholders::_1));
-        
+    
+    // TODO 这是什么话题？有什么用？
     agmap_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/pubAGMapTransformedPC", qos,
         std::bind(&ParticleGenerator::agmapCallback, this, std::placeholders::_1));
@@ -63,15 +73,15 @@ void ParticleGenerator::loadMapData()
 
 void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) 
 {
-    // Get ground truth center (for testing purposes)
-    // In real application, this would come from WiFi localization
+    // 获取ground truth中心(测试用途)
+    // 在实际应用中，这应该来自WiFi定位 TODO 待MaXu部分完成后，接入WiFi接口
     std::array<double, 2> gt_center = {0.0, 0.0};  // placeholder
     
-    // Add noise to ground truth center
+    // 添加噪声
     gt_center[0] += 0.25 * dist_(gen_);
     gt_center[1] += 0.25 * dist_(gen_);
     
-    // Generate and publish particles
+    // 生成并发布粒子
     generateParticles(msg->header.stamp, gt_center);
 }
 
@@ -83,23 +93,23 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     particles_msg.header.frame_id = "map";
     particles_msg.header.stamp = stamp;
     
-    // Create circle around ground truth center
+    // 在ground truth中心周围生成圆形搜索区域内的粒子
     for (double x = gt_center[0] - radius_; x <= gt_center[0] + radius_; x += 1.0/step_) {
         for (double y = gt_center[1] - radius_; y <= gt_center[1] + radius_; y += 1.0/step_) {
             Eigen::Vector2d point(x, y);
             
-            // Check if point is within search circle
+            // 检查生成的粒子是否在搜索圆内
             if ((point - Eigen::Vector2d(gt_center[0], gt_center[1])).norm() > radius_) {
                 continue;
             }
             
-            // Check intersection with all areas
+            // 检查每个粒子是否在Area Graph的有效区域内
             for (size_t i = 0; i < AGmaps_.size(); i++) {
                 if (checkIntersection(point, AGmaps_[i])) {
                     geometry_msgs::msg::Point32 p;
                     p.x = x;
                     p.y = y;
-                    p.z = i;  // Area index
+                    p.z = i;  // Area index 区域索引
                     particles_msg.points.push_back(p);
                 }
             }
