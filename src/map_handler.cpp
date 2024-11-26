@@ -41,8 +41,10 @@ void MapHandler::initializePublishers()
         "mapMarkers", qos);
     map_line_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
         "mapLine", qos);
-    pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud>(
+    pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/mapPC", qos);
+    init_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "/mapPCInit", qos);
 }
 
 void MapHandler::loadMapData()
@@ -54,19 +56,19 @@ void MapHandler::loadMapData()
         
         // TODO 硬编码路径问题
         // Load main map data
-        std::string map_file = "/home/jay/AGLoc_ws/map/picking_list_star_center.txt";
+        std::string map_file = "/home/johnnylin/AGLoc_ws/map/picking_list_star_center.txt";
         if (!loadMapDataFromFile(map_file, map_points_)) {
             throw std::runtime_error("Failed to load main map file");
         }
 
         // Load initialization map data
-        std::string init_file = pkg_dir + "/home/jay/AGLoc_ws/map/picking_list_star_center_initialization.txt";
+        std::string init_file = "/home/johnnylin/AGLoc_ws/map/picking_list_star_center_initialization.txt";
         if (!loadMapDataFromFile(init_file, map_init_points_)) {
             throw std::runtime_error("Failed to load initialization map file");
         }
 
         // Load corridor map data
-        std::string corridor_file = pkg_dir + "/home/jay/AGLoc_ws/map/corridor_enlarge.txt";
+        std::string corridor_file = "/home/johnnylin/AGLoc_ws/map/corridor_enlarge.txt";
         if (!loadMapDataFromFile(corridor_file, map_corridor_points_)) {
             throw std::runtime_error("Failed to load corridor map file");
         }
@@ -77,7 +79,6 @@ void MapHandler::loadMapData()
     }
 }
 
-// 这个函数，把所谓的三个不同形式的map文件，读取为了一系列 3d points
 bool MapHandler::loadMapDataFromFile(const std::string& filename, 
                                    std::vector<Eigen::Vector3d>& points)
 {
@@ -101,6 +102,31 @@ bool MapHandler::loadMapDataFromFile(const std::string& filename,
     return true;
 }
 
+void MapHandler::convertToPointCloud2Message(
+    const std::vector<Eigen::Vector3d>& points,
+    sensor_msgs::msg::PointCloud2& cloud_msg)
+{
+    // 创建PCL点云
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl_cloud->points.resize(points.size());
+    
+    // 填充点云数据
+    for(size_t i = 0; i < points.size(); i++) {
+        pcl_cloud->points[i].x = points[i].x();
+        pcl_cloud->points[i].y = points[i].y();
+        pcl_cloud->points[i].z = 0.0;
+    }
+
+    // 设置点云基本属性
+    pcl_cloud->width = points.size();
+    pcl_cloud->height = 1;
+    pcl_cloud->is_dense = true;
+
+    // 转换为ROS2消息
+    pcl::toROSMsg(*pcl_cloud, cloud_msg);
+    cloud_msg.header.frame_id = "map";
+}
+
 void MapHandler::createMapMarkers()
 {
     // Create marker for map lines
@@ -110,10 +136,10 @@ void MapHandler::createMapMarkers()
     map_line_markers_.color.b = 1.0;
     map_line_markers_.color.a = 1.0;
 
-    // Create point cloud messages
-    map_pc_.header.frame_id = "map";
-    map_pc_init_.header.frame_id = "map";
-    corridor_enlarge_pc_.header.frame_id = "map";
+    // Convert point clouds from Eigen vectors to PointCloud2 messages
+    convertToPointCloud2Message(map_points_, map_pc_);
+    convertToPointCloud2Message(map_init_points_, map_pc_init_);
+    convertToPointCloud2Message(map_corridor_points_, corridor_enlarge_pc_);
 
     // Create markers for map points
     for (size_t i = 0; i < map_points_.size(); ++i) {
@@ -126,19 +152,6 @@ void MapHandler::createMapMarkers()
         p.y = map_points_[i].y();
         p.z = 0.0;
         map_line_markers_.points.push_back(p);
-
-        // Add point to point cloud
-        map_pc_.points.push_back(createPoint32(map_points_[i]));
-    }
-
-    // Add initialization points
-    for (const auto& point : map_init_points_) {
-        map_pc_init_.points.push_back(createPoint32(point));
-    }
-
-    // Add corridor points
-    for (const auto& point : map_corridor_points_) {
-        corridor_enlarge_pc_.points.push_back(createPoint32(point));
     }
 }
 
@@ -178,9 +191,17 @@ void MapHandler::timerCallback()
 {
     // Update timestamp
     auto current_time = this->now();
+    
+    // Update timestamps for all messages
     map_pc_.header.stamp = current_time;
     map_pc_init_.header.stamp = current_time;
     corridor_enlarge_pc_.header.stamp = current_time;
+
+    // Update marker timestamps
+    for (auto& marker : map_markers_.markers) {
+        marker.header.stamp = current_time;
+    }
+    map_line_markers_.header.stamp = current_time;
 
     // Publish markers
     markers_pub_->publish(map_markers_);
@@ -188,13 +209,22 @@ void MapHandler::timerCallback()
 
     // Publish point clouds
     RCLCPP_DEBUG(this->get_logger(), "Sending map pc from map handler");
-    pointcloud_pub_->publish(map_pc_);
+    pointcloud_pub_->publish(map_pc_);         // 发布主地图点云
+    init_pointcloud_pub_->publish(map_pc_init_); // 发布初始化点云
 }
 
 void MapHandler::initializeMapMessages()
 {
-    // Initialize headers
+    // Initialize all message headers
     auto current_time = this->now();
+    
+    // Initialize marker timestamps
+    for (auto& marker : map_markers_.markers) {
+        marker.header.stamp = current_time;
+    }
+    map_line_markers_.header.stamp = current_time;
+    
+    // Initialize point cloud timestamps
     map_pc_.header.stamp = current_time;
     map_pc_init_.header.stamp = current_time;
     corridor_enlarge_pc_.header.stamp = current_time;

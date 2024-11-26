@@ -1,6 +1,6 @@
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, SetParameter
+from launch_ros.actions import Node, SetParameter
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition 
@@ -9,9 +9,17 @@ import os
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('localization_using_area_graph')
-    
-    # Declare parameters
+    topology_pkg_dir = get_package_share_directory('area_graph_data_parser')
+
+    bag_file_arg = DeclareLaunchArgument(
+        'bag_file',
+        default_value='/home/johnnylin/AGLoc_ws/bags/0524',  # 注意不需要.db3后缀
+        description='Path to ROS2 bag file (without .db3 extension)'
+    )
+
+    osm_file = os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_1plus2_D.osm')
     params_file = os.path.join(pkg_dir, 'config', 'params.yaml')
+
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
         default_value='false',
@@ -36,15 +44,15 @@ def generate_launch_description():
         use_sim_time_arg,
         use_sim_time_param,
         use_global_localization_arg,
-        
+        bag_file_arg,
         # RViz2
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', os.path.join(pkg_dir, 'config', 'areaGraphRviz.rviz')],
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
-        ),
+        # Node(
+        #     package='rviz2',
+        #     executable='rviz2',
+        #     name='rviz2',
+        #     arguments=['-d', os.path.join(pkg_dir, 'config', 'areaGraphRviz.rviz')],
+        #     parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        # ),
 
         # Static transforms
         Node(
@@ -75,7 +83,8 @@ def generate_launch_description():
             package='area_graph_data_parser',
             executable='topology_publisher',
             name='topology_publisher',
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time'),
+                         'osm_file': osm_file}],
             output='screen',
         ),
 
@@ -98,11 +107,11 @@ def generate_launch_description():
             name='data_sender',
             parameters=[{
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
-                # TODO 需要一个rosbag
-                'bag_file': 'path/to/your.bag',
+                'bag_file': LaunchConfiguration('bag_file'),  # 使用launch参数
                 'start_timestamp': 0.0,
-                'frequency': 10
-                }],
+                'frequency': 10,
+                'storage_id': 'sqlite3'  # 添加存储格式参数
+            }],
             output='screen',
         ),
 

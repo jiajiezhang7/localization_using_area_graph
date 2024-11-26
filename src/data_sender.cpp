@@ -38,7 +38,8 @@ void DataSender::initializeParameters()
     this->declare_parameter("bag_file", "");
     this->declare_parameter("start_timestamp", 0.0);
     this->declare_parameter("frequency", 10);
-    
+    this->declare_parameter("storage_id", "sqlite3");
+
     bag_file_ = this->get_parameter("bag_file").as_string();
     start_timestamp_ = this->get_parameter("start_timestamp").as_double();
     freq_ = this->get_parameter("frequency").as_int();

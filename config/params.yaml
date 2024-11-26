@@ -1,168 +1,171 @@
-# LiDAR配置参数
-# 这些参数主要在cloudBase.cpp的organizePointcloud()函数中使用，用于:
-    # 点云数据的预处理和组织
-    # 过滤无效点
-    # 实现论文中的"clutter removal"步骤
+/**:
+    ros__parameters:
+        # LiDAR配置参数
+        # 这些参数主要在cloudBase.cpp的organizePointcloud()函数中使用，用于:
+        # 点云数据的预处理和组织
+        # 过滤无效点
+        # 实现论文中的"clutter removal"步骤
+        pointCloudTopic: "/hesai/pandar"            # Point cloud topic
+        N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
+        Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
+        downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
+        downsampleRateHorizontal: 1                 # 水平方向降采样率
+        lidarMinRange: 0.1                          # 最小有效距离 default: 1.0, minimum lidar range to be used
+        lidarMaxRange: 1000.0                       # 最大有效距离 default: 1000.0, maximum lidar range to be used
+        N_ceiling: 28                               # 天花板点云过滤阈值 from up to down, which beam may hit ceiling, used to delete ceiling points
+        # ----------------------------------------------------
 
-pointCloudTopic: "/hesai/pandar"            # Point cloud topic
-N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
-Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
-downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
-downsampleRateHorizontal: 1                 # 水平方向降采样率
-lidarMinRange: 0.1                          # 最小有效距离 default: 1.0, minimum lidar range to be used
-lidarMaxRange: 1000.0                       # 最大有效距离 default: 1000.0, maximum lidar range to be used
-N_ceiling: 28                               # 天花板点云过滤阈值 from up to down, which beam may hit ceiling, used to delete ceiling points
-# ----------------------------------------------------
+        # 全局定位参数
+        # 这些参数实现了论文III.D节"Guess Scoring"中的误差阈值：
+            # 在cloudInitializer.cpp的rescueRobot()函数中用于全局定位
+            # 在cloudHandler.cpp的filterUsefulPoints()中用于pose tracking
+            # 较大的Init阈值用于处理较大的初始误差
+            # 较小的跟踪阈值用于精确定位
 
-# 全局定位参数
-# 这些参数实现了论文III.D节"Guess Scoring"中的误差阈值：
-    # 在cloudInitializer.cpp的rescueRobot()函数中用于全局定位
-    # 在cloudHandler.cpp的filterUsefulPoints()中用于pose tracking
-    # 较大的Init阈值用于处理较大的初始误差
-    # 较小的跟踪阈值用于精确定位
+        # this is for initialization only, when with big initial error
+        errorUpThredInit: 9.0                       # 全局定位时，外部点的阈值
+        errorLowThredInit: 1.0                      # 全局定位时，内部点的阈值
+        # do not set too big, since robot can see through doors.
+        errorUpThred: 1.0 #5 #1.2 #1.8 if outside, bigger  # 跟踪定位时外部点阈值 
+        errorLowThred: 0.8 #1.0 #1.2                       # 跟踪定位时内部点阈值
+        # -----------------------------------------------------
 
-# this is for initialization only, when with big initial error
-errorUpThredInit: 9.0                       # 全局定位时，外部点的阈值
-errorLowThredInit: 1.0                      # 全局定位时，内部点的阈值
-# do not set too big, since robot can see through doors.
-errorUpThred: 1.0 #5 #1.2 #1.8 if outside, bigger  # 跟踪定位时外部点阈值 
-errorLowThred: 0.8 #1.0 #1.2                       # 跟踪定位时内部点阈值
-# -----------------------------------------------------
+        # 外参和初始姿态
+        # 这些参数在cloudBase.cpp的以下函数中使用：
+            # setInitialPose()：设置机器人初始姿态
+            # mapAGCB()：处理地图坐标变换
 
-# 外参和初始姿态
-# 这些参数在cloudBase.cpp的以下函数中使用：
-    # setInitialPose()：设置机器人初始姿态
-    # mapAGCB()：处理地图坐标变换
+        # # Extrinsics (lidar -> IMU)
+        # lidar to map
+        # # 0510 bag
+        # mapExtrinsicTrans: [9.8,-34.3, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]            # 地图到真实世界的平移
+        # initialYawAngle: 10.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90                       # 初始偏航角
+        # initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0]     # 初始位置猜测 （本应由WiFi给出）
+        # mapYawAngle: -81.0 #0510                                                                      # 地图旋转角度
 
-# # Extrinsics (lidar -> IMU)
-# lidar to map
-# # 0510 bag
-mapExtrinsicTrans: [9.8,-34.3, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]            # 地图到真实世界的平移
-initialYawAngle: 10 # 247 #174 #184 #corridor:180 # 20 #43     20s:90                       # 初始偏航角
-initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0]     # 初始位置猜测 （本应由WiFi给出）
-mapYawAngle: -81 #0510                                                                      # 地图旋转角度
+        #  0524 bag
+        initialExtrinsicTrans: [-1.0,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
+        initialYawAngle: 180.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
+        # transform ag to nearly zero
+        mapExtrinsicTrans: [146.0,-64.0, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
+        mapYawAngle: 0.0 #0524
 
-#  0524 bag
-# initialExtrinsicTrans: [-1,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
-# initialYawAngle: 180 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
-# # transform ag to nearly zero
-# mapExtrinsicTrans: [146,-64, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
-# mapYawAngle: 0 #0524
+        # initialExtrinsicRot: [0.7071068, -0.7071068, 0,
+        #                 0.7071068, 0.7071068, 0,
+        #                 0, 0, 1]
+        # initialExtrinsicRot: [0.731, -0.682, 0,
+        # 0.682, 0.731, 0,
+        # 0, 0, 1]
+        initialExtrinsicRot: [1.0 ,0.0, 0.0, 
+                                0.0,1.0, 0.0, 
+                                0.0, 0.0, 1.0]                                    
+        # -------------------------------------------------
 
-# initialExtrinsicRot: [0.7071068, -0.7071068, 0,
-#                 0.7071068, 0.7071068, 0,
-#                 0, 0, 1]
-# initialExtrinsicRot: [0.731, -0.682, 0,
-# 0.682, 0.731, 0,
-# 0, 0, 1]
-initialExtrinsicRot: [1,0, 0, 0, 1, 0, 0, 0, 1]                                    
-# -------------------------------------------------
-
-opti: true
-##LBFGS para
-mem_size: 8
-g_epsilon: 1.0e-3
-past: 3
-delta: 1.0e-3
-max_iterations : 10
-max_linesearch: 8
-min_step : 1.0e-20
-max_step: 1.0
-f_dec_coeff : 1.0e-4
-s_curv_coeff : 0.9
-cautious_factor: 1.0e-6
-machine_prec : 1.0e-16
-
-
-
-# ICP参数
-# 这些参数实现了论文III.F节"Pose Tracking via weighted point-to-line ICP"中的算法，主要在：
-    # cloudHandler.cpp的optimizationICP()中使用
-    # cloudInitializer.cpp的initializationICP()中使用
-
-translation_thres: 0.01                # 平移阈值
-icp_iteration: 15 #10                  # 常规ICP迭代次数
-icp_init_iteration: 40 #180            # 初始化时ICP迭代次数
-icp_stop_translation_thred: 0.01       # ICP停止的平移阈值
-icp_stop_rotation_thred: 0.01 # 0.01   # ICP停止的旋转阈值
-# bool for using weight in icp
-use_weight: false                      # 是否使用权重
+        opti: true
+        ##LBFGS para
+        mem_size: 8
+        g_epsilon: 1.0e-3
+        past: 3
+        delta: 1.0e-3
+        max_iterations : 10
+        max_linesearch: 8
+        min_step : 1.0e-20
+        max_step: 1.0
+        f_dec_coeff : 1.0e-4
+        s_curv_coeff : 0.9
+        cautious_factor: 1.0e-6
+        machine_prec : 1.0e-16
 
 
 
-# 走廊检测参数
-# 这些参数实现了论文III.G节"Corridorness Optimization"，在：
-    # cloudHandler.cpp的mergeMapHistogram()函数中使用
-    # 用于解决走廊环境中的特殊定位问题
+        # ICP参数
+        # 这些参数实现了论文III.F节"Pose Tracking via weighted point-to-line ICP"中的算法，主要在：
+            # cloudHandler.cpp的optimizationICP()中使用
+            # cloudInitializer.cpp的initializationICP()中使用
 
-detect_corridor: false                 # 是否启用走廊检测
-maxPercentageCorridor: 1               # 最大走廊比例
-corridorDSmaxDist: 8.0                 # 走廊下采样最大距离
-# ---------------------------------------------------------
-
-
-# threshold to tell if icp is initialized or not, if not, err threshold need to be bigger and may need to recaluate intersection with map after reached a certain angle change
-initialized_thred: 20
-#after reach threshold, needs to recalculate intersection with map
-recalIntersectionThred: 1.5 #1.5
-
-# NOT VERY EFFECTIVE
-percentageThred: 0.12
-averDistanceThred: 0.15
-radiusDisthred: 0.1
-# ----------------------------------------------------
-
-# 环境过滤参数
-# 这些参数在cloudBase.cpp的organizePointcloud()中使用，用于：
-    # 过滤掉地面和天花板的点云
-
-groundThred:   -0.3                    # 地面点过滤阈值
-ceilingThred:   2.0 #1.8               # 天花板点过滤阈值
-parallelThred: 15.0                    # 平行线判定阈值
-
-subSample: 5
-# only for check initialization status...
-pause_iter: false
-initialization_imu: false
-diff_angle_init: 150.0
-# without icp initialization 2
-rescue_angle_interval: 2
+        translation_thres: 0.01                # 平移阈值
+        icp_iteration: 15 #10                  # 常规ICP迭代次数
+        icp_init_iteration: 40 #180            # 初始化时ICP迭代次数
+        icp_stop_translation_thred: 0.01       # ICP停止的平移阈值
+        icp_stop_rotation_thred: 0.01 # 0.01   # ICP停止的旋转阈值
+        # bool for using weight in icp
+        use_weight: false                      # 是否使用权重
 
 
 
-# case1: bRescueRobot: true, bTestRescue: true
-                  # test rescue robot, meaning all frames are supposed to get a rescue result
-                  # start sendData in launch
-# case2: bRescueRobot: true, bTestRescue: false
-                  # rescue robot once, then go to nominal localization
-                  # this is how the real robot operate, rescue then localization
-# case3: bRescueRobot: false, bTestRescue: fasle
-                  # given initial pose, only localization, only set initialied in code
+        # 走廊检测参数
+        # 这些参数实现了论文III.G节"Corridorness Optimization"，在：
+            # cloudHandler.cpp的mergeMapHistogram()函数中使用
+            # 用于解决走廊环境中的特殊定位问题
 
-bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
-bTestRescue:  false                  # 是否测试 [全局定位准不准] 模式
+        detect_corridor: false                 # 是否启用走廊检测
+        maxPercentageCorridor: 1.0               # 最大走廊比例
+        corridorDSmaxDist: 8.0                 # 走廊下采样最大距离
+        # ---------------------------------------------------------
 
-# 添加particle_generator参数
-particle_generator_step: 2.0       # 粒子采样步长
-particle_generator_radius: 6.0     # 搜索半径(米)
-# --------------------------------------------------------
 
-bOnlyScoreParticles: false
-scoreDownsampleRate: 0.4
+        # threshold to tell if icp is initialized or not, if not, err threshold need to be bigger and may need to recaluate intersection with map after reached a certain angle change
+        initialized_thred: 20
+        #after reach threshold, needs to recalculate intersection with map
+        recalIntersectionThred: 1.5 #1.5
 
-# only for testing
-bResultChecking: false
-checkingAngle: 174
-checkingGuessX: 7.25
-checkingGuessY: 35.25
+        # NOT VERY EFFECTIVE
+        percentageThred: 0.12
+        averDistanceThred: 0.15
+        radiusDisthred: 0.1
+        # ----------------------------------------------------
 
-bCHENGNODE: true
-bGenerateResultFile: false
-bFurthestRingTracking: true
-# set to 0 means don't pause
-turkeyPauseThred: 0
+        # 环境过滤参数
+        # 这些参数在cloudBase.cpp的organizePointcloud()中使用，用于：
+            # 过滤掉地面和天花板的点云
 
-# both false, check passage and whole map, for paper experiments
-bAllPassageOpen: false
-bAllPassageClose: false
-bInitializationWithICP: false
+        groundThred:   -0.3                    # 地面点过滤阈值
+        ceilingThred:   2.0 #1.8               # 天花板点过滤阈值
+        parallelThred: 15.0                    # 平行线判定阈值
+
+        subSample: 5
+        # only for check initialization status...
+        pause_iter: false
+        initialization_imu: false
+        diff_angle_init: 150.0
+        # without icp initialization 2
+        rescue_angle_interval: 2.0
+
+
+
+        # case1: bRescueRobot: true, bTestRescue: true
+                        # test rescue robot, meaning all frames are supposed to get a rescue result
+                        # start sendData in launch
+        # case2: bRescueRobot: true, bTestRescue: false
+                        # rescue robot once, then go to nominal localization
+                        # this is how the real robot operate, rescue then localization
+        # case3: bRescueRobot: false, bTestRescue: fasle
+                        # given initial pose, only localization, only set initialied in code
+
+        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bTestRescue:  false                  # 是否测试 [全局定位准不准] 模式
+
+        # 添加particle_generator参数
+        particle_generator_step: 2.0       # 粒子采样步长
+        particle_generator_radius: 6.0     # 搜索半径(米)
+        # --------------------------------------------------------
+
+        bOnlyScoreParticles: false
+        scoreDownsampleRate: 0.4
+
+        # only for testing
+        bResultChecking: false
+        checkingAngle: 174.0
+        checkingGuessX: 7.25
+        checkingGuessY: 35.25
+
+        bCHENGNODE: true
+        bGenerateResultFile: false
+        bFurthestRingTracking: true
+        # set to 0 means don't pause
+        turkeyPauseThred: 0.0
+
+        # both false, check passage and whole map, for paper experiments
+        bAllPassageOpen: false
+        bAllPassageClose: false
+        bInitializationWithICP: false
