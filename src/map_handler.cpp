@@ -47,28 +47,28 @@ void MapHandler::initializePublishers()
         "/mapPCInit", qos);
 }
 
+// 加载三个不同用途的地图文件
 void MapHandler::loadMapData()
 {
-    // 加载三个不同用途的地图文件
     try {
         // Get package share directory
         std::string pkg_dir = ament_index_cpp::get_package_share_directory("localization_using_area_graph");
         
-        // TODO 硬编码路径问题
         // Load main map data
-        std::string map_file = "/home/johnnylin/AGLoc_ws/map/picking_list_star_center.txt";
+        // TODO 这里把绝对路径改写为了pkg_dir + ""形式，竟然就无法正确读取了？
+        std::string map_file = pkg_dir + "/data/map/picking_list_star_center.txt";
         if (!loadMapDataFromFile(map_file, map_points_)) {
             throw std::runtime_error("Failed to load main map file");
         }
 
         // Load initialization map data
-        std::string init_file = "/home/johnnylin/AGLoc_ws/map/picking_list_star_center_initialization.txt";
+        std::string init_file = pkg_dir + "/data/map/picking_list_star_center_initialization.txt";
         if (!loadMapDataFromFile(init_file, map_init_points_)) {
             throw std::runtime_error("Failed to load initialization map file");
         }
 
         // Load corridor map data
-        std::string corridor_file = "/home/johnnylin/AGLoc_ws/map/corridor_enlarge.txt";
+        std::string corridor_file = pkg_dir + "/data/map/corridor_enlarge.txt";
         if (!loadMapDataFromFile(corridor_file, map_corridor_points_)) {
             throw std::runtime_error("Failed to load corridor map file");
         }
@@ -79,6 +79,7 @@ void MapHandler::loadMapData()
     }
 }
 
+// 把每个点的z坐标设置为0的意图：picking_list中选择的点是每个ring距离最远的点，他们当然可能在不同的水平面，而ICP做的是2D的匹配
 bool MapHandler::loadMapDataFromFile(const std::string& filename, 
                                    std::vector<Eigen::Vector3d>& points)
 {

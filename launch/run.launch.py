@@ -13,7 +13,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/johnnylin/AGLoc_ws/bags/0524',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/0524',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file (without .db3 extension)'
     )
 
@@ -46,39 +46,62 @@ def generate_launch_description():
         use_global_localization_arg,
         bag_file_arg,
         # RViz2
-        # Node(
-        #     package='rviz2',
-        #     executable='rviz2',
-        #     name='rviz2',
-        #     arguments=['-d', os.path.join(pkg_dir, 'config', 'areaGraphRviz.rviz')],
-        #     parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
-        # ),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', os.path.join(pkg_dir, 'config', 'localization.rviz')],
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        ),
 
-        # Static transforms
+        # world -> map transform
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='world_map',
-            arguments=['0', '0', '0', '0', '0', '0', '/world', '/map'],
+            arguments=[
+                '--frame-id', 'world',
+                '--child-frame-id', 'map'
+                # 默认值为单位变换，因为我们不需要任何平移和旋转
+            ]
         ),
 
-        # 0510 AG camera base link transform
+
+        # 0524 AG camera base link transform
+        # map -> AGmap transform
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='camera_base_link',
-            arguments=['9.8', '-34.3', '0.0', '0', '0', '-0.649', '0.760', 'map', 'AGmap'],
+            arguments=[
+                '--frame-id', 'map',
+                '--child-frame-id', 'AGmap',
+                '--x', '146.0',
+                '--y', '-64.0',
+                '--z', '0.0'
+                # 没有旋转，使用默认的单位四元数
+            ]
         ),
 
         # PandarQT to map transform
+        # TODO Jiajie 不知道pandarQT和map的坐标系设置有什么用意，但关注到数字和map->AGmap正好是相反的
+        # PandarQT -> map transform
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='pandarqt_map',
-            arguments=['0', '0', '0', '0', '0', '0', 'PandarQT', 'map'],
+            arguments=[
+                '--frame-id', 'PandarQT',
+                '--child-frame-id', 'map',
+                '--x', '-146.0',
+                '--y', '64.0',
+                '--z', '0.0'
+                # 没有旋转，使用默认的单位四元数
+            ]
         ),
 
         # Area Graph Data Parser (formerly data_process)
+        # TODO Jiajie 虽然在这里传了osm_file，但未确认是否源文件有没有使用这个参数（因为我之前碰到的情况是，非得改topology_publisher.cpp中的原文件路径才可以更换文件）
         Node(
             package='area_graph_data_parser',
             executable='topology_publisher',
@@ -98,8 +121,10 @@ def generate_launch_description():
                 {'use_sim_time': LaunchConfiguration('use_sim_time')}
             ],
             output='screen',
+            prefix=['gdb -ex run --args'],  # 添加gdb调试
         ),
 
+        # TODO Jiajie Fujing的run.launch源文件注释掉了，估计是另外窗口播放了rosbag
         # Data Sender node (formerly sendData.py)
         Node(
             package='localization_using_area_graph',
@@ -131,14 +156,16 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # Map Handler node
-        Node(
-            package='localization_using_area_graph',
-            executable='map_handler',
-            name='map_handler',
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
-            output='screen',
-        ),
+        # TODO Fujing的run.launch源文件注释掉了，估计没有再用自己的mapLine和mapMarkers，这意味着三个txt地图文件也不重要了，
+        # 而是全面转向data_process所提供的AG信息，包括可视化和mapPC_AG(这还没找到证据)
+        # Map Handler node，发布话题: /mapLine, /mapMarkers，全部在/map坐标系下
+        # Node(
+        #     package='localization_using_area_graph',
+        #     executable='map_handler',
+        #     name='map_handler',
+        #     parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        #     output='screen',
+        # ),
 
         # Destination Receiver node (formerly getDestinationFromRVIZ.py)
             #  接收RViz中设置的目标点, 订阅 "/goal_pose" 话题, 将目标点保存到yaml文件

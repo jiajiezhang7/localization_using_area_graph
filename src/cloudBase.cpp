@@ -74,7 +74,7 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
     line_strip->id = 1;
     line_strip->action = visualization_msgs::msg::Marker::ADD;
 
-    // Check all map lines of this area
+    // check all map lines of this area, record how many times a ray goes through map polygon to decide if the robot is inside or outside of this area
     for(int i = areaStartIndex; i < areaStartIndex + 1000000; i++) {
         // The end of this area
         if((int)map_pc->points[i].intensity % 3 == 2) {
@@ -299,10 +299,29 @@ void CloudBase::mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudM
     pubMapPC->publish(outMsg);
 }
 
-// 继续修改其他函数...
-
+// AGLoc系统中，地图数据的流向：  topology_publisher -> /mapPC_AG -> CloudBase::mapAGCB() -> CloudBase::mapCB()
 void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
-    RCLCPP_WARN(this->get_logger(), "Receiving map from AG");
+    RCLCPP_INFO(this->get_logger(), "Receiving map from AG");
+
+    // 1. 添加消息字段检查
+    // RCLCPP_INFO(this->get_logger(), "Received message fields:");
+    // for(const auto& field : laserCloudMsg->fields) {
+    //     RCLCPP_INFO(this->get_logger(), "Field: %s, offset: %d, datatype: %d", 
+    //                 field.name.c_str(), field.offset, field.datatype);
+    // }
+
+    // 2. 添加消息基本信息检查
+    // RCLCPP_INFO(this->get_logger(), "Point cloud message info:");
+    // RCLCPP_INFO(this->get_logger(), "Frame ID: %s", laserCloudMsg->header.frame_id.c_str());
+    // RCLCPP_INFO(this->get_logger(), "Width: %d, Height: %d", 
+    //             laserCloudMsg->width, laserCloudMsg->height);
+    // RCLCPP_INFO(this->get_logger(), "Point step: %d, Row step: %d",
+    //             laserCloudMsg->point_step, laserCloudMsg->row_step);
+
+    // mapSize = map_pc->points.size();
+    // RCLCPP_INFO(this->get_logger(), "Current map_pc size: %d", mapSize);
+
+
     mapSize = map_pc->points.size();
 
     // Receive index first, if already received, return
@@ -316,14 +335,37 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMap(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMapTansformed(new pcl::PointCloud<pcl::PointXYZI>());
-    pcl::fromROSMsg(*laserCloudMsg, *laserAGMap);
+
+    try {
+        RCLCPP_INFO(this->get_logger(), "Starting PCL conversion...");
+        pcl::fromROSMsg(*laserCloudMsg, *laserAGMap);
+        RCLCPP_INFO(this->get_logger(), "PCL conversion successful. Points: %zu", 
+                    laserAGMap->points.size());
+
+        // 检查前几个点的数据
+        // for(size_t i = 0; i < std::min(size_t(5), laserAGMap->points.size()); i++) {
+        //     RCLCPP_INFO(this->get_logger(), "Point %zu: x=%.3f, y=%.3f, z=%.3f, intensity=%.3f",
+        //                 i, laserAGMap->points[i].x, laserAGMap->points[i].y,
+        //                 laserAGMap->points[i].z, laserAGMap->points[i].intensity);
+        // }
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "PCL conversion failed: %s", e.what());
+        return;
+    }
    
     Eigen::Matrix4f mapPose = Eigen::Matrix4f::Zero();
     Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
     transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
     transform_initial.rotate(Eigen::AngleAxisf(mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
     mapPose = transform_initial.matrix();
-    pcl::transformPointCloud(*laserAGMap, *laserAGMapTansformed, mapPose);
+
+    try {
+        pcl::transformPointCloud(*laserAGMap, *laserAGMapTansformed, mapPose);
+        RCLCPP_INFO(this->get_logger(), "Point cloud transformation successful");
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Transform failed: %s", e.what());
+        return;
+    }
 
     // Publish transformed point cloud
     sensor_msgs::msg::PointCloud2 outMsg;
@@ -348,6 +390,16 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
             thisPoint.y = laserAGMapTansformed->points[i].y;
             thisPoint.z = laserAGMapTansformed->points[i].z;
             thisPoint.intensity = laserAGMapTansformed->points[i].intensity;
+
+            // 检查intensity的有效性
+            int intensityMod3 = static_cast<int>(thisPoint.intensity) % 3;
+            if(intensityMod3 < 0 || intensityMod3 > 2) {
+                RCLCPP_WARN(this->get_logger(), 
+                            "Invalid intensity value at point %d: %.3f (mod 3 = %d)",
+                            i, thisPoint.intensity, intensityMod3);
+            }
+
+
             map_pc->points[i] = thisPoint;
             mapHistogram.push_back(0);
 
@@ -367,7 +419,7 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
         RCLCPP_INFO(this->get_logger(), "Map center = [%f, %f]", 
                     mapCenterInitialization(0), mapCenterInitialization(1));
         mapInit = true;
-        RCLCPP_WARN(this->get_logger(), "AG Map initialized success, this is the %d map.", 
+        RCLCPP_INFO(this->get_logger(), "AG Map initialized success, this is the %d map.", 
                     mapReceivedTimes);
     }
 
@@ -420,85 +472,174 @@ void CloudBase::checkMapinRay(int ring, int horizonIndex, int& last_index) {
     }
 }
 
-void CloudBase::organizePointcloud() {
-    organizedCloudIn64->resize(64 * Horizon_SCAN);
+bool CloudBase::validatePointCloudParams() {
+    RCLCPP_INFO(get_logger(), "Validating scanner parameters...");
+    RCLCPP_INFO(get_logger(), "N_SCAN: %d", N_SCAN);
+    RCLCPP_INFO(get_logger(), "Horizon_SCAN: %d", Horizon_SCAN);
+    RCLCPP_INFO(get_logger(), "downsampleRate: %d", downsampleRate);
+    
+    if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
+        RCLCPP_ERROR(get_logger(), 
+                     "Invalid scanner parameters: N_SCAN=%d, Horizon_SCAN=%d",
+                     N_SCAN, Horizon_SCAN);
+        return false;
+    }
+    return true;
+}
 
-    if(bFurthestRingTracking) {
-        N_SCAN = 64;
+void CloudBase::logPointCloudStats(const std::string& prefix,
+                                 const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud) {
+    if (!cloud) {
+        RCLCPP_ERROR(get_logger(), "%s: Null point cloud", prefix.c_str());
+        return;
     }
     
-    int cloudSize = laserCloudIn->points.size(); 
-    furthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
-    transformedFurthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
+    RCLCPP_INFO(get_logger(), "%s point cloud stats:", prefix.c_str());
+    RCLCPP_INFO(get_logger(), "  Size: %zu points", cloud->points.size());
+    RCLCPP_INFO(get_logger(), "  Is Dense: %s", cloud->is_dense ? "true" : "false");
+    RCLCPP_INFO(get_logger(), "  Width: %d, Height: %d", cloud->width, cloud->height);
+}
 
-    for (int i = 0; i < cloudSize; ++i) {
-        pcl::PointXYZI thisPoint;
-        thisPoint.x = laserCloudIn->points[i].x;
-        thisPoint.y = laserCloudIn->points[i].y;
-        thisPoint.z = laserCloudIn->points[i].z;
+void CloudBase::logPointStats(const pcl::PointXYZI& point, int rowIdn, int columnIdn) {
+    static int logCount = 0;
+    if (logCount++ % 1000 == 0) {  // 每1000个点记录一次
+        RCLCPP_DEBUG(get_logger(), 
+            "Point stats - Row: %d, Col: %d, Pos:[%.2f, %.2f, %.2f], Int: %.2f",
+            rowIdn, columnIdn, point.x, point.y, point.z, point.intensity);
+    }
+}
 
-        float range_xy = std::sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y);
-        thisPoint.intensity = range_xy;
+void CloudBase::organizePointcloud() {
+    // 1. 首先验证扫描参数
+    if (!validatePointCloudParams()) {
+        return;
+    }
 
-        float range = std::sqrt(thisPoint.x * thisPoint.x + 
-                              thisPoint.y * thisPoint.y + 
-                              thisPoint.z * thisPoint.z);
+    // 2. 记录输入点云统计信息
+    // FIXME: 注意到 laserCloudIn 是 为Velodyne设计的点云类型(PointXYZIRT) -- 包含了额外的时间戳(time)和扫描线(ring)信息
+    //          而 当前的logPointCLoudStats期望接受的数据类型是 PCL标准点类型 -- pcl::PointXYZI
+    // logPointCloudStats("Input", laserCloudIn);
 
-        int rowIdn = laserCloudIn->points[i].ring;
-        if (rowIdn < 0 || rowIdn >= N_SCAN) {
-            RCLCPP_ERROR(this->get_logger(), "WRONG ROW_ID_N, CHECK N_SCAN....");
-            continue;
-        }
-
-        if (rowIdn % downsampleRate != 0) {
-            continue;
-        }
-
-        float horizonAngle = std::atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-        static float ang_res_x = 360.0/float(Horizon_SCAN);
-        int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
+    try {
+        // 3. 初始化数据结构
+        RCLCPP_DEBUG(get_logger(), "Resizing point clouds for organization...");
+        organizedCloudIn64->resize(64 * Horizon_SCAN);
         
-        if (columnIdn >= Horizon_SCAN) {
-            columnIdn -= Horizon_SCAN;
+        if(bFurthestRingTracking) {
+            N_SCAN = 64;
+            RCLCPP_DEBUG(get_logger(), "FurthestRingTracking enabled, N_SCAN set to 64");
         }
-        if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
-            continue;
-        }
+        
+        int cloudSize = laserCloudIn->points.size();
+        furthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
+        transformedFurthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
 
-        int index = columnIdn + rowIdn * Horizon_SCAN;
+        // 4. 处理每个点
+        int validPoints = 0;
+        int filteredPoints = 0;
+        
+        for (int i = 0; i < cloudSize; ++i) {
+            pcl::PointXYZI thisPoint;
+            thisPoint.x = laserCloudIn->points[i].x;
+            thisPoint.y = laserCloudIn->points[i].y;
+            thisPoint.z = laserCloudIn->points[i].z;
 
-        if (range < lidarMinRange || range > lidarMaxRange ||
-            thisPoint.z < groundThred || thisPoint.z > ceilingThred) {
-            thisPoint.x = thisPoint.y = thisPoint.z = thisPoint.intensity = 0;
+            // 5. 计算点的距离信息
+            float range_xy = std::sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y);
+            thisPoint.intensity = range_xy;
+            float range = std::sqrt(range_xy * range_xy + thisPoint.z * thisPoint.z);
+
+            // 6. 获取行索引并验证
+            // FIXME: 我们试图访问Velodyne特有的字段，但rosbag中的话题是hesai/pandar
+            int rowIdn = laserCloudIn->points[i].ring;
+            if (rowIdn < 0 || rowIdn >= N_SCAN) {
+                RCLCPP_ERROR(get_logger(), 
+                    "Invalid ring index %d at point %d [x:%.2f, y:%.2f, z:%.2f]",
+                    rowIdn, i, thisPoint.x, thisPoint.y, thisPoint.z);
+                filteredPoints++;
+                continue;
+            }
+
+            // 7. 应用降采样
+            if (rowIdn % downsampleRate != 0) {
+                filteredPoints++;
+                continue;
+            }
+
+            // 8. 计算列索引
+            float horizonAngle = std::atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+            static float ang_res_x = 360.0/float(Horizon_SCAN);
+            int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
             
-            if(!initialized && bRescueRobot) {
+            // 9. 验证列索引
+            if (columnIdn >= Horizon_SCAN) {
+                columnIdn -= Horizon_SCAN;
+            }
+            if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
+                RCLCPP_DEBUG(get_logger(), 
+                    "Point %d filtered: column index %d out of range", i, columnIdn);
+                filteredPoints++;
+                continue;
+            }
+
+            // 10. 记录点的详细信息
+            logPointStats(thisPoint, rowIdn, columnIdn);
+
+            // 11. 处理点的存储
+            int index = columnIdn + rowIdn * Horizon_SCAN;
+            if (range < lidarMinRange || range > lidarMaxRange ||
+                thisPoint.z < groundThred || thisPoint.z > ceilingThred) {
+                // 清零点并存储
+                thisPoint.x = thisPoint.y = thisPoint.z = thisPoint.intensity = 0;
+                
+                if(!initialized && bRescueRobot) {
+                    organizedCloudIn->points[index%Horizon_SCAN] = thisPoint;
+                } else {
+                    organizedCloudIn->points[index] = thisPoint;
+                    organizedCloudIn64->points[index] = thisPoint;
+                }
+                filteredPoints++;
+                continue;
+            }
+
+            // 12. 存储有效点
+            if((!initialized && bRescueRobot)) {
                 organizedCloudIn->points[index%Horizon_SCAN] = thisPoint;
             } else {
                 organizedCloudIn->points[index] = thisPoint;
                 organizedCloudIn64->points[index] = thisPoint;
             }
-            continue;
+            validPoints++;
+
+            // 13. 更新最远点
+            if(range_xy > furthestRing->points[columnIdn].intensity) {
+                furthestRing->points[columnIdn] = thisPoint;
+                furthestRing->points[columnIdn].intensity = range_xy;
+            }
         }
 
-        if((!initialized && bRescueRobot)) {
-            organizedCloudIn->points[index%Horizon_SCAN] = thisPoint;
-        } else {
-            organizedCloudIn->points[index] = thisPoint;
-            organizedCloudIn64->points[index] = thisPoint;
+        // 14. 记录处理结果
+        RCLCPP_INFO(get_logger(), 
+            "Point cloud organized: %d valid points, %d filtered points",
+            validPoints, filteredPoints);
+
+        // 15. 特殊模式处理
+        if(!initialized && bRescueRobot) {
+            *organizedCloudIn = *furthestRing;
+            RCLCPP_DEBUG(get_logger(), "Rescue mode: Using furthestRing as organizedCloudIn");
+        }
+        if(bFurthestRingTracking) {
+            *organizedCloudIn = *furthestRing;
+            N_SCAN = 1;
+            RCLCPP_DEBUG(get_logger(), "FurthestRingTracking: Reset N_SCAN to 1");
         }
 
-        if(range_xy > furthestRing->points[columnIdn].intensity) {
-            furthestRing->points[columnIdn] = thisPoint;
-            furthestRing->points[columnIdn].intensity = range_xy;
-        }
-    }
+        // 16. 记录输出点云统计信息
+        logPointCloudStats("Organized", organizedCloudIn);
 
-    if(!initialized && bRescueRobot) {
-        *organizedCloudIn = *furthestRing;
-    }
-    if(bFurthestRingTracking) {
-        *organizedCloudIn = *furthestRing;
-        N_SCAN = 1;
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "Error in organizePointcloud: %s", e.what());
+        throw;
     }
 }
 
@@ -592,6 +733,12 @@ void CloudBase::test() {
 
 // 实用工具函数添加
 void CloudBase::allocateMemory() {
+    // 添加前置检查
+    if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
+        RCLCPP_ERROR(get_logger(), "Invalid N_SCAN(%d) or Horizon_SCAN(%d)", 
+                     N_SCAN, Horizon_SCAN);
+        return;
+    }
     // Initialize point cloud pointers
     laserCloudIn.reset(new pcl::PointCloud<PointXYZIRT>());
     organizedCloudIn.reset(new pcl::PointCloud<pcl::PointXYZI>());

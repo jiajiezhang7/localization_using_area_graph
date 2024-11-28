@@ -224,6 +224,15 @@ public:
     double calParticleDist(int ring, int horizonIndex, int& last_index);
     void saveTUMTraj(geometry_msgs::msg::PoseStamped& pose_stamped);
 
+
+protected:
+        // 添加调试辅助函数声明
+    void logPointCloudStats(const std::string& prefix, 
+                           const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud);
+    bool validatePointCloudParams();
+    void logPointStats(const pcl::PointXYZI& point, int rowIdn, int columnIdn);
+
+    
 private:
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));

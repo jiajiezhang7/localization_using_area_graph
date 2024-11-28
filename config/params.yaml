@@ -43,6 +43,7 @@
         # initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0]     # 初始位置猜测 （本应由WiFi给出）
         # mapYawAngle: -81.0 #0510                                                                      # 地图旋转角度
 
+        # Jiajie 现在复现代码做测试所用的是0524的配置
         #  0524 bag
         initialExtrinsicTrans: [-1.0,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
         initialYawAngle: 180.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90

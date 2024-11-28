@@ -82,20 +82,21 @@ double CloudHandler::corridornessDSRate(double maxPercentage) {
     return 10 * maxPercentage - 4;
 }
 
-// Check which area the robot is in currently
+// check robot is now inside which area, a smarter way is to get connected area based on passage
 void CloudHandler::gettingInsideWhichArea() {
     auto insideAreaPC = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
     
     // Check if still in previous area
     if(lastInsideIndex != -1) {
         bool binside = areaInsideChecking(robotPose, lastInsideIndex);
-        
+        // still inside old area
         if(binside) {
             // Still inside old area, collect points for visualization
             for(int j = lastInsideIndex; j < lastInsideIndex + 100000; j++) {
                 if((int)map_pc->points[j].intensity % 3 == 2) {
                     break;
                 }
+                // used for visualization
                 insideAreaPC->points.push_back(map_pc->points[j]);
             }
             
@@ -105,7 +106,7 @@ void CloudHandler::gettingInsideWhichArea() {
             outMsg.header = mapHeader;
             pubinsideAreaPC->publish(outMsg);
             
-            RCLCPP_INFO(get_logger(), "Inside old area");
+            RCLCPP_INFO(get_logger(), "---------------------Inside old area---------------------");
             return;
         }
     }
@@ -130,6 +131,7 @@ void CloudHandler::gettingInsideWhichArea() {
             
             // Collect area points for visualization
             for(size_t j = i; j < static_cast<size_t>(i + 100000) && j < map_pc->points.size(); j++) {
+                // the end of this area
                 if((int)map_pc->points[j].intensity % 3 == 2) {
                     break;
                 }
@@ -223,10 +225,13 @@ void CloudHandler::liosamOdometryIncrementalCB(
 
 void CloudHandler::cloudHandlerCB(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+
+    RCLCPP_INFO(get_logger(), "Received point cloud message, mapInit=%d", mapInit);
+    RCLCPP_INFO(get_logger(), "Map size: %zu", map_pc->points.size());
     
     // Show initialization message
     if(globalImgTimes == 0) {
-        showImg1line("Global localizing");
+        showImg1line("---------------------------Global localizing---------------------------");
     }
     globalImgTimes++;
 
@@ -239,13 +244,13 @@ void CloudHandler::cloudHandlerCB(
     outsideAreaIndexRecord.clear(); 
     outsideAreaLastRingIndexRecord.clear(); 
 
-    // Check map initialization
+    // 重要：检查地图是否初始化
     if(!mapInit) {
         RCLCPP_WARN(get_logger(), "Map not initialized yet, waiting for map!");
         return;
     }
 
-    // Prepare for new frame processing
+    // 准备新帧处理
     setEveryFrame();
     cloudInitializer.setMapPC(map_pc);
     cloudHeader = laserCloudMsg->header;
@@ -253,9 +258,10 @@ void CloudHandler::cloudHandlerCB(
     mapHeader.frame_id = "map";
     globalPath.header = mapHeader;
 
-    // Convert pointcloud
+    // 这里进行点云转换
     sensor_msgs::msg::PointCloud2 temp_msg = *laserCloudMsg;
     pcl::fromROSMsg(temp_msg, *laserCloudIn);
+    // TODO Jiajie 问题可能出在这（进程崩溃：这是一个浮点数算术异常(SIGFPE)，具体发生在PCL点云数据处理过程中）
     organizePointcloud();
     
     if(bFurthestRingTracking) {
@@ -348,7 +354,7 @@ void CloudHandler::cloudHandlerCB(
             showImg1line("Pose tracking");
         }
 
-        RCLCPP_WARN(get_logger(), "NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML");
+        RCLCPP_INFO(get_logger(), "NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML");
         
         // 直接使用 robotPose 进行跟踪，没有任何评估或优化步骤
         // TODO 这里的robotPose的值从哪里来？
@@ -980,7 +986,15 @@ void CloudHandler::mergeMapHistogram() {
 }
 
 void CloudHandler::allocateMemory() {
+    
+    // 添加前置检查
+    if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
+        RCLCPP_ERROR(get_logger(), "Invalid N_SCAN(%d) or Horizon_SCAN(%d)", 
+                     N_SCAN, Horizon_SCAN);
+        return;
+    }
     // Initialize point cloud smart pointers
+    // FIXME: 为什么这里的laserCloudIn要设置为PointXYZIRT这种专门为Velodyne激光雷达设计的点类型，而不是PCL标准点类型？
     laserCloudIn = std::make_shared<pcl::PointCloud<PointXYZIRT>>();
     laserUppestRing = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
     potentialCeilingPoints = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
