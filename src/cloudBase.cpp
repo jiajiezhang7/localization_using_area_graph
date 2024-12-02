@@ -20,12 +20,6 @@
  *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
  *       IEEE Robotics and Automation Letters, 2023
  * 
- * @implementation_details
- *        - Converts ROS1 message types to ROS2
- *        - Updates timing and transform handling for ROS2
- *        - Implements ROS2 parameter handling
- *        - Maintains compatibility with original algorithm design
- * 
  * @dependencies
  *        - ROS2 core libraries
  *        - PCL library for point cloud processing
@@ -50,21 +44,26 @@ void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
                  << " " << pose_stamped.pose.orientation.w << std::endl;
 }
 
+// 检查机器人是否在区域内
 bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex) {
+    // 创建机器人当前位置点
     pcl::PointXYZI robot;
     robot.x = robotPose(0,3);
     robot.y = robotPose(1,3);
     robot.z = robotPose(2,3);
     robot.intensity = 0;
 
+    // 创建一个远处的点,用于射线检测
     pcl::PointXYZI robotInfinity;
     robotInfinity.x = robotPose(0,3) + 5132;
     robotInfinity.y = robotPose(1,3) + 2345;
     robotInfinity.z = robotPose(2,3);
     robotInfinity.intensity = 0;
 
+    // 记录射线穿过边界的次数
     int throughTimes = 0;
 
+    // 创建可视化标记
     auto line_strip = std::make_unique<visualization_msgs::msg::Marker>();
     line_strip->type = visualization_msgs::msg::Marker::LINE_STRIP;
     line_strip->header = mapHeader;
@@ -74,9 +73,9 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
     line_strip->id = 1;
     line_strip->action = visualization_msgs::msg::Marker::ADD;
 
-    // check all map lines of this area, record how many times a ray goes through map polygon to decide if the robot is inside or outside of this area
+    // 检查该区域所有边界线段
     for(int i = areaStartIndex; i < areaStartIndex + 1000000; i++) {
-        // The end of this area
+        // 到达区域末尾时退出
         if((int)map_pc->points[i].intensity % 3 == 2) {
             break;
         }
@@ -87,8 +86,9 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
         }
     }
 
-    // Inside this area
+    // 如果射线穿过边界次数为奇数,说明点在区域内部
     if(throughTimes % 2 == 1) {
+        // 可视化射线
         geometry_msgs::msg::Point p;
         p.x = robot.x;
         p.y = robot.y;
@@ -108,6 +108,7 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
     return false;
 }
 
+// 初始化CloudBase类
 CloudBase::CloudBase(const std::string& node_name)
     : ParamServer(node_name) {
     initializeVariables();
@@ -116,7 +117,7 @@ CloudBase::CloudBase(const std::string& node_name)
     allocateMemory();
 
     // 通过LIO-SAM得到的GT数据保存路径
-    GTstream.open("/home/jay/AGLoc_ws/GT/GTliosam2023-05-24-20-54-47.txt", 
+    GTstream.open("/home/jay/AGLoc_ws/src/localization_using_area_graph/data/GT/GTliosam.txt", 
                   std::ofstream::app);
     GTstream.setf(std::ios::fixed);
     GTstream.precision(2);
@@ -129,6 +130,7 @@ CloudBase::CloudBase(const std::string& node_name)
     RCLCPP_INFO(this->get_logger(), "CloudBase initialized successfully");
 }
 
+// only call this for 2022-11-14-19-07-34 bag
 geometry_msgs::msg::PoseStamped CloudBase::transformLiosamPath(const nav_msgs::msg::Path& pathMsg) {
     geometry_msgs::msg::PoseStamped this_pose_stamped;
     this_pose_stamped = pathMsg.poses.back();
@@ -170,13 +172,7 @@ geometry_msgs::msg::PoseStamped CloudBase::transformLiosamPath(const nav_msgs::m
     return this_pose_stamped;
 }
 
-void CloudBase::mapInitCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
-    // 添加实现或移除订阅器
-    RCLCPP_INFO(this->get_logger(), "Map init callback received");
-}
-
-geometry_msgs::msg::Pose CloudBase::transformLiosamPathnew(
-    const nav_msgs::msg::Odometry::SharedPtr pathMsg) {
+geometry_msgs::msg::Pose CloudBase::transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg) {
     // [[ 0.99968442 -0.02004835 -0.01513714]
     //  [ 0.01981344  0.99968335 -0.01551225]
     //  [ 0.01544334  0.01520744  0.99976509]]
@@ -222,17 +218,27 @@ geometry_msgs::msg::Pose CloudBase::transformLiosamPathnew(
     return this_pose_stamped;
 }
 
+//map and bag are not recorded in the same time, therefore bag's lio sam path has a transform with line map
+// 接受到LIO-SAM路径后的回调处理
 void CloudBase::liosamPathCB(const nav_msgs::msg::Path::SharedPtr pathMsg) {
     geometry_msgs::msg::PoseStamped this_pose_stamped = pathMsg->poses.back();
     TransformedLiosamPath.poses.push_back(this_pose_stamped);
     pubTransformedLiosamPath->publish(TransformedLiosamPath);
 }
+
+// Fujing源代码里没有实现
+void CloudBase::mapInitCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+    // 添加实现或移除订阅器
+    RCLCPP_INFO(this->get_logger(), "Map init callback received");
+}
+
 // 接受到AGindex后的回调处理
 void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg) {
     AG_index = *msg;
     AGindexReceived = true;
 }
 
+// 从LIO-SAM中获取GT数据
 void CloudBase::getGTfromLiosam(std_msgs::msg::Header cloudHeader) {
     // In ROS2 we need to use tf2 instead of tf
     tf2::Quaternion quat;
@@ -246,119 +252,134 @@ void CloudBase::getGTfromLiosam(std_msgs::msg::Header cloudHeader) {
              << yaw/M_PI*180 << std::endl;
 }
 
+// 接受到地图数据后的回调处理，这是对于来自map_Handler的地图数据的处理，但是由于map_Handler没有被使用，所以这个函数没有被调用
 void CloudBase::mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+    // 地图中心点的权重
     double mapCenterWeight = 0;
+    // 地图中心点的初始化向量(x,y)
     mapCenterInitialization.setZero();
+    // 地图初始化标志位
     mapInit = false;
+    // 地图接收次数计数器加1
     mapReceivedTimes++;
 
+    // 如果直方图不为空,清空直方图
     if(!mapHistogram.empty()) {
         mapHistogram.clear();
     }
 
+    // 如果地图未初始化
     if(!mapInit) {
+        // 清空地图点云
         map_pc->clear();
+        // 计算地图点云大小(宽x高)
         mapSize = laserCloudMsg->width * laserCloudMsg->height;
+        // 调整地图点云大小
         map_pc->points.resize(mapSize);
 
-        // Convert ROS2 PointCloud2 to PCL PointCloud
+        // 将ROS2 PointCloud2消息转换为PCL点云格式
         pcl::fromROSMsg(*laserCloudMsg, *map_pc);
 
+        // 遍历所有点
         for (int i = 0; i < mapSize; i++) {
+            // 初始化直方图
             mapHistogram.push_back(0);
 
+            // 计算当前点与前一个点的中点x坐标
             double middile_x = (map_pc->points[i].x - 
                               map_pc->points[(i-1+mapSize)%mapSize].x)/2;
+            // 计算当前点与前一个点的中点y坐标                              
             double middile_y = (map_pc->points[i].y - 
                               map_pc->points[(i-1+mapSize)%mapSize].y)/2;
+            // 计算当前点与前一个点的距离                              
             double length = std::sqrt(std::pow(map_pc->points[i].x - 
                                     map_pc->points[(i-1+mapSize)%mapSize].x, 2) +
                                     std::pow(map_pc->points[i].y - 
                                     map_pc->points[(i-1+mapSize)%mapSize].y, 2));
-                                    
+            
+            // 累加权重                                
             mapCenterWeight += length;
+            // 累加x方向加权和
             mapCenterInitialization(0) += middile_x * length;
+            // 累加y方向加权和
             mapCenterInitialization(1) += middile_y * length;
         }
 
+        // 计算地图中心点坐标(加权平均)
         mapCenterInitialization = mapCenterInitialization / mapCenterWeight;
 
+        // 输出地图中心点坐标信息
         RCLCPP_INFO(this->get_logger(), "Map center = [%f, %f]", 
                     mapCenterInitialization(0), 
                     mapCenterInitialization(1));
 
+        // 设置地图初始化完成标志
         mapInit = true;
+        // 输出地图初始化成功信息
         RCLCPP_WARN(this->get_logger(), 
                     "cloudHandler Map initialized success, this is the %d map.", 
                     mapReceivedTimes);
     }
 
+    // 将PCL点云转换回ROS2消息格式并发布
     sensor_msgs::msg::PointCloud2 outMsg;
     pcl::toROSMsg(*map_pc, outMsg);
     outMsg.header = mapHeader;
     pubMapPC->publish(outMsg);
 }
 
-// AGLoc系统中，地图数据的流向：  topology_publisher -> /mapPC_AG -> CloudBase::mapAGCB() -> CloudBase::mapCB()
+
+
+// 真实被使用的map来自area_graph_data_parser的mapPC_AG
+// AGLoc系统中，地图数据的流向：  topology_publisher -> /mapPC_AG -> CloudBase::mapAGCB()
+/**
+ * @brief 处理来自Area Graph的地图点云数据的回调函数
+ * @details 该函数负责:
+ *          1. 接收和转换Area Graph地图点云
+ *          2. 对地图进行坐标变换
+ *          3. 计算地图中心点
+ *          4. 初始化地图相关参数
+ * @param laserCloudMsg 输入的地图点云消息(ROS PointCloud2格式)
+ */
 void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     RCLCPP_INFO(this->get_logger(), "Receiving map from AG");
 
-    // 1. 添加消息字段检查
-    // RCLCPP_INFO(this->get_logger(), "Received message fields:");
-    // for(const auto& field : laserCloudMsg->fields) {
-    //     RCLCPP_INFO(this->get_logger(), "Field: %s, offset: %d, datatype: %d", 
-    //                 field.name.c_str(), field.offset, field.datatype);
-    // }
-
-    // 2. 添加消息基本信息检查
-    // RCLCPP_INFO(this->get_logger(), "Point cloud message info:");
-    // RCLCPP_INFO(this->get_logger(), "Frame ID: %s", laserCloudMsg->header.frame_id.c_str());
-    // RCLCPP_INFO(this->get_logger(), "Width: %d, Height: %d", 
-    //             laserCloudMsg->width, laserCloudMsg->height);
-    // RCLCPP_INFO(this->get_logger(), "Point step: %d, Row step: %d",
-    //             laserCloudMsg->point_step, laserCloudMsg->row_step);
-
-    // mapSize = map_pc->points.size();
-    // RCLCPP_INFO(this->get_logger(), "Current map_pc size: %d", mapSize);
-
-
+    // 获取当前地图点云的大小
     mapSize = map_pc->points.size();
 
-    // Receive index first, if already received, return
+    // 检查是否已接收到AG索引数据和地图是否已初始化
     if(!AGindexReceived || mapInit) {
         return; 
     }
 
-    // Handle map transform, transform map to GT FRAME
+    // 设置地图坐标系为"map"
     std_msgs::msg::Header tempHeader = laserCloudMsg->header;
     tempHeader.frame_id = "map";
     
+    // 创建PCL点云对象用于存储原始和变换后的地图
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMap(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMapTansformed(new pcl::PointCloud<pcl::PointXYZI>());
 
+    // 将ROS消息转换为PCL点云格式
     try {
         RCLCPP_INFO(this->get_logger(), "Starting PCL conversion...");
         pcl::fromROSMsg(*laserCloudMsg, *laserAGMap);
         RCLCPP_INFO(this->get_logger(), "PCL conversion successful. Points: %zu", 
                     laserAGMap->points.size());
 
-        // 检查前几个点的数据
-        // for(size_t i = 0; i < std::min(size_t(5), laserAGMap->points.size()); i++) {
-        //     RCLCPP_INFO(this->get_logger(), "Point %zu: x=%.3f, y=%.3f, z=%.3f, intensity=%.3f",
-        //                 i, laserAGMap->points[i].x, laserAGMap->points[i].y,
-        //                 laserAGMap->points[i].z, laserAGMap->points[i].intensity);
-        // }
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "PCL conversion failed: %s", e.what());
         return;
     }
    
+    // 构建地图变换矩阵
     Eigen::Matrix4f mapPose = Eigen::Matrix4f::Zero();
     Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
     transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
     transform_initial.rotate(Eigen::AngleAxisf(mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
     mapPose = transform_initial.matrix();
 
+    // 对点云进行坐标变换
     try {
         pcl::transformPointCloud(*laserAGMap, *laserAGMapTansformed, mapPose);
         RCLCPP_INFO(this->get_logger(), "Point cloud transformation successful");
@@ -367,31 +388,35 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
         return;
     }
 
-    // Publish transformed point cloud
+    // 发布变换后的点云
     sensor_msgs::msg::PointCloud2 outMsg;
     pcl::toROSMsg(*laserAGMapTansformed, outMsg);
     outMsg.header = tempHeader;
     pubAGMapTransformedPC->publish(outMsg);
 
+    // 初始化地图中心计算相关变量
     double mapCenterWeight = 0;
     mapCenterInitialization.setZero();
     mapReceivedTimes++;
     
     mapHistogram.clear();
 
+    // 如果地图未初始化，进行初始化处理
     if(!mapInit) {
         map_pc->clear();
         mapSize = laserAGMapTansformed->points.size(); 
         map_pc->points.resize(mapSize);
 
+        // 遍历所有点，进行地图初始化
         for (int i = 0; i < mapSize; i++) {
+            // 创建并设置点的属性
             pcl::PointXYZI thisPoint;
             thisPoint.x = laserAGMapTansformed->points[i].x;  
             thisPoint.y = laserAGMapTansformed->points[i].y;
             thisPoint.z = laserAGMapTansformed->points[i].z;
             thisPoint.intensity = laserAGMapTansformed->points[i].intensity;
 
-            // 检查intensity的有效性
+            // 验证点的intensity值是否有效
             int intensityMod3 = static_cast<int>(thisPoint.intensity) % 3;
             if(intensityMod3 < 0 || intensityMod3 > 2) {
                 RCLCPP_WARN(this->get_logger(), 
@@ -399,23 +424,27 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
                             i, thisPoint.intensity, intensityMod3);
             }
 
-
+            // 存储点并初始化直方图
             map_pc->points[i] = thisPoint;
             mapHistogram.push_back(0);
 
+            // 计算相邻点的中点和距离
             double middile_x = (map_pc->points[i].x - map_pc->points[(i-1+mapSize)%mapSize].x)/2;
             double middile_y = (map_pc->points[i].y - map_pc->points[(i-1+mapSize)%mapSize].y)/2;
             double length = std::sqrt(
                 std::pow(map_pc->points[i].x - map_pc->points[(i-1+mapSize)%mapSize].x, 2) +
                 std::pow(map_pc->points[i].y - map_pc->points[(i-1+mapSize)%mapSize].y, 2));
                 
+            // 累加权重和加权坐标
             mapCenterWeight += length;
             mapCenterInitialization(0) += middile_x * length;
             mapCenterInitialization(1) += middile_y * length;
         }
         
+        // 计算地图中心点的加权平均坐标
         mapCenterInitialization = mapCenterInitialization / mapCenterWeight;
 
+        // 输出地图中心点信息并设置初始化标志
         RCLCPP_INFO(this->get_logger(), "Map center = [%f, %f]", 
                     mapCenterInitialization(0), mapCenterInitialization(1));
         mapInit = true;
@@ -423,6 +452,7 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
                     mapReceivedTimes);
     }
 
+    // 发布处理后的地图点云
     sensor_msgs::msg::PointCloud2 outMsgMap;
     pcl::toROSMsg(*map_pc, outMsgMap);
     outMsgMap.header = tempHeader;
@@ -433,20 +463,34 @@ void CloudBase::imuCB(const sensor_msgs::msg::Imu::SharedPtr imuMsg) {
     imu_buf.push_back(*imuMsg);
 }
 
+/**
+ * @brief 使用质心法初始化机器人位姿
+ * @details 该函数通过计算转换后点云的质心位置，并与地图的质心位置进行对比，
+ *          来调整机器人的位姿。主要步骤包括:
+ *          1. 计算转换后点云的质心坐标
+ *          2. 输出质心位置信息
+ *          3. 根据两个质心的差值调整机器人位姿
+ */
 void CloudBase::initializedUsingMassCenter() {
+    // 初始化质心坐标
     double center_x = 0;
     double center_y = 0;
     
+    // 累加所有点的坐标来计算质心
     for(size_t i = 0; i < transformed_pc->points.size(); i++) {
         center_x += transformed_pc->points[i].x;
         center_y += transformed_pc->points[i].y;
     }
     
+    // 计算平均值得到质心坐标
     center_x /= transformed_pc->points.size();
     center_y /= transformed_pc->points.size();
     
+    // 输出转换后点云的质心位置
     RCLCPP_INFO(this->get_logger(), "Transformed PC CENTER = [%f, %f]", center_x, center_y);
     
+    // 根据质心差值调整机器人位姿
+    // robotPose(0,3)和robotPose(1,3)分别表示机器人位姿矩阵中的x和y平移分量
     robotPose(0,3) -= center_x - mapCenterInitialization(0);
     robotPose(1,3) -= center_y - mapCenterInitialization(1);
 }

@@ -1,6 +1,6 @@
 /**
  * @file map_handler.hpp
- * @brief Node for handling and publishing Area Graph map data
+ * @brief Node for handling and publishing Area Graph map data（照Fujing的原代码看，在run.launch中整个节点都是被注释的）
  * @author Jiajie Zhang
  * @date 2024-11-09
  */

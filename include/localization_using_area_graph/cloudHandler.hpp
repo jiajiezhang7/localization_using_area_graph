@@ -5,35 +5,7 @@
  *         Sören Schwertfeger (original ROS1 implementation)
  * @brief Point cloud processing and localization using Area Graph map representation
  * @version 0.1
- * @date 2024-11-09
- * 
- * @details Core handler class for AGLoc system that processes 3D LiDAR point clouds 
- *          and performs localization within an Area Graph map. Key functionalities:
- *          
- *          - Point Cloud Processing:
- *            * Clutter removal and filtering
- *            * 3D to 2D projection for wall detection
- *            * Downsampling based on corridorness metric
- *            * Ray intersection with Area Graph polygons
- *
- *          - Localization:
- *            * Global localization using pose scoring
- *            * Pose tracking via weighted point-to-line ICP
- *            * Area detection and transition handling
- *            * Corridorness optimization for long hallways
- *
- *          - ROS2 Integration:
- *            * Point cloud subscription and processing
- *            * Transform broadcasting and handling
- *            * Parameter management
- *            * Visualization publishing
- *
- * Main changes from ROS1:
- *          - Updated message handling for ROS2
- *          - QoS profile configuration
- *          - Modernized parameter handling
- *          - Updated transform system to TF2
- *          - Improved thread safety
+ * @date 2024-12-02
  *
  */
 #pragma once
@@ -57,42 +29,42 @@
 
 class CloudHandler : public CloudBase {
 public:
-    // ROS2 Subscribers
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subLaserCloud;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamOdometry;
+    // ROS2 订阅器
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subLaserCloud;    // 订阅激光点云数据
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;  // 订阅初始位姿猜测
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamOdometry;      // 订阅LIO-SAM里程计数据
 
-    // ROS2 Publishers
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;
+    // ROS2 发布器
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云
 
-    // Core functionality object
-    CloudInitializer cloudInitializer;
+    // 核心功能对象
+    CloudInitializer cloudInitializer;  // 云初始化器对象
 
-    // Map related indices
-    int insideAreaStartIndex;  // MAP PC index
-    int insideAreaID;          // data structure AGindex
+    // 地图相关索引
+    int insideAreaStartIndex;  // 地图点云索引
+    int insideAreaID;          // AG索引数据结构
 
-    // Processing variables
-    std::vector<bool> vbHistogramRemain;
-    std::chrono::steady_clock::time_point sumFrameRunTime; // Using ROS2 time
-    int numofFrame;
-    bool getGuessOnce;
-    int globalImgTimes;
+    // 处理变量
+    std::vector<bool> vbHistogramRemain;  // 直方图剩余标志
+    std::chrono::steady_clock::time_point sumFrameRunTime; // 使用ROS2时间，累计帧运行时间
+    int numofFrame;       // 帧数
+    bool getGuessOnce;    // 是否已获得一次猜测
+    int globalImgTimes;   // 全局图像次数
 
-    explicit CloudHandler();
-    ~CloudHandler() override = default;
+    explicit CloudHandler();  // 显式构造函数
+    ~CloudHandler() override = default;  // 默认析构函数
 
-    // Point cloud processing methods
-    void filterUsefulPoints();
-    void optimizationICP();
-    void showImg1line(const std::string& words);
+    // 点云处理方法
+    void filterUsefulPoints();  // 过滤有用点
+    void optimizationICP();     // ICP优化
+    void showImg1line(const std::string& words);  // 显示一行图像
 
-    // Map and histogram processing
-    void mergeMapHistogram();
-    double corridornessDSRate(double maxPercentage);
-    void gettingInsideWhichArea();
+    // 地图和直方图处理
+    void mergeMapHistogram();  // 合并地图直方图
+    double corridornessDSRate(double maxPercentage);  // 计算走廊度下采样率
+    void gettingInsideWhichArea();  // 确定所在区域
 
-    // Point cloud checking methods
+    // 点云检查方法
     bool checkWholeMap(int pc_index,
                       const pcl::PointXYZI& PCPoint,
                       double &map1x,
@@ -100,30 +72,31 @@ public:
                       double &map2x,
                       double &map2y,
                       double &intersectionx,
-                      double &intersectiony);
+                      double &intersectiony);  // 检查整个地图
 
-    // Override methods from CloudBase
-    void calClosestMapPoint(int inside_index) override;
+    // 重写CloudBase方法
+    void calClosestMapPoint(int inside_index) override;  // 计算最近地图点
     bool checkMap(int ring, 
                  int horizonIndex,
                  int &last_index,
                  double &minDist,
-                 int inside_index) override;
-    void allocateMemory() override;
-    void resetParameters() override;
+                 int inside_index) override;  // 检查地图
+    void allocateMemory() override;  // 分配内存
+    void resetParameters() override;  // 重置参数
 
 private:
 
 
-    // Callback methods
-    void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
-    void liosamOdometryIncrementalCB(const nav_msgs::msg::Odometry::SharedPtr odomMsg);
-    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
+    // 回调方法
+    void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 处理接收到的点云数据
+    void liosamOdometryIncrementalCB(const nav_msgs::msg::Odometry::SharedPtr odomMsg);  // 处理LIO-SAM里程计增量数据
+    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 获取初始外部猜测
 
-    // Initialize publishers and subscribers
+    // 初始化发布器和订阅器
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
+        // 发布内部区域点云
         pubinsideAreaPC = this->create_publisher<sensor_msgs::msg::PointCloud2>(
             "insideAreaPC", qos);
     }
@@ -131,34 +104,38 @@ private:
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
+        // 订阅点云话题
         subLaserCloud = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointCloudTopic, qos,
             std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
             
+        // 订阅初始猜测粒子
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));
             
+        // 订阅LIO-SAM里程计数据
         subLiosamOdometry = this->create_subscription<nav_msgs::msg::Odometry>(
             "/lio_sam/mapping/odometry", qos,
             std::bind(&CloudHandler::liosamOdometryIncrementalCB, this, std::placeholders::_1));
 
-        subLiosamodometry_incremental = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/lio_sam/mapping/odometry_incremental", qos,
-            std::bind(&CloudHandler::liosamOdometryIncrementalCB, 
-                     this, 
-                     std::placeholders::_1));
+        // 订阅LIO-SAM增量里程计数据（在Fujing的代码中没有使用）
+        // subLiosamodometry_incremental = this->create_subscription<nav_msgs::msg::Odometry>(
+        //     "/lio_sam/mapping/odometry_incremental", qos,
+        //     std::bind(&CloudHandler::liosamOdometryIncrementalCB, 
+        //              this, 
+        //              std::placeholders::_1));
     }
 
-    // Initialize variables
+    // 初始化变量
     void initializeVariables() {
-        // Initialize time tracking
+        // 初始化时间跟踪
         sumFrameRunTime = std::chrono::steady_clock::now();
-        insideAreaStartIndex = 0;
-        insideAreaID = 0;
-        numofFrame = 0;
-        getGuessOnce = false;
-        globalImgTimes = 0;
+        insideAreaStartIndex = 0;  // 内部区域起始索引
+        insideAreaID = 0;          // 内部区域ID
+        numofFrame = 0;            // 帧数
+        getGuessOnce = false;      // 是否已获得一次猜测
+        globalImgTimes = 0;        // 全局图像次数
         
 
     }

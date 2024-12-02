@@ -34,54 +34,56 @@ class CloudBase : public ParamServer {
 public:
     // ROS2 Subscribers
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMap;               //订阅 /mapPC     --- from map_handler
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;             //订阅 /mapPC_AG  --- from topology_publisher (area_graph_data_parser)
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapInit;           //订阅 /AGindex   --- from topology_publisher (area_graph_data_parser)
-    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;
-    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental;
-    // 订阅AG_index话题 -- 来自 area_graph_data_parser
-    rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapInit;           //订阅 /mapPC_Init --- from map_handler
+    
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;             //订阅 /mapPC_AG  --- 来自 topology_publisher (area_graph_data_parser)
+    rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;    // 订阅AG_index话题 -- 来自 topology_publisher (area_graph_data_parser)
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;                     // 订阅IMU数据
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;                // 订阅LIO-SAM路径数据
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental; // 订阅LIO-SAM增量里程计数据
+   
 
-    // Headers
-    std_msgs::msg::Header cloudHeader;
-    std_msgs::msg::Header mapHeader;
-    nav_msgs::msg::Path globalPath;
+    // 消息头部信息
+    std_msgs::msg::Header cloudHeader;      // 点云数据的消息头
+    std_msgs::msg::Header mapHeader;        // 地图数据的消息头
+    nav_msgs::msg::Path globalPath;         // 全局路径
 
-    // ROS2 Publishers
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUppestRing;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubFurthestRing;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubPotentialCeiling;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubtest;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOrganizedCloudIn;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubIntersection;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedPC;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedWholePC;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints1;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints2;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOptiPC;
-    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;
-    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubTransformedLiosamPath;
-    rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubInsidePC;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOutsidePC;
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubinfinity;
+    // ROS2 发布器
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUppestRing;          // 发布最上层激光环
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubFurthestRing;        // 发布最远激光环
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubPotentialCeiling;    // 发布潜在天花板点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubtest;                // 测试用发布器
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOrganizedCloudIn;    // 发布组织化的输入点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubIntersection;        // 发布交点点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedPC;       // 发布变换后的点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedWholePC;  // 发布变换后的完整点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints1;       // 发布有用点云1
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints2;       // 发布有用点云2
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOptiPC;              // 发布优化后的点云
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubTransformedLiosamPath;         // 发布变换后的LIO-SAM路径
+    rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;               // 发布完成信号
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubInsidePC;            // 发布内部点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOutsidePC;           // 发布外部点云
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubinfinity;          // 发布无穷远点标记
 
+    // 存储变换后的LIO-SAM路径数据
     nav_msgs::msg::Path TransformedLiosamPath;
 
-    // Flags and state variables
-    bool bUseFurestestRing;
-    bool bPCA;  // hope to use PCA to tell if the robot is inside corridor when rescue
-    bool AGindexReceived;
-    int lastInsideIndex;  // record current area index the robot is in
-    int globalImgTimes;
+    // 标志位和状态变量
+    bool bUseFurestestRing;      // 是否使用最远环点云
+    bool bPCA;                   // 是否使用PCA分析判断机器人是否在走廊中(用于救援模式)
+    bool AGindexReceived;        // 是否接收到Area Graph索引数据
+    int lastInsideIndex;         // 记录机器人当前所在区域的索引
+    int globalImgTimes;          // 全局定位迭代次数计数器
 
-    // Scoring variables
-    double insideScore;
-    double outsideScore;
-    double insideTotalRange;
-    double outsideTotalScore;
+    // 评分相关变量
+    double insideScore;          // 区域内匹配得分
+    double outsideScore;         // 区域外匹配得分
+    double insideTotalRange;     // 区域内总距离范围
+    double outsideTotalScore;    // 区域外总评分
 
     /*
     organizedCloudIn size:
@@ -90,96 +92,98 @@ public:
      */
     /*
     three cases:
-    reset every frame:
-            laserCloudIn
-            organizedCloudIn
-            furthestRing
-    reset every guess:
-            transformed_pc
-            ringMapP1
-            ringMapP2
-            intersectionOnMap
-            insidePC
-            outsidePC
-    reset every icp iteration:
-            UsefulPoints1
-            UsefulPoints2
+    reset every frame:        // 每帧重置
+        laserCloudIn         // 原始激光点云
+        organizedCloudIn     // 组织化的点云
+        furthestRing         // 最远环
+
+    reset every guess:        // 每次位姿猜测重置
+        transformed_pc       // 变换后的点云
+        ringMapP1           // 地图环点1
+        ringMapP2           // 地图环点2
+        intersectionOnMap   // 地图上的交点
+        insidePC           // 内部点云
+        outsidePC          // 外部点云
+
+    reset every icp iteration:  // 每次ICP迭代重置
+        UsefulPoints1         // 有用点1
+        UsefulPoints2         // 有用点2
     */
 
+
     // Point cloud containers
-    pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn64;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformedFurthestRing;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_pc;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr mapCorridorEnlarge_pc;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr ringMapP1;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr ringMapP2;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr intersectionOnMap;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr UsefulPoints1;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr UsefulPoints2;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr laserUppestRing;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr potentialCeilingPoints;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr insidePC;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr outsidePC;
+    pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;  // 原始激光点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn;  // 组织化的点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn64;  // 64线组织化点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing;  // 最远环
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformedFurthestRing;  // 变换后的最远环
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_pc;  // 变换后的点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc;  // 地图点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr mapCorridorEnlarge_pc;  // 扩大的走廊地图点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr ringMapP1;  // 地图环点1
+    pcl::PointCloud<pcl::PointXYZI>::Ptr ringMapP2;  // 地图环点2
+    pcl::PointCloud<pcl::PointXYZI>::Ptr intersectionOnMap;  // 地图上的交点
+    pcl::PointCloud<pcl::PointXYZI>::Ptr UsefulPoints1;  // 有用点1
+    pcl::PointCloud<pcl::PointXYZI>::Ptr UsefulPoints2;  // 有用点2
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laserUppestRing;  // 激光最上环
+    pcl::PointCloud<pcl::PointXYZI>::Ptr potentialCeilingPoints;  // 潜在天花板点
+    pcl::PointCloud<pcl::PointXYZI>::Ptr insidePC;  // 内部点云
+    pcl::PointCloud<pcl::PointXYZI>::Ptr outsidePC;  // 外部点云
 
-    // State variables
-    int mapSize;
-    bool mapInit;
-    std::deque<sensor_msgs::msg::Imu> imu_buf;
-    Eigen::Matrix4f robotPose;
+    // 地图和机器人状态相关变量
+    int mapSize;                                    // 地图大小
+    bool mapInit;                                   // 地图是否初始化
+    std::deque<sensor_msgs::msg::Imu> imu_buf;      // IMU数据缓冲
+    Eigen::Matrix4f robotPose;                      // 机器人位姿
 
-    // Centers and metrics
-    Eigen::Vector2d mapCenter;
-    Eigen::Vector2d PCCenter;
-    int numIcpPoints;
-    double IcpPointsPercentage;
-    int mapReceivedTimes;
-    double averDistancePairedPoints;
+    // 中心点和度量相关变量
+    Eigen::Vector2d mapCenter;                      // 地图中心
+    Eigen::Vector2d PCCenter;                       // 点云中心
+    int numIcpPoints;                               // ICP点数量
+    double IcpPointsPercentage;                     // ICP点百分比
+    int mapReceivedTimes;                           // 地图接收次数
+    double averDistancePairedPoints;                // 配对点平均距离
 
-    Eigen::Vector2d mapCenterInitialization;
-    Eigen::Vector2d PCCenterInitialization;
+    Eigen::Vector2d mapCenterInitialization;        // 地图中心初始化
+    Eigen::Vector2d PCCenterInitialization;         // 点云中心初始化
 
-    // Index and record vectors
-    std::vector<int> usefulIndex;
-    std::vector<int> outsideAreaIndexRecord;
-    std::vector<int> outsideAreaLastRingIndexRecord;
+    // 索引和记录向量
+    std::vector<int> usefulIndex;                   // 有用点索引
+    std::vector<int> outsideAreaIndexRecord;        // 外部区域索引记录
+    std::vector<int> outsideAreaLastRingIndexRecord;// 外部区域最后一环索引记录
 
-    // Thresholds and weights
-    double errorUpThredCurr;
-    double errorLowThredCurr;
-    double weightSumTurkey;
-    double weightSumCauchy;
-    std::vector<double> weightsTurkey;
-    double accumulateAngle;
-    bool initialized;
-    bool onlyOneDirection;
+    // 阈值和权重相关变量
+    double errorUpThredCurr;                        // 当前上限阈值
+    double errorLowThredCurr;                       // 当前下限阈值
+    double weightSumTurkey;                         // Turkey权重和
+    double weightSumCauchy;                         // Cauchy权重和
+    std::vector<double> weightsTurkey;              // Turkey权重向量
+    double accumulateAngle;                         // 累积角度
+    bool initialized;                               // 是否初始化
+    bool onlyOneDirection;                          // 是否只有一个方向
 
-    // Vectors for computation
-    std::vector<int> mapHistogram;
-    std::vector<double> Vec_pcx;
-    std::vector<double> Vec_pcy;
-    std::vector<double> Vec_pedalx;
-    std::vector<double> Vec_pedaly;
-    std::vector<Eigen::Vector3f> corridorGuess;
-    std::vector<Eigen::Vector3f> roomGuess;
-    area_graph_data_parser::msg::AGindex AG_index;
+    // 计算用向量
+    std::vector<int> mapHistogram;                  // 地图直方图
+    std::vector<double> Vec_pcx;                    // 点云X坐标向量
+    std::vector<double> Vec_pcy;                    // 点云Y坐标向量
+    std::vector<double> Vec_pedalx;                 // 垂足X坐标向量
+    std::vector<double> Vec_pedaly;                 // 垂足Y坐标向量
+    std::vector<Eigen::Vector3f> corridorGuess;     // 走廊猜测
+    std::vector<Eigen::Vector3f> roomGuess;         // 房间猜测
+    area_graph_data_parser::msg::AGindex AG_index;  // 区域图索引
     
-    // Counters
-    int numTotalHistogram;
-    int currentIteration;
-    int runTime;
+    // 计数器
+    int numTotalHistogram;                          // 总直方图数
+    int currentIteration;                           // 当前迭代次数
+    int runTime;                                    // 运行时间
 
-    // Output streams
-    std::ofstream GTstream;
-    std::ofstream robotPoseTum;
-    std::ofstream LiosamPoseTum;
+    // 输出流
+    std::ofstream GTstream;                         // 地面真值输出流
+    std::ofstream robotPoseTum;                     // 机器人位姿TUM格式输出流
+    std::ofstream LiosamPoseTum;                    // LIO-SAM位姿TUM格式输出流
 
 
     
-
     // 将默认构造函数改为接受节点名的构造函数
     explicit CloudBase(const std::string& node_name);
     
@@ -261,17 +265,18 @@ private:
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
+        // TODO /mapPC和/mapPCInit，由于禁用map_handler，所以不需要订阅
         subMap = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/mapPC", qos,
             std::bind(&CloudBase::mapCB, this, std::placeholders::_1));
-            
-        subMapAG = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/mapPC_AG", qos,
-            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));
-            
+
         subMapInit = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/mapPCInit", qos,
             std::bind(&CloudBase::mapInitCB, this, std::placeholders::_1));
+
+        subMapAG = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/mapPC_AG", qos,
+            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));
             
         subImu = this->create_subscription<sensor_msgs::msg::Imu>(
             "imu/data", qos,

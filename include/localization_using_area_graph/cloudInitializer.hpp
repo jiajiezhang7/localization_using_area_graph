@@ -84,82 +84,82 @@
 
 class CloudInitializer : public CloudBase {
 public:
-    // Transform and scoring variables
+    // 变换和评分变量
     Eigen::Matrix4f MaxRobotPose;                    // 最佳位姿估计
     double MaxScore;                                 // 最佳得分
     bool bGuessReady;                                // 粒子初始化就绪标志
 
-    // Vectors for ray intersection calculation
-    std::vector<int> numofIntersection;     // Record ray intersections with map
-    std::vector<double> inRayDis;           // Distance measurements
-    std::vector<double> inRayRange;         // Range measurements
-    std::vector<double> match_with_outside; // Outside area matching flags (1=outside, 0=inside)
+    // 射线交叉计算的向量
+    std::vector<int> numofIntersection;     // 记录射线与地图的交叉次数
+    std::vector<double> inRayDis;           // 距离测量
+    std::vector<double> inRayRange;         // 范围测量
+    std::vector<double> match_with_outside; // 外部区域匹配标志 (1=外部, 0=内部)
 
-    // Counters and metrics
-    int numofInsidePoints;
-    int numofOutsidePoints;
-    double turkeyScore;
+    // 计数器和度量
+    int numofInsidePoints;    // 内部点数量
+    int numofOutsidePoints;   // 外部点数量
+    double turkeyScore;       // Turkey权重得分
 
-    int rescueTimes;
-    double rescueRunTime;
+    int rescueTimes;          // 救援次数
+    double rescueRunTime;     // 救援运行时间
 
-    // File output stream
-    std::ofstream rescueRoomStream;
+    // 文件输出流
+    std::ofstream rescueRoomStream;  // 用于记录救援房间信息的输出流
 
-    // ROS2 Subscriptions and Publishers
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;
-    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotGuessMarker;
-    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotPoseAfterICP;
-    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubCurrentMaxRobotPose;
+    // ROS2 订阅和发布器
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;  // 初始猜测订阅器
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotGuessMarker;  // 机器人猜测标记发布器
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotPoseAfterICP;  // ICP后机器人位姿发布器
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubCurrentMaxRobotPose;  // 当前最佳机器人位姿发布器
 
-    // Message storage
-    geometry_msgs::msg::PointStamped robotGuess;
+    // 消息存储
+    geometry_msgs::msg::PointStamped robotGuess;  // 机器人猜测位置
 
-    // Constructor and Destructor
+    // 构造函数和析构函数
     explicit CloudInitializer();
     ~CloudInitializer() override = default;
 
-    // Core functionality methods
+    // 核心功能方法
     void setLaserCloudin(pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing_,
-                        std_msgs::msg::Header mapHeader_);
-    void setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_);
-    void showImgIni(double x, double y, int yaw);
-    void rescueRobot();
-    void scoreParticlesDist();
-    void scoreParticles();
-    void checkingGuess();
+                        std_msgs::msg::Header mapHeader_);  // 设置输入激光点云数据
+    void setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_);  // 设置参考地图点云
+    void showImgIni(double x, double y, int yaw);  // 可视化初始化状态
+    void rescueRobot();  // 执行恢复定位
+    void scoreParticlesDist();  // 基于距离评估位姿粒子
+    void scoreParticles();  // 评估位姿粒子
+    void checkingGuess();  // 验证位姿假设
 
-    // Point cloud processing methods
+    // 点云处理方法
     bool checkWholeMap(const pcl::PointXYZI& PCPoint,
                       const pcl::PointXYZI& PosePoint,
                       int horizonIndex,
                       double& minDist,
-                      bool& findIntersection);
+                      bool& findIntersection);  // 检查整个地图
 
     double getScoreFromTwoPC(const Eigen::Matrix4f& robotPose,
                             pcl::PointCloud<pcl::PointXYZI>::Ptr PC1,
-                            pcl::PointCloud<pcl::PointXYZI>::Ptr PC2);
+                            pcl::PointCloud<pcl::PointXYZI>::Ptr PC2);  // 从两个点云获取得分
 
-    // Override methods from CloudBase
-    void calClosestMapPoint(int inside_index) override;
+    // 重写CloudBase方法
+    void calClosestMapPoint(int inside_index) override;  // 计算最近的地图点
     bool checkMap(int ring, int horizonIndex, int& last_index,
-                 double& minDist, int inside_index) override;
-    void allocateMemory() override;
-    void resetParameters() override;
+                 double& minDist, int inside_index) override;  // 检查地图
+    void allocateMemory() override;  // 分配内存
+    void resetParameters() override;  // 重置参数
 
-    // ICP and initialization methods
-    void initializationICP(int insideAGIndex);
-    bool checkICPmovingDist(Eigen::Matrix4f robotPoseGuess);
-    bool insideOldArea(int mapPCindex);
-    // Callback methods
-    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
+    // ICP和初始化方法
+    void initializationICP(int insideAGIndex);  // 使用ICP进行初始化
+    bool checkICPmovingDist(Eigen::Matrix4f robotPoseGuess);  // 检查ICP移动距离
+    bool insideOldArea(int mapPCindex);  // 检查是否在旧区域内
+    // 回调方法
+    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 获取初始外部猜测
+
 private:
+    // 成员变量
+    double intersectionx;  // 交叉点x坐标
+    double intersectiony;  // 交叉点y坐标
 
-    // 添加成员变量
-    double intersectionx;
-    double intersectiony;
-
-    // Publisher initialization
+    // 初始化发布器
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
@@ -173,7 +173,7 @@ private:
             "pubCurrentMaxRobotPose", qos);
     }
 
-    // Subscriber initialization
+    // 初始化订阅器
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
@@ -182,7 +182,7 @@ private:
             std::bind(&CloudInitializer::getInitialExtGuess, this, std::placeholders::_1));
     }
 
-    // Initialize variables
+    // 初始化变量
     void initializeVariables() {
         MaxScore = 0.0;
         numofInsidePoints = 0;
@@ -192,7 +192,7 @@ private:
         rescueTimes = 0;
         rescueRunTime = 0.0;
         
-        // Reserve space for vectors
+        // 为向量预留空间
         numofIntersection.reserve(1000);
         inRayDis.reserve(1000);
         inRayRange.reserve(1000);
