@@ -69,8 +69,8 @@ ParamServer::ParamServer(const std::string& node_name)
 void ParamServer::declare_parameters() {
     // Basic parameters
     this->declare_parameter("pointCloudTopic", "points_raw");
-    this->declare_parameter("N_SCAN", 32);
-    this->declare_parameter("Horizon_SCAN", 1800);
+    this->declare_parameter("N_SCAN", 64);
+    this->declare_parameter("Horizon_SCAN", 600);
     this->declare_parameter("downsampleRate", 1);
     this->declare_parameter("lidarMinRange", 1.0);
     this->declare_parameter("lidarMaxRange", 1000.0);

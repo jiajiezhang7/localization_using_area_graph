@@ -777,7 +777,17 @@ void CloudHandler::resetParameters() {
 void CloudHandler::filterUsefulPoints() {
     // 记录开始时间
     auto startTime = this->now();
-    
+    if (!transformed_pc || transformed_pc->empty()) {
+        RCLCPP_ERROR(get_logger(), "Invalid transformed point cloud");
+        return;
+    }
+
+    // 确保width不为0
+    if (transformed_pc->width == 0) {
+        RCLCPP_ERROR(get_logger(), "Point cloud width cannot be zero");
+        return;
+    }
+
     // 重置每次迭代的中心点和权重相关参数
     PCCenter.setZero();          // 点云中心点
     mapCenter.setZero();         // 地图中心点

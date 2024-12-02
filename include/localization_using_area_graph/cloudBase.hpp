@@ -230,11 +230,7 @@ public:
 
 
 protected:
-        // 添加调试辅助函数声明
-    void logPointCloudStats(const std::string& prefix, 
-                           const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud);
-    bool validatePointCloudParams();
-    void logPointStats(const pcl::PointXYZI& point, int rowIdn, int columnIdn);
+
 
     
 private:

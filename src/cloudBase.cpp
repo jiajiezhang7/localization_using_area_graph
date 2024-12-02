@@ -516,65 +516,74 @@ void CloudBase::checkMapinRay(int ring, int horizonIndex, int& last_index) {
     }
 }
 
-bool CloudBase::validatePointCloudParams() {
-    RCLCPP_INFO(get_logger(), "Validating scanner parameters...");
-    RCLCPP_INFO(get_logger(), "N_SCAN: %d", N_SCAN);
-    RCLCPP_INFO(get_logger(), "Horizon_SCAN: %d", Horizon_SCAN);
-    RCLCPP_INFO(get_logger(), "downsampleRate: %d", downsampleRate);
-    
-    if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
-        RCLCPP_ERROR(get_logger(), 
-                     "Invalid scanner parameters: N_SCAN=%d, Horizon_SCAN=%d",
-                     N_SCAN, Horizon_SCAN);
-        return false;
-    }
-    return true;
-}
 
-void CloudBase::logPointCloudStats(const std::string& prefix,
-                                 const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud) {
-    if (!cloud) {
-        RCLCPP_ERROR(get_logger(), "%s: Null point cloud", prefix.c_str());
-        return;
-    }
-    
-    RCLCPP_INFO(get_logger(), "%s point cloud stats:", prefix.c_str());
-    RCLCPP_INFO(get_logger(), "  Size: %zu points", cloud->points.size());
-    RCLCPP_INFO(get_logger(), "  Is Dense: %s", cloud->is_dense ? "true" : "false");
-    RCLCPP_INFO(get_logger(), "  Width: %d, Height: %d", cloud->width, cloud->height);
-}
-
-void CloudBase::logPointStats(const pcl::PointXYZI& point, int rowIdn, int columnIdn) {
-    static int logCount = 0;
-    if (logCount++ % 1000 == 0) {  // 每1000个点记录一次
-        RCLCPP_DEBUG(get_logger(), 
-            "Point stats - Row: %d, Col: %d, Pos:[%.2f, %.2f, %.2f], Int: %.2f",
-            rowIdn, columnIdn, point.x, point.y, point.z, point.intensity);
-    }
-}
-
+/**
+ * @brief 组织点云数据的主要函数
+ * @details 该函数负责将无序的点云数据组织成有序结构,主要功能包括:
+ *          1. 验证扫描参数的有效性
+ *          2. 记录点云统计信息
+ *          3. 初始化数据结构
+ *          4. 处理每个点并计算相关参数
+ *          5. 根据ring信息组织点云
+ * 
+ * @note 该函数期望输入的点云数据包含ring信息(如Velodyne点云)
+ *       如果输入数据不包含ring信息可能会导致错误
+ */
 void CloudBase::organizePointcloud() {
-    // 1. 首先验证扫描参数
-    if (!validatePointCloudParams()) {
+    // 添加参数验证
+    if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
+        RCLCPP_ERROR(get_logger(), "Invalid scan parameters: N_SCAN=%d, Horizon_SCAN=%d", 
+                     N_SCAN, Horizon_SCAN);
         return;
     }
 
-    // 2. 记录输入点云统计信息
-    // FIXME: 注意到 laserCloudIn 是 为Velodyne设计的点云类型(PointXYZIRT) -- 包含了额外的时间戳(time)和扫描线(ring)信息
-    //          而 当前的logPointCLoudStats期望接受的数据类型是 PCL标准点类型 -- pcl::PointXYZI
-    // logPointCloudStats("Input", laserCloudIn);
-
+    if (!laserCloudIn || laserCloudIn->empty()) {
+        RCLCPP_ERROR(get_logger(), "Empty input point cloud");
+        return;
+    }
+    // 为点云分配内存前进行大小检查
+    if (transformed_pc && transformed_pc->width > 0) {
+        size_t cloud_size = transformed_pc->width * transformed_pc->height;
+        if (cloud_size == 0) {
+            RCLCPP_ERROR(get_logger(), "Invalid cloud size: width=%d, height=%d",
+                        transformed_pc->width, transformed_pc->height);
+            return;
+        }
+    }
     try {
         // 3. 初始化数据结构
         RCLCPP_DEBUG(get_logger(), "Resizing point clouds for organization...");
         organizedCloudIn64->resize(64 * Horizon_SCAN);
         
+        // 正确初始化 furthestRing
+        furthestRing->clear();
+        furthestRing->width = Horizon_SCAN;   // 设置宽度
+        furthestRing->height = 1;             // 设置高度为1（无序点云）
+        furthestRing->points.resize(Horizon_SCAN);
+        furthestRing->is_dense = false;       // 可能包含无效点
+
+        // 2. 同样初始化transformedFurthestRing
+        transformedFurthestRing->clear();
+        transformedFurthestRing->width = Horizon_SCAN;
+        transformedFurthestRing->height = 1;
+        transformedFurthestRing->is_dense = false;
+        transformedFurthestRing->points.resize(Horizon_SCAN);
+
+        // 3. 添加验证
+        if (furthestRing->width != Horizon_SCAN) {
+            RCLCPP_ERROR(get_logger(), 
+            "FurthestRing initialization failed: width=%zu, expected=%d",
+            furthestRing->width, Horizon_SCAN);
+            return;
+        
+        }
         if(bFurthestRingTracking) {
             N_SCAN = 64;
             RCLCPP_DEBUG(get_logger(), "FurthestRingTracking enabled, N_SCAN set to 64");
         }
         
         int cloudSize = laserCloudIn->points.size();
+
         furthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
         transformedFurthestRing->points.resize(Horizon_SCAN, pcl::PointXYZI());
 
@@ -594,7 +603,6 @@ void CloudBase::organizePointcloud() {
             float range = std::sqrt(range_xy * range_xy + thisPoint.z * thisPoint.z);
 
             // 6. 获取行索引并验证
-            // FIXME: 我们试图访问Velodyne特有的字段，但rosbag中的话题是hesai/pandar
             int rowIdn = laserCloudIn->points[i].ring;
             if (rowIdn < 0 || rowIdn >= N_SCAN) {
                 RCLCPP_ERROR(get_logger(), 
@@ -626,8 +634,6 @@ void CloudBase::organizePointcloud() {
                 continue;
             }
 
-            // 10. 记录点的详细信息
-            logPointStats(thisPoint, rowIdn, columnIdn);
 
             // 11. 处理点的存储
             int index = columnIdn + rowIdn * Horizon_SCAN;
@@ -667,19 +673,29 @@ void CloudBase::organizePointcloud() {
             "Point cloud organized: %d valid points, %d filtered points",
             validPoints, filteredPoints);
 
-        // 15. 特殊模式处理
+        // rescue without initialization
         if(!initialized && bRescueRobot) {
-            *organizedCloudIn = *furthestRing;
+
+            if (furthestRing->width == 0) {
+                RCLCPP_ERROR(get_logger(), "FurthestRing width is zero before assignment");
+                return;
+            }
+
+            *organizedCloudIn = *furthestRing; 
             RCLCPP_DEBUG(get_logger(), "Rescue mode: Using furthestRing as organizedCloudIn");
         }
         if(bFurthestRingTracking) {
-            *organizedCloudIn = *furthestRing;
+            if (furthestRing->width == 0 || furthestRing->points.empty()) {
+                RCLCPP_ERROR(get_logger(), 
+                    "Invalid furthestRing: width=%zu, points=%zu",
+                    furthestRing->width, furthestRing->points.size());
+                return;
+            }
+            *organizedCloudIn = *furthestRing; 
             N_SCAN = 1;
             RCLCPP_DEBUG(get_logger(), "FurthestRingTracking: Reset N_SCAN to 1");
         }
 
-        // 16. 记录输出点云统计信息
-        logPointCloudStats("Organized", organizedCloudIn);
 
     } catch (const std::exception& e) {
         RCLCPP_ERROR(get_logger(), "Error in organizePointcloud: %s", e.what());

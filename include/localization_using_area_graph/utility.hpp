@@ -136,7 +136,22 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(VelodynePointXYZIRT,
     (float, x, x)(float, y, y)(float, z, z)
     (float, intensity, intensity)(uint16_t, ring, ring))
 
-using PointXYZIRT = VelodynePointXYZIRT;
+struct HesaiPointXYZIRT {
+    PCL_ADD_POINT4D
+    PCL_ADD_INTENSITY
+    double timestamp;  // 8 bytes
+    uint32_t ring;    // 4 bytes
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(HesaiPointXYZIRT,
+    (float, x, x)(float, y, y)(float, z, z)
+    (float, intensity, intensity)
+    (double, timestamp, timestamp)(uint32_t, ring, ring))
+
+
+
+using PointXYZIRT = HesaiPointXYZIRT;
 typedef pcl::PointXYZI PointType;
 
 enum class SensorType { VELODYNE, OUSTER };
