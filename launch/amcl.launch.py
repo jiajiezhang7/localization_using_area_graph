@@ -25,8 +25,8 @@ def generate_launch_description():
         # AMCL Send Odom TF node
         Node(
             package='localization_using_area_graph',
-            executable='amcl_send_odom_tf',
-            name='amcl_send_odom_tf',
+            executable='amcl_odom_tf_broadcaster',
+            name='amcl_odom_tf_broadcaster',
             output='screen'
         ),
 
@@ -46,12 +46,8 @@ def generate_launch_description():
         ),
 
         # Save AMCL Result node
-        Node(
-            package='localization_using_area_graph',
-            executable='save_amcl_result',
-            name='saveAmclTumResult',
-            output='screen'
-        ),
+        # TODO 已删除，需要重新构建用以保存AMCL结果的节点
+
 
         # Pointcloud to Laserscan node
         Node(
@@ -82,7 +78,7 @@ def generate_launch_description():
             name='map_server',
             output='screen',
             parameters=[{
-                # TODO 路径硬编码问题
+                # TODO 需要重新构建
                 'yaml_filename': '/home/jay/AGLoc_ws/gmapping_map/0510gmappingAreaGraph.yaml'
             }]
         ),
@@ -129,6 +125,7 @@ def generate_launch_description():
         ),
 
         # RViz2
+        # TODO rviz配置文件 需要重新构建
         Node(
             package='rviz2',
             executable='rviz2',

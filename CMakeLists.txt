@@ -24,8 +24,8 @@ find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
-find_package(tf2_eigen REQUIRED)           # 添加这个
-find_package(tf2_msgs REQUIRED)            # 添加这个
+find_package(tf2_eigen REQUIRED)           
+find_package(tf2_msgs REQUIRED)            
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
@@ -105,15 +105,7 @@ target_link_libraries(cloud_handler
   tf2_geometry_msgs::tf2_geometry_msgs  # 修改这一行
 )
 
-## AMCL TF broadcaster
-add_executable(amcl_odom_tf_broadcaster
-  src/amcl_odom_tf_broadcaster_node.cpp
-  src/amcl_odom_tf_broadcaster.cpp
-)
 
-target_link_libraries(amcl_odom_tf_broadcaster
-  utility
-)
 
 ## Particle Generator
 add_executable(particle_generator
@@ -126,47 +118,13 @@ target_link_libraries(particle_generator
   ${PCL_LIBRARIES}
 )
 
-## Data Sender
-add_executable(data_sender
-  src/data_sender_node.cpp
-  src/data_sender.cpp
-)
 
-target_link_libraries(data_sender
-  utility
-  rosbag2_cpp::rosbag2_cpp
-  rosbag2_storage::rosbag2_storage
-)
-
-## Map Handler
-add_executable(map_handler
-  src/map_handler_node.cpp
-  src/map_handler.cpp
-)
-
-target_link_libraries(map_handler
-  utility
-)
-
-## Destination Receiver
-add_executable(destination_receiver
-  src/destination_receiver_node.cpp
-  src/destination_receiver.cpp
-)
-
-target_link_libraries(destination_receiver
-  utility
-  yaml-cpp
-)
 
 # Add dependencies to all executables
 foreach(target
     cloud_handler
-    amcl_odom_tf_broadcaster
-    particle_generator
-    data_sender
-    map_handler
-    destination_receiver)
+    particle_generator)
+    
   ament_target_dependencies(${target}
     rclcpp
     std_msgs
@@ -188,11 +146,7 @@ install(
   TARGETS
     cloud_handler
     utility
-    amcl_odom_tf_broadcaster
     particle_generator
-    data_sender
-    map_handler
-    destination_receiver
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -205,8 +159,9 @@ install(
 )
 
 # Install launch and config files
-install(
-  DIRECTORY launch config
+install(DIRECTORY
+  launch 
+  config
   DESTINATION share/${PROJECT_NAME}
 )
 
