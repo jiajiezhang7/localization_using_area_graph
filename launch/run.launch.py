@@ -13,11 +13,11 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/0524',  # 注意不需要.db3后缀
-        description='Path to ROS2 bag file (without .db3 extension)'
+        default_value='/home/jay/AGLoc_ws/rosbag/1226/1226.mcap',  # 注意不需要.db3后缀
+        description='Path to ROS2 bag file'
     )
 
-    osm_file = os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_F2_D.osm')
+    osm_file = os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_D_F2.osm')
     params_file = os.path.join(pkg_dir, 'config', 'params.yaml')
 
     use_global_localization_arg = DeclareLaunchArgument(
@@ -39,12 +39,23 @@ def generate_launch_description():
         value=LaunchConfiguration('use_sim_time')
     )
 
+    # 添加start_offset参数声明，可以让bag从指定时间开始播放
+    start_offset_arg = DeclareLaunchArgument(
+        'start_offset',
+        default_value='0.0',
+        description='Start playing the bag from this time offset (in seconds)'
+    )
+
+    # 添加地图文件路径
+    map_file = os.path.join(pkg_dir, 'maps', 'elevator.yaml')  # 请确保地图文件路径正确
+
     return LaunchDescription([
         # Parameters
         use_sim_time_arg,
         use_sim_time_param,
         use_global_localization_arg,
         bag_file_arg,
+        start_offset_arg,
         # RViz2
         Node(
             package='rviz2',
@@ -58,7 +69,7 @@ def generate_launch_description():
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            name='world_map',
+            name='transform_world_to_map',
             arguments=[
                 '--frame-id', 'world',
                 '--child-frame-id', 'map'
@@ -67,43 +78,44 @@ def generate_launch_description():
         ),
 
 
-        # 0524 AG camera base link transform
+        # 1226+elevator AG camera base link transform
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            name='camera_base_link',
+            name='transform_map_to_agmap',
             arguments=[
                 '--frame-id', 'map',
                 '--child-frame-id', 'AGmap',
-                '--x', '0.0',
-                '--y', '0.0',
-                '--z', '0.0'
-                # 没有旋转，使用默认的单位四元数
+                '--x', '-32.5',
+                '--y', '-7.0',
+                '--z', '-16.0',
+                '--yaw', '3.26321'
             ]
         ),
-        # PandarQT -> AGMap, indentical, 为了让AGmap和PandarQT的坐标系一致，因为定位的原理需要ICP比较
+        # hesai_lidar -> AGMap, indentical, 为了让AGmap和hesai_lidar的坐标系一致，因为定位的原理需要ICP比较
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            name='pandarqt_agmap',
+            name='transform_agmap_to_hesailidar',
             arguments=[
-                '--frame-id', 'AGmap',
-                '--child-frame-id', 'PandarQT',
+                '--frame-id', 'map',
+                # 如果照Fujing原来的意思，这里应该是hesai_lidar,但是这样的的话，在tf关系中, world→map→AGmap是一条线，这与rosbag中的odm→base_link→hesai_lidar这条线是断开的
+                # 归根结底是因为Fujing的定位根本没有用到odom，因此我的修改是：禁用rosbag中的tf发布
+                '--child-frame-id', 'hesai_lidar',
                 '--x', '0.0',
                 '--y', '0.0',
                 '--z', '0.0'
             ]
         ),
-
-        # Area Graph Data Parser (formerly data_process)
-        # TODO Jiajie 虽然在这里传了osm_file，但未确认是否源文件有没有使用这个参数（因为我之前碰到的情况是，非得改topology_publisher.cpp中的原文件路径才可以更换文件）
+        # Area Graph Data Parser
         Node(
             package='area_graph_data_parser',
-            executable='topology_publisher',
-            name='topology_publisher',
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time'),
-                         'osm_file_path': osm_file}],
+            executable='main',
+            name='main', 
             output='screen',
+            parameters=[{
+                'osm_file_path': osm_file  # 将参数传递给main节点
+            }]
         ),
 
         # Main AGLoc node (Cloud Handler)
@@ -119,9 +131,13 @@ def generate_launch_description():
             # prefix=['gdb -ex run --args'], 
         ),
 
-        # 使用ExecuteProcess来播放rosbag，以0.5倍速播放
+        # Play Bag File
         ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', '--rate', '0.1', LaunchConfiguration('bag_file')],
+            cmd=['ros2', 'bag', 'play', '-s', 'mcap',
+                 '--remap', '/tf:=/ignored_tf', '/tf_static:=/ignored_tf_static',
+                 '--start-offset', LaunchConfiguration('start_offset'),
+                 LaunchConfiguration('bag_file'),
+                 '--clock'],
             output='screen'
         ),
 
@@ -139,6 +155,31 @@ def generate_launch_description():
             ],
             condition=IfCondition(LaunchConfiguration('use_global_localization')),
             output='screen',
+        ),
+
+        # Map Server Node
+        Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='map_server',
+            output='screen',
+            parameters=[{
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'yaml_filename': map_file
+            }]
+        ),
+
+        # Lifecycle Manager Node
+        Node(
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager_localization',
+            output='screen',
+            parameters=[
+                {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                {'autostart': True},
+                {'node_names': ['map_server']}
+            ]
         ),
 
     ])

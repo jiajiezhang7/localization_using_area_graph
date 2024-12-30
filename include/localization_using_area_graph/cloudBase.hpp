@@ -59,7 +59,7 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedWholePC;  // 发布变换后的完整点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints1;       // 发布有用点云1
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints2;       // 发布有用点云2
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云（后续定位实际使用的AGMap）
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOptiPC;              // 发布优化后的点云
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径

@@ -5,7 +5,7 @@
         # 点云数据的预处理和组织
         # 过滤无效点
         # 实现论文中的"clutter removal"步骤
-        pointCloudTopic: "/hesai/pandar"            # Point cloud topic
+        pointCloudTopic: "/lidar_points"            # Point cloud topic
         N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
         Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
         downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
@@ -48,6 +48,7 @@
         initialExtrinsicTrans: [-1.0,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
         initialYawAngle: 180.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
         # transform ag to nearly zero
+        # 这里会把AGmap的坐标系变换到map的坐标系下，所以这里需要设置AGmap到map的平移和旋转，但是这里和run.launch.py中的设置tf关系是重复的
         mapExtrinsicTrans: [146.0,-64.0, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
         mapYawAngle: 0.0 #0524
 

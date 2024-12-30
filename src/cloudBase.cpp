@@ -331,7 +331,7 @@ void CloudBase::mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudM
 
 
 // 真实被使用的map来自area_graph_data_parser的mapPC_AG
-// AGLoc系统中，地图数据的流向：  topology_publisher -> /mapPC_AG -> CloudBase::mapAGCB()
+// AGLoc系统中，地图数据的流向：  topology_publisher -> /mapPC_AG -> CloudBase::mapAGCB() -> pubMapPC(它被定位流程真正用到)+ pubAGMapTransformedPC
 /**
  * @brief 处理来自Area Graph的地图点云数据的回调函数
  * @details 该函数负责:
