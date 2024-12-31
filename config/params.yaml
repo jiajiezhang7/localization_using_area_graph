@@ -1,0 +1,118 @@
+# Topics
+pointCloudTopic: "/hesai/pandar"            # Point cloud topic
+N_SCAN: 64                                  # number of lidar channel (i.e., 16, 32, 64, 128)
+Horizon_SCAN: 600 #1800                     # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
+downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
+downsampleRateHorizontal: 1
+lidarMinRange: 0.1                          # default: 1.0, minimum lidar range to be used
+lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
+N_ceiling: 28                               #from up to down, which beam may hit ceiling, used to delete ceiling points
+# this is for initialization only, when with big initial error
+errorUpThredInit: 9.0
+errorLowThredInit: 1.0
+# this is for normal smaller error
+# do not set too big, since robot can see through doors.
+errorUpThred: 1.0 #5 #1.2 #1.8 #1.2 bigger    outside
+errorLowThred: 0.8 #1.0 #1.0 #1.2 #1.0
+
+# # Extrinsics (lidar -> IMU)
+# lidar to map
+# # 0510 bag
+mapExtrinsicTrans: [9.8,-34.3, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
+initialYawAngle: 10 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
+initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
+mapYawAngle: -81 #0510
+
+#  0524 bag
+# initialExtrinsicTrans: [-1,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
+# initialYawAngle: 180 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
+# # transform ag to nearly zero
+# mapExtrinsicTrans: [146,-64, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
+# mapYawAngle: 0 #0524
+
+# initialExtrinsicRot: [0.7071068, -0.7071068, 0,
+#                 0.7071068, 0.7071068, 0,
+#                 0, 0, 1]
+# initialExtrinsicRot: [0.731, -0.682, 0,
+# 0.682, 0.731, 0,
+# 0, 0, 1]
+initialExtrinsicRot: [1,0, 0,
+0, 1, 0,
+0, 0, 1]
+
+opti: true
+##LBFGS para
+mem_size: 8
+g_epsilon: 1.0e-3
+past: 3
+delta: 1.0e-3
+max_iterations : 10
+max_linesearch: 8
+min_step : 1.0e-20
+max_step: 1.0
+f_dec_coeff : 1.0e-4
+s_curv_coeff : 0.9
+cautious_factor: 1.0e-6
+machine_prec : 1.0e-16
+
+
+
+#icp threshold
+translation_thres: 0.01
+icp_iteration: 15 #10
+icp_init_iteration: 40 #180
+icp_stop_translation_thred: 0.01
+icp_stop_rotation_thred: 0.01 # 0.01
+# bool for using weight in icp
+use_weight: false
+# bool for corridor detection
+detect_corridor: false
+maxPercentageCorridor: 1
+# threshold to tell if icp is initialized or not, if not, err threshold need to be bigger and may need to recaluate intersection with map after reached a certain angle change
+initialized_thred: 20
+#after reach threshold, needs to recalculate intersection with map
+recalIntersectionThred: 1.5 #1.5
+# NOT VERY EFFECTIVE
+percentageThred: 0.12
+averDistanceThred: 0.15
+radiusDisthred: 0.1
+groundThred:   -0.3 #-0.3
+ceilingThred:   2.0 #2.0  #1.8 
+parallelThred: 15.0
+subSample: 5
+# only for check initialization status...
+pause_iter: false
+initialization_imu: false
+diff_angle_init: 150.0
+# without icp initialization 2
+rescue_angle_interval: 2
+
+# case1: bRescueRobot: true, bTestRescue: true
+                  # test rescue robot, meaning all frames are supposed to get a rescue result
+                  # start sendData in launch
+# case2: bRescueRobot: true, bTestRescue: false
+                  # rescue robot once, then go to nominal localization
+                  # this is how the real robot operate, rescue then localization
+# case3: bRescueRobot: false, bTestRescue: fasle
+                  # given initial pose, only localization, only set initialied in code
+bRescueRobot: false
+bTestRescue:  false
+
+bOnlyScoreParticles: false
+scoreDownsampleRate: 0.4
+# only for testing
+bResultChecking: false
+checkingAngle: 174
+checkingGuessX: 7.25
+checkingGuessY: 35.25
+
+bCHENGNODE: true
+bGenerateResultFile: false
+bFurthestRingTracking: true
+# set to 0 means don't pause
+turkeyPauseThred: 0
+corridorDSmaxDist: 8.0
+# both false, check passage and whole map, for paper experiments
+bAllPassageOpen: false
+bAllPassageClose: false
+bInitializationWithICP: false

@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+import rospy
+import numpy as np 
+import time
+
+from sensor_msgs.msg import PointCloud
+from geometry_msgs.msg import Point32
+import std_msgs.msg
+
+if __name__ == '__main__':
+    rospy.init_node('mapHandlerNode')
+    map=np.loadtxt("../../../map/picking_list_star_center.txt",delimiter=',')
+    pointcloudPublisher = rospy.Publisher("/mapPC", PointCloud, queue_size=10)
+    mapPC = PointCloud()
+    header = std_msgs.msg.Header()
+    header.stamp = rospy.Time.now()
+    header.frame_id = 'map'
+    mapPC.header = header
+    for i in range(len(map)):
+        mapPC.points.append(Point32(map[i,0],map[i,1],0))
+    time.sleep(2)
+    rate = rospy.Rate(1)
+    print("sending map pc from map handler")
+    pointcloudPublisher.publish(mapPC)
+    while not rospy.is_shutdown():
+        rospy.spin()
+        rate.sleep()
+# <class 'shapely.geometry.multipoint.MultiPoint'>
