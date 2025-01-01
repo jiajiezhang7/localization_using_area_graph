@@ -254,7 +254,7 @@ public:
     virtual void resetParameters();
     // END OF VIRTUAL
 
-
+// NOT USED  
     void initializedUsingMassCenter();
     // first frame of lidar, initialization
     // void rescueRobot();

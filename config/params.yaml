@@ -6,6 +6,8 @@ downsampleRate: 1                           # default: 1. Downsample your data i
 downsampleRateHorizontal: 1
 lidarMinRange: 0.1                          # default: 1.0, minimum lidar range to be used
 lidarMaxRange: 1000.0                       # default: 1000.0, maximum lidar range to be used
+groundThred:   -0.3 #-0.3
+ceilingThred:   2.0 #2.0  #1.8 
 N_ceiling: 28                               #from up to down, which beam may hit ceiling, used to delete ceiling points
 # this is for initialization only, when with big initial error
 errorUpThredInit: 9.0
@@ -76,8 +78,7 @@ recalIntersectionThred: 1.5 #1.5
 percentageThred: 0.12
 averDistanceThred: 0.15
 radiusDisthred: 0.1
-groundThred:   -0.3 #-0.3
-ceilingThred:   2.0 #2.0  #1.8 
+
 parallelThred: 15.0
 subSample: 5
 # only for check initialization status...

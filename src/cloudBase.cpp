@@ -63,17 +63,21 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose,int areaStar
 }
 
 CloudBase::CloudBase(){
-    mapInit=false;
-    mapCenter.setZero();
-    PCCenter.setZero();
-    numIcpPoints=0;
-    IcpPointsPercentage=0;
-    accumulateAngle=0;
-    initialized=false;
-    onlyOneDirection=false;
-    mapReceivedTimes=0;
-    AGindexReceived=false;
-    lastInsideIndex=-1;
+    // 地图相关
+    mapInit=false;           // 地图是否初始化
+    mapCenter.setZero();     // 地图中心点
+    PCCenter.setZero();      // 点云中心点
+    mapReceivedTimes=0;      // 地图接收次数
+    AGindexReceived=false;   // 是否接收到Areaindex
+    lastInsideIndex=-1;      // 上一次所在区域的索引
+
+    // ICP相关
+    numIcpPoints=0;          // icp点的数量
+    IcpPointsPercentage=0;   // 用于icp的点的百分比
+    accumulateAngle=0;       // 累计角度
+    initialized=false;        // 是否初始化完成
+    onlyOneDirection=false;   // 是否只有一个方向
+
     // GTstream.open("/home/xiefujing/research/area_graph/ws/GT/GTliosam2023-05-10-20-16-52.txt", ofstream::app);
     GTstream.open("/home/xiefujing/research/area_graph/ws/GT/GTliosam2023-05-24-20-54-47.txt", ofstream::app);
     GTstream.setf(ios::fixed);
@@ -89,30 +93,35 @@ CloudBase::CloudBase(){
     TransformedLiosamPath.header.frame_id="/map";
 
     // subMap        = nh.subscribe<sensor_msgs::PointCloud>("/mapPC",1,&CloudBase::mapCB, this, ros::TransportHints().tcpNoDelay());
+    // 订阅地图话题
     subMapAG    = nh.subscribe<sensor_msgs::PointCloud>("/mapPC_AG",1,&CloudBase::mapAGCB, this, ros::TransportHints().tcpNoDelay());
     
     //sub in cloud handler
     // subLiosamPath=nh.subscribe("/lio_sam/mapping/odometry",1000,&CloudBase::liosamPathCB, this, ros::TransportHints().tcpNoDelay());
     // subCorridorEnlarge=nh.subscribe<sensor_msgs::PointCloud>("/corridorEnlargePC",1,&CloudBase::mapCorrdorEnlargeCB, this, ros::TransportHints().tcpNoDelay());
     // subAGindex= nh.subscribe<areaGraphDataParser::AGindex>("/AGindex",1000,&CloudBase::AGindexCB, this, ros::TransportHints().tcpNoDelay());
+    // 订阅区域图索引
     subAGindex= nh.subscribe("/AGindex",1000,&CloudBase::AGindexCB, this, ros::TransportHints().tcpNoDelay());
     
-    pubRobotPath                     = nh.advertise<nav_msgs::Path>("RobotPath", 1);
-    pubUppestRing = nh.advertise<sensor_msgs::PointCloud2> ("uppestRing", 1);
-    pubFurthestRing = nh.advertise<sensor_msgs::PointCloud2> ("FurthestRing", 1);
-    pubPotentialCeiling = nh.advertise<sensor_msgs::PointCloud2> ("potentialCeiling", 1);
-    pubOrganizedCloudIn= nh.advertise<sensor_msgs::PointCloud2> ("pubOrganizedCloudIn", 1);
-    pubMapPC= nh.advertise<sensor_msgs::PointCloud2> ("pubMapPC", 1);
-    pubAGMapTransformedPC= nh.advertise<sensor_msgs::PointCloud2> ("pubAGMapTransformedPC", 1);
+    // 发布话题（大量的可视化话题）
+    pubRobotPath                     = nh.advertise<nav_msgs::Path>("RobotPath", 1);           // 机器人路径
+    pubUppestRing = nh.advertise<sensor_msgs::PointCloud2> ("uppestRing", 1);                  // 可视化：最上层的点云环
+    pubFurthestRing = nh.advertise<sensor_msgs::PointCloud2> ("FurthestRing", 1);              // 可视化：最远的点云环
+    pubPotentialCeiling = nh.advertise<sensor_msgs::PointCloud2> ("potentialCeiling", 1);      // 可视化：最可能的天花板
+    pubOrganizedCloudIn= nh.advertise<sensor_msgs::PointCloud2> ("pubOrganizedCloudIn", 1);    // 可视化：有序的点云
+    pubMapPC= nh.advertise<sensor_msgs::PointCloud2> ("pubMapPC", 1);                          // 可视化：地图
+    pubAGMapTransformedPC= nh.advertise<sensor_msgs::PointCloud2> ("pubAGMapTransformedPC", 1);// TODO 还不知道这是啥
 
     // pubMapCorridorEnlargePC= nh.advertise<sensor_msgs::PointCloud2> ("pubMapCorridorEnlargePC", 1);
 
-    pubIntersection= nh.advertise<sensor_msgs::PointCloud2> ("pubIntersection", 1);
-    pubTransformedPC= nh.advertise<sensor_msgs::PointCloud2> ("pubTransformedPC", 1);
-    pubTransformedWholePC= nh.advertise<sensor_msgs::PointCloud2> ("pubTransformedWholePC", 1);
+    pubIntersection= nh.advertise<sensor_msgs::PointCloud2> ("pubIntersection", 1);            // 可视化：激光点与地图的交点
+    pubTransformedPC= nh.advertise<sensor_msgs::PointCloud2> ("pubTransformedPC", 1);          // 可视化：转换后的点云
+    pubTransformedWholePC= nh.advertise<sensor_msgs::PointCloud2> ("pubTransformedWholePC", 1);// 可视化：转换后的整个点云 TODO 还不知道这是啥
 
-    pubUsefulPoints1= nh.advertise<sensor_msgs::PointCloud2> ("pubUsefulPoints1", 1);
+    // TODO 还不明白以下两个Useful的意义
+    pubUsefulPoints1= nh.advertise<sensor_msgs::PointCloud2> ("pubUsefulPoints1", 1);  
     pubUsefulPoints2= nh.advertise<sensor_msgs::PointCloud2> ("pubUsefulPoints2", 1);
+
     pubtest = nh.advertise<sensor_msgs::PointCloud2> ("pubtest", 1);
     pubOptiPC = nh.advertise<sensor_msgs::PointCloud2> ("pubOptiPC", 1);
     pubInsidePC= nh.advertise<sensor_msgs::PointCloud2> ("pubInsidePC", 1);
@@ -123,6 +132,7 @@ CloudBase::CloudBase(){
     pubinfinity = nh.advertise<visualization_msgs::Marker>("pubinfinity", 10);
 
     //out of param.yaml
+    // 从yaml文件设置初始位姿
     setInitialPose(initialYawAngle,initialExtTrans);
 }
 
@@ -277,76 +287,97 @@ void CloudBase::mapAGCB (const sensor_msgs::PointCloudConstPtr& laserCloudMsg){
     ROS_WARN("receiveing map from AG");
     mapSize=map_pc->points.size();
     //receive index first, if already received, return
-    //TODO: if the map changed....map need to be updated...
-    if(!AGindexReceived||mapInit){
+    //TODO: if the map changed....map need to be updated... --- 这是对应于论文中提到的换楼层map变化 -- AGmap Reload的情况
+    
+    // 如果还没收到AGindex，或者map已经初始化了，就返回，先不做CB处理
+    if(!AGindexReceived || mapInit){
         return;
     }
+
     //handle map transform, transform map to GT FRAME
-    std_msgs::Header tempHeader;
-    tempHeader=laserCloudMsg->header;
-    tempHeader.frame_id="/map";
+    std_msgs::Header tempHeader = laserCloudMsg->header;
+    tempHeader.frame_id = "/map";
+
+    // 转换点云格式：ROS PointCloud -> ROS PointCloud2
     sensor_msgs::PointCloud2 AGpointcloud2;
+    // convertPointCloudToPointCloud2 这个函数定义在 sensor_msgs/point_cloud_conversion.h，通过utility.h引入
+    // TODO: 这里的用意是: 原来的delin版本的map_pc是pointcloud格式，但是现在的map_pc已经发布为pointcloud2格式，因此这里的操作现在看来是多余的
     convertPointCloudToPointCloud2(*laserCloudMsg, AGpointcloud2);
 
+    // 转换为PCL格式
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMap(new pcl::PointCloud<pcl::PointXYZI>());
-    //FIXME: may be not necessary, just use map_pc
+    //Fujing: may be not necessary, just use map_pc --- Jiajie: 这里的意思是或许可以不用创建新的变量，直接在原来的map_pc上做变换
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMapTansformed(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::moveFromROSMsg(AGpointcloud2, *laserAGMap);
    
+    //构建变换矩阵
     Eigen::Matrix4f mapPose;
     mapPose.setZero();
     Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
+
+    // 设置平移和旋转yaw（参数在params.yaml）
     transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
     transform_initial.rotate (Eigen::AngleAxisf (mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
     mapPose=transform_initial.matrix();
+
+    // 应用变换
     pcl::transformPointCloud(*laserAGMap,*laserAGMapTansformed,mapPose);
     //publish to particle generator, need to generate particles with knowledge of which area the point is in
-    pubPclCloud( laserAGMapTansformed, &pubAGMapTransformedPC, & tempHeader );
+    // 粒子生成器要知道它需要在哪个区域中生成点
+    pubPclCloud(laserAGMapTansformed, &pubAGMapTransformedPC, & tempHeader);
 
     double mapCenterWeight=0;
-    mapCenterInitialization<<0,0;
+    mapCenterInitialization<<0, 0;
     mapReceivedTimes++;
     if(mapHistogram.size()!=0){
         mapHistogram.clear();
     }
+
+    // 地图初始化
     if(!mapInit){
         map_pc->clear();
         mapSize = laserAGMapTansformed->points.size(); 
         map_pc->points.resize(mapSize);
-        for (int i = 0; i < mapSize; i++)
-        {
+        // 遍历所有map_pc
+        for (int i = 0; i < mapSize; i++){
             // pcl格式  
             pcl::PointXYZI thisPoint;
             thisPoint.x = laserAGMapTansformed->points[i].x;  
             thisPoint.y = laserAGMapTansformed->points[i].y;
             thisPoint.z = laserAGMapTansformed->points[i].z;
             thisPoint.intensity =laserAGMapTansformed->points[i].intensity;
+            // 用经过变换的点云替换原来的点云
             map_pc->points[i] = thisPoint;
-            mapHistogram.push_back(0);
 
+            // 初始化直方图
+            mapHistogram.push_back(0);
+            
+            // 计算地图中心 --- 加权平均法
             double middile_x=(map_pc->points[i].x-map_pc->points[(i-1+mapSize)%mapSize].x)/2;
             double middile_y=(map_pc->points[i].y-map_pc->points[(i-1+mapSize)%mapSize].y)/2;
+            // 计算线段长度
             double length=sqrt((map_pc->points[i].x-map_pc->points[(i-1+mapSize)%mapSize].x)*(map_pc->points[i].x-map_pc->points[(i-1+mapSize)%mapSize].x)+(map_pc->points[i].y-map_pc->points[(i-1+mapSize)%mapSize].y)*(map_pc->points[i].y-map_pc->points[(i-1+mapSize)%mapSize].y));
             mapCenterWeight+=length;
             mapCenterInitialization(0)+=middile_x*length;
             mapCenterInitialization(1)+=middile_y*length;
         }
-        mapCenterInitialization(0)=mapCenterInitialization(0)/mapCenterWeight;
-        mapCenterInitialization(1)=mapCenterInitialization(1)/mapCenterWeight;
+
+        // 计算最终的地图中心点 -- deprecated
+        mapCenterInitialization /= mapCenterWeight;
 
         std::cout<<"map center = "<<mapCenterInitialization(0)<<","<<mapCenterInitialization(1)<<std::endl;
         mapInit=true;
         ROS_WARN("AG Map initialized success, this is the %d map.", mapReceivedTimes);
 
     }
-        // ROS_WARN("!!!!!!!!!!!!!!!READDY TO PUBLISH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    pubPclCloud( map_pc, &pubMapPC, & tempHeader );
+    // 发布经过变换后的地图
+    pubPclCloud(map_pc, &pubMapPC, &tempHeader);
 }
 
 void CloudBase::formFurthestRing(){
 }
 
-// not using
+// not using - deprecated
 void CloudBase::initializedUsingMassCenter(){
     double center_x=0;
     double center_y=0;
@@ -362,7 +393,7 @@ void CloudBase::initializedUsingMassCenter(){
     // pcl::transformPointCloud(*organizedCloudIn,*transformed_pc,robotPose);
 }
 
-
+// 虚函数，被子类cloudHandler实现
 void CloudBase::calClosestMapPoint(int inside_index){
     cout<<"CloudBase calClosestMapPoint, doing nothing"<<endl;
 }
@@ -370,66 +401,77 @@ void CloudBase::calClosestMapPoint(int inside_index){
 // filter invalid points, downsample
 // 1d array N_SCAN*Horizon_SCAN
 // get the furthest point of each column
-// 将无序的点云数据组织成有序的格式（按行列排列）
-// 过滤掉无效和不需要的点（如地面点、太远或太近的点）
-// 支持点云降采样，减少数据量
-// 提取每一列的最远点，用于特定的跟踪任务
-// 支持不同的工作模式（普通模式、救援模式、最远点跟踪模式）
+// 函数作用：将原始的无序激光点云数据组织成有序的格式（按行列排列）， 过滤掉无效和不需要的点（如地面点、太远或太近的点）
+// 输入： LaserCloudIn
+// 输出 --- 函数计算后的结果存储在：
+    // 1. organizedCloudIn64 -- 完整的64线点云
+    // 2. organizedCloudIn -- 筛选后的有序点云(根据运行模式不同而存储不同内容：降采样点云或最远点)
 void CloudBase::organizePointcloud(){
+    // 初始化64线点云数组
     organizedCloudIn64->resize(64*Horizon_SCAN);
 
+    // 如果是最远点跟踪模式 -- 全局定位模式，则设置为64线
     if(bFurthestRingTracking){
         N_SCAN=64;
     }
     int cloudSize = laserCloudIn->points.size(); 
     // furthestRing->clear();
+    
+    // 初始化最远点数组，每个水平角度保存一个最远点 
     furthestRing->points.resize(Horizon_SCAN,0);
     // transformedFurthestRing->clear();
     transformedFurthestRing->points.resize(Horizon_SCAN,0);
-    // std::cout<<"Organizing this frame pointcloud, laserCloudIn size = "<<cloudSize<<std::endl;
-    // transver the current frame pointcloud
+
+    // 主循环：对当前帧点云处理
     for (int i = 0; i < cloudSize; ++i)
     {
-        // pcl format
+        // 转换为PCL格式点
         pcl::PointXYZI thisPoint;
         thisPoint.x = laserCloudIn->points[i].x;
         thisPoint.y = laserCloudIn->points[i].y;
         thisPoint.z = laserCloudIn->points[i].z;
-        // range checking, use intensity to store range, 2D range
+        // TODO range_xy和range的意义是什么？range_xy是2D范围，range是3D范围
+        // 计算水平距离，用作intensity
         float range_xy=sqrt(thisPoint.x*thisPoint.x+thisPoint.y*thisPoint.y);
         thisPoint.intensity =range_xy;
-
         float range = sqrt(thisPoint.x*thisPoint.x + thisPoint.y*thisPoint.y + thisPoint.z*thisPoint.z);
-        // check ring
+        // check ring（获取激光号 --- 0~63）
         int rowIdn = laserCloudIn->points[i].ring;
+        // 检查激光号是否合法
         if (rowIdn < 0 || rowIdn >= N_SCAN){
             ROS_ERROR("WRONG ROW_ID_N,CHECK N_SCAN....");
             continue;
         }
-        // ring downsample
+        // 线号降采样
         if (rowIdn % downsampleRate != 0){
             continue;
         }
-        // get column index of each point
+        // 计算水平角度和列索引
         float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;//与y轴夹角，[-pi,pi]
         // 水平扫描角度步长，例如一周扫描1800次，则两次扫描间隔角度0.2°
         static float ang_res_x = 360.0/float(Horizon_SCAN);
         int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
+
+        // 处理角度溢出
         if (columnIdn >= Horizon_SCAN)
             columnIdn -= Horizon_SCAN;
         if (columnIdn < 0 || columnIdn >= Horizon_SCAN){
             continue;
         }
         //TODO: -0.8, RULE OUT GROUND POINTS
+        // 计算一维索引
         int index = columnIdn + rowIdn * Horizon_SCAN;
-        // filter invalid points
-        if (range < lidarMinRange || range > lidarMaxRange||laserCloudIn->points[i].z<groundThred
-            ||laserCloudIn->points[i].z>ceilingThred){
-            thisPoint.x = 0;
-            thisPoint.y = 0;
-            thisPoint.z = 0;
-            thisPoint.intensity = 0;
-            if(!initialized&&bRescueRobot){
+        
+        // 过滤无效点（如地面点、太远或太近的点） -- TODO: 为什么把无效点设置为0后仍然要存储？
+        if (range < lidarMinRange || range > lidarMaxRange|| 
+            laserCloudIn->points[i].z<groundThred || 
+            laserCloudIn->points[i].z>ceilingThred) {
+
+            // 将无效点设置为0
+            thisPoint.x = thisPoint.y = thisPoint.z = thisPoint.intensity = 0;
+
+            // 根据不同的运作模式存储点云
+            if(!initialized && bRescueRobot){
                 organizedCloudIn->points[index%Horizon_SCAN] = thisPoint;
             }
             else{
@@ -438,7 +480,8 @@ void CloudBase::organizePointcloud(){
             }
             continue;
         }
-        if((!initialized&&bRescueRobot)){
+
+        if((!initialized && bRescueRobot)){
             organizedCloudIn->points[index%Horizon_SCAN] = thisPoint;
         }
         //only localization
@@ -447,7 +490,7 @@ void CloudBase::organizePointcloud(){
             organizedCloudIn64->points[index] = thisPoint;
         }
         // save the furthest point of each column for clutter free point set
-        if(range_xy>furthestRing->points[columnIdn].intensity){
+        if(range_xy > furthestRing->points[columnIdn].intensity){
             furthestRing->points[columnIdn]=thisPoint;
             furthestRing->points[columnIdn].intensity=range_xy;
         }

@@ -158,10 +158,10 @@ void CloudHandler::cloudHandlerCB(const sensor_msgs::PointCloud2ConstPtr& laserC
 
     setEveryFrame();
     cloudInitializer.setMapPC(map_pc);
-    cloudHeader=laserCloudMsg->header;
-    mapHeader=cloudHeader;
-    mapHeader.frame_id="/map";
-    globalPath.header=mapHeader;
+    cloudHeader = laserCloudMsg->header;      // 1. 从激光消息获取header
+    mapHeader = cloudHeader;                  // 2. 复制所有header信息（包括frame_id）
+    mapHeader.frame_id = "/map";             // 3. 显式覆盖frame_id为"/map"
+    globalPath.header = mapHeader;            // 4. 将修改后的header（带有/map frame_id）赋值给globalPath
 
     // getGTfromLiosam(cloudHeader);
 
@@ -169,13 +169,13 @@ void CloudHandler::cloudHandlerCB(const sensor_msgs::PointCloud2ConstPtr& laserC
     sensor_msgs::PointCloud2 temp_msg=*laserCloudMsg;
     //ros pointcloud to pcl xyzirt
     pcl::moveFromROSMsg(temp_msg, *laserCloudIn);
+    
+    // 输入: laserCloudIn; 
+    // 输出:      // 1. organizedCloudIn64 -- 完整的64线点云  
+                 // 2. organizedCloudIn -- 筛选后的有序点云(根据运行模式不同而存储不同内容：降采样点云或最远点)
     organizePointcloud();
 
-
-    if(bFurthestRingTracking){
-        // N_SCAN=1;
-    }
-    pubPclCloud( organizedCloudIn, &pubOrganizedCloudIn, & cloudHeader );
+    pubPclCloud(organizedCloudIn, &pubOrganizedCloudIn, & cloudHeader);
     //transform pointcloud robotPose T_wl
 
     //normal localization 
@@ -363,59 +363,89 @@ void CloudHandler:: showImg1line(string words){
 }
 
 // according to robot pose and map, save this ray should intersect with which map point, and its intersection.
+// 用于检查激光射线与地图线段的交点
+// 地图特征：
+    // 使用 intensity%3 判断区域的开始和结束
+    // z!=0 表示玻璃区域
+    // intensity>2 表示通道线段
+// 主要计算得到的结果：
+    //  - intersectionOnMap变量，保存了激光射线与地图线段的交点
+    //  - ringMapP1和ringMapP2变量，保存了与激光射线相交的地图线段的两个端点，在后续ICP优化中用于计算点到线段的距离
+    //  - transformed_pc变量的intensity值，修改为了当前与其相交的地图线段的index
 bool CloudHandler::checkMap(int ring,int horizonIndex,int& last_index,double & minDist,int inside_index){
+    // 获取激光点云中的点（transformed_pc --- 转换到世界坐标系下的激光点云）
     pcl::PointXYZI PCPoint;
     PCPoint.x =transformed_pc->points[ring*Horizon_SCAN+horizonIndex].x;
     PCPoint.y =transformed_pc->points[ring*Horizon_SCAN+horizonIndex].y;
     PCPoint.z =0;
+
+    // 获取机器人位置点
     pcl::PointXYZI PosePoint;
     PosePoint.x=robotPose(0,3);
     PosePoint.y=robotPose(1,3);
     PosePoint.z=0;
+
     bool findIntersection=false;
     minDist=0;
     //traverse map
     //BUG: last_index should not change in for
     for(int j=inside_index;j<mapSize;j++){
-        // the last map point of a area
+        // 如果遍历到Area的末尾node，则跳出
         if((int)map_pc->points[j%mapSize].intensity%3==2){
             break;
         }
+        // TODO 跳过玻璃（z!=0表示这是玻璃）
         //means it is glass, defined in data parser
         if(map_pc->points[j%mapSize].z!=0){
             continue;
         }
+
         //WRONG map point..........
         //FIXME:
         // if((j%mapSize==28)||(j%mapSize==32)){
         //     continue;
         // }
         pcl::PointXYZI intersectionOnMapThisLine;
+        // 检查激光射线是否与当前地图线段相交
         bool inbetween=inBetween(PosePoint,PCPoint,map_pc->points[j%mapSize],map_pc->points[(j+1)%mapSize],&intersectionOnMapThisLine);
         if(inbetween){
             //ray may intersect with map several times since the shape of the map polygon is not guarteened to be convex, chose the closest intersection                                
+            // 如果是第一个交点或者这个交点距离机器人更近
             if(minDist==0 ||
                         minDist>((intersectionOnMapThisLine.x-PosePoint.x)*(intersectionOnMapThisLine.x-PosePoint.x)
                                             +(intersectionOnMapThisLine.y-PosePoint.y)*(intersectionOnMapThisLine.y-PosePoint.y))){
                 findIntersection=true;
-                minDist=(intersectionOnMapThisLine.x-PosePoint.x)*(intersectionOnMapThisLine.x-PosePoint.x)+(intersectionOnMapThisLine.y-PosePoint.y)*(intersectionOnMapThisLine.y-PosePoint.y);
+                // 更新最小距离
+                minDist=(intersectionOnMapThisLine.x-PosePoint.x)*(intersectionOnMapThisLine.x-PosePoint.x) + 
+                        (intersectionOnMapThisLine.y-PosePoint.y)*(intersectionOnMapThisLine.y-PosePoint.y);
+                
+                // 记录交点
                 intersectionOnMap->points[horizonIndex]=intersectionOnMapThisLine;
-                // passage line, defined in osm_ag_lib
-                if((int)map_pc->points[j%mapSize].intensity>2&&(int)map_pc->points[(j+1)%mapSize].intensity>2){
+
+                
+                // 对代表通道passage的点（他们的特点是：起点和终点的intensity>2）做特殊处理
+                if((int)map_pc->points[j%mapSize].intensity>2 && (int)map_pc->points[(j+1)%mapSize].intensity>2){
                     // mark this point intersection with passage, make a difference when test all passage open
-                    intersectionOnMap->points[horizonIndex].intensity=-1;
+                    intersectionOnMap->points[horizonIndex].intensity = -1;
                 }
+
+                // 记录与哪个地图线段相交
                 // mark this ray point is intersection with which map line point, used in pedal calculation
                 ringMapP1->points[horizonIndex]=map_pc->points[j%mapSize];
                 ringMapP2->points[horizonIndex]=map_pc->points[(j+1)%mapSize];
                 last_index=j%mapSize;
                 //case2 after rescue and case3 
+                // 根据不同模式记录相交信息
                 if(initialized||(!bTestRescue&&!bRescueRobot)){
+                    // 正常模式：记录所有线的相交信息
                     for(int i=0;i<N_SCAN;i++){
-                        transformed_pc->points[i*Horizon_SCAN+horizonIndex].intensity=j%mapSize;
+                        // 将同一水平角度上的所有激光点（从下到上的所有线）的intensity都设置为相同的值 --- 当前找到的地图线段的index
+                            // （这是因为我们认为同一水平角度的从上到下64线的所有点都应该与地图中的同一个线段相交对应）
+                        transformed_pc->points[i*Horizon_SCAN+horizonIndex].intensity = j%mapSize;
                     }
                 }
                 else{
+                    // 救援模式：只记录当前线的相交信息（因为在救援模式下，我们只关注单条激光线的匹配情况）
                     transformed_pc->points[horizonIndex].intensity=j%mapSize;
                 }
             }
@@ -709,16 +739,21 @@ void CloudHandler::optimizationICP(){
 
     int totalIteration=0;
     if(initialized){
-        totalIteration=icp_iteration;
+        // 已初始化状态 --- 使用正常迭代次数
+        totalIteration = icp_iteration;
+    }else{
+        // 未初始化状态 --- 使用初始化迭代次数
+        totalIteration = icp_init_iteration;
     }
-    else{
-        totalIteration=icp_init_iteration;
-    }
-    // ICP iterations
-    for (int iteration=0;iteration<totalIteration;iteration++){
+    // 主迭代循环
+    mapHeader=cloudHeader;
+    for (int iteration=0; iteration<totalIteration; iteration++){
         // if angle changes too much, needs to recalculate intersection with map, since there may be lots of mismatch by now.
+
         clock_t startTime,endTime;
         startTime = ros::Time::now().toNSec();
+
+        // 清除向量和计数器
         averDistancePairedPoints=0;
         currentIteration=iteration;
         Vec_pcx.clear();
@@ -726,40 +761,50 @@ void CloudHandler::optimizationICP(){
         Vec_pedalx.clear();
         Vec_pedaly.clear();
 
+        // 过滤有用的点对
         filterUsefulPoints();
         endTime = ros::Time::now().toNSec();
         cout << "The filterUsefulPoints run time is:" << (double)(endTime - startTime) / 1e6 << "ms" << endl;
-        startTime = ros::Time::now().toNSec();
 
+
+        startTime = ros::Time::now().toNSec();
+        // 特殊场景处理 --- 走廊
         if(detect_corridor){
             auto startTime = ros::Time::now().toNSec();
             ROS_ERROR(" DETECT CORRIDOR???????????????");
+            // 合并地图直方图
             mergeMapHistogram();
             auto endTime = ros::Time::now().toNSec();
             cout << "The mergeMapHistogram run time is:" << (double)(endTime - startTime) / 1e6 << "ms" << endl;
         }
+
         if(use_weight){
+            // 使用加权平均计算质心
             mapCenter=mapCenter/weightSumTurkey;
             PCCenter=PCCenter/weightSumTurkey;          
             // std::cout<<"weighted map center = "<<mapCenter<<", weighted PCCenter = "<<PCCenter<<"weight = "<<weightSumTurkey<<std::endl;
         }else{
+            // 使用普通平均计算质心
             mapCenter=mapCenter/numIcpPoints;
             PCCenter=PCCenter/numIcpPoints;
         }
+
+        // 构建协方差矩阵W
         Eigen::Matrix2d W;
         W.setZero();
         auto startTime_ = ros::Time::now().toNSec();
-
-        for (int i=0;i<numIcpPoints;i++){
+        for (int i=0; i<numIcpPoints; i++){
             Eigen::Vector2d PCVec;
             Eigen::Vector2d MapVec;
             if(UsefulPoints1->points[usefulIndex[i]].x!=0||UsefulPoints1->points[usefulIndex[i]].y!=0){
                 if(use_weight&&initialized){
+                    // 加权模式
                     PCVec<<UsefulPoints1->points[usefulIndex[i]].x,UsefulPoints1->points[usefulIndex[i]].y;
                     // PCVec<<UsefulPoints1->points[usefulIndex[i]].x-PCCenter(0),UsefulPoints1->points[usefulIndex[i]].y-PCCenter(1);
                     MapVec<<UsefulPoints2->points[usefulIndex[i]].x,UsefulPoints2->points[usefulIndex[i]].y;
                     W+=weightsTurkey[i]*MapVec*PCVec.transpose();
                 }else{
+                    // 普通模式
                     PCVec<<UsefulPoints1->points[usefulIndex[i]].x-PCCenter(0),UsefulPoints1->points[usefulIndex[i]].y-PCCenter(1);
                     MapVec<<UsefulPoints2->points[usefulIndex[i]].x-mapCenter(0),UsefulPoints2->points[usefulIndex[i]].y-mapCenter(1);
                     W+=MapVec*PCVec.transpose();
@@ -767,15 +812,19 @@ void CloudHandler::optimizationICP(){
             }
         }
 
+        // TODO: 不明白这里的意义
         if(use_weight&&initialized){
             W=1/weightSumTurkey*W-mapCenter*PCCenter.transpose();
             // W=1/weightSumTurkey*W;
         }
+
+        // SVD分解求解最优旋转矩阵
         Eigen::JacobiSVD<Eigen::MatrixXd> svd(W, Eigen::ComputeFullU |Eigen::ComputeFullV);
         Eigen::Matrix2d U=svd.matrixU();
         Eigen::Matrix2d V=svd.matrixV();
         Eigen::Matrix2d rotationMatrix=U*V.transpose();
         Eigen::Vector2d translation=mapCenter-rotationMatrix*PCCenter;
+
         auto endTime_ = ros::Time::now().toNSec();
         cout << "The for loop +svd run time is:" << (double)(endTime_ - startTime_) / 1e6 << "ms" << endl;
         // if(initialized&&translation.norm()<translation_thres&&errorLowThredCurr>0.15&&errorUpThredCurr>0.15&&averDistancePairedPoints<1.5*errorUpThred){
@@ -784,6 +833,7 @@ void CloudHandler::optimizationICP(){
         // }
         // accumulateAngle+=acos(rotationMatrix(0,0))/3.14159*180;
         // std::cout<<"----------------------------------------iteration = "<<iteration<<std::endl;
+
         startTime_ = ros::Time::now().toNSec();
         ROS_WARN("---------------iteration =, %d",iteration);
         // std::cout<<"translation = "<<std::endl<<translation<<std::endl;
@@ -793,9 +843,11 @@ void CloudHandler::optimizationICP(){
 
         // Eigen::Matrix4f robotPose;
         // auto   inverse_start = ros::Time::now().toNSec();
+        // 计算旧位姿的逆
         Eigen::Matrix4f robotPoseOldInv=robotPose.inverse();
         // auto inverse_end = ros::Time::now().toNSec();
             // cout << "The inverse run time is:" << (double)(inverse_end - inverse_start) / 1e6 << "ms" << endl;
+        // 更新位置和旋转
         robotPose(0,3)+=translation(0);
         robotPose(1,3)+=translation(1);
         robotPose(3,3)=1;
@@ -803,11 +855,12 @@ void CloudHandler::optimizationICP(){
         robotPose(2,2)=1;
         endTime_ = ros::Time::now().toNSec();
         cout << "rest for loop +svd run time 0 is:" << (double)(endTime_ - startTime_) / 1e6 << "ms" << endl;
-        //transform to lidar frame
+        // 变换点云到新位姿
         pcl::transformPointCloud(*transformed_pc,*transformed_pc,robotPose*robotPoseOldInv);
 
         endTime_ = ros::Time::now().toNSec();
         cout << "rest for loop +svd run time 1 is:" << (double)(endTime_ - startTime_) / 1e6 << "ms" << endl;
+
         //reset useful  points for next ICP iteration
         // UsefulPoints1->clear();
         // UsefulPoints2->clear();
@@ -859,23 +912,28 @@ void CloudHandler::optimizationICP(){
         endTime = ros::Time::now().toNSec();
         cout << "The EXCEPT filterUsefulPoints run time is:" << (double)(endTime - startTime) / 1e6 << "ms" << endl;
     }// end of icp iterations
-        // publish robot pose after icp iteration
-        geometry_msgs::PoseStamped pose_stamped;
-        pose_stamped.header = mapHeader;
-        pose_stamped.pose.position.x = robotPose(0,3);
-        pose_stamped.pose.position.y = robotPose(1,3);
-        pose_stamped.pose.position.z = 0;
-        Eigen::Matrix3d rotation3d;
-        rotation3d.setIdentity();
-        rotation3d.topLeftCorner(3,3)=robotPose.topLeftCorner(3,3).cast<double>();
-        Eigen::Quaterniond quaternion(rotation3d);
-        pose_stamped.pose.orientation.x = quaternion.x();
-        pose_stamped.pose.orientation.y = quaternion.y();
-        pose_stamped.pose.orientation.z = quaternion.z();
-        pose_stamped.pose.orientation.w = quaternion.w();
-        globalPath.poses.push_back(pose_stamped);
-        pubRobotPath.publish(globalPath);
-        saveTUMTraj(pose_stamped);
+
+    // 构造并发布位姿消息
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header = mapHeader;
+    pose_stamped.pose.position.x = robotPose(0,3);
+    pose_stamped.pose.position.y = robotPose(1,3);
+    pose_stamped.pose.position.z = 0;
+
+    // 将旋转矩阵转换为四元数
+    Eigen::Matrix3d rotation3d;
+    rotation3d.setIdentity();
+    rotation3d.topLeftCorner(3,3) = robotPose.topLeftCorner(3,3).cast<double>();
+    Eigen::Quaterniond quaternion(rotation3d);
+    pose_stamped.pose.orientation.x = quaternion.x();
+    pose_stamped.pose.orientation.y = quaternion.y();
+    pose_stamped.pose.orientation.z = quaternion.z();
+    pose_stamped.pose.orientation.w = quaternion.w();
+
+    // 发布路径并保存轨迹
+    globalPath.poses.push_back(pose_stamped);
+    pubRobotPath.publish(globalPath);
+    saveTUMTraj(pose_stamped);
 
     // std::fill(mapHistogram.begin(), mapHistogram.end(), 0);
     // only publish transformed_pc after whole icp
@@ -1105,59 +1163,6 @@ void CloudHandler::resetParameters(){
     UsefulPoints2->points.resize(N_SCAN*Horizon_SCAN,0);
 }
 
-// //map and bag are not recorded in the same time, therefore bag's lio sam path has a transform with line map
-// void CloudHandler::liosamPathCB (const nav_msgs::Path& pathMsg){
-
-// // -0.080	0.997	-0.000	0.241
-// // -0.008	-0.000	1.000	-0.010
-// // 0.000	0.000	0.000	1.000
-// // [ 0, 0.0040028, -0.0400277, 0.9991906 ]
-
-    
-    
-// //     0.9965   	-0.0800   	-0.0080   	-0.1024   
-// // 0.0800   	0.9966   	-0.0006   	-0.2499   
-// // 0.0080   	-0.0006   	0.9999   	0.0092   
-// // 0.0000   	0.0000   	0.0000   	1.0000   
-//     geometry_msgs::PoseStamped this_pose_stamped;
-//     this_pose_stamped=*(pathMsg.poses.end()-1);
-
-//     Eigen::Matrix3d rotation_matrix;
-//     rotation_matrix<<0.9965  ,	-0.0800   ,	-0.0080,
-//                                             0.0800  , 	0.9966   ,	-0.0006,
-//                                             0.0080  , 	-0.0006   	,0.9999;
-
-//     Eigen::Quaterniond quaternion(rotation_matrix);
-//     Eigen::Quaterniond quaternionLIO(this_pose_stamped.pose.orientation.w,this_pose_stamped.pose.orientation.x,this_pose_stamped.pose.orientation.y,this_pose_stamped.pose.orientation.z);
-//     Eigen::Quaterniond afterRotationQuat=quaternion*quaternionLIO;
-//     double newx= 0.9965*(pathMsg.poses.end()-1)->pose.position.x - 0.08*	(pathMsg.poses.end()-1)->pose.position.y-0.0080*(pathMsg.poses.end()-1)->pose.position.z - 0.1024  ;
-//     double newy=0.0800*(pathMsg.poses.end()-1)->pose.position.x+0.9966*	(pathMsg.poses.end()-1)->pose.position.y-0.0006*(pathMsg.poses.end()-1)->pose.position.z - 0.2499;
-//     double newz=0.0080*(pathMsg.poses.end()-1)->pose.position.x	-0.0006*	(pathMsg.poses.end()-1)->pose.position.y+0.9999*(pathMsg.poses.end()-1)->pose.position.z+0.0092  ;
-
-//     this_pose_stamped.pose.position.x = newx;
-//     this_pose_stamped.pose.position.y = newy;
-//     this_pose_stamped.pose.position.z = newz;
-//     this_pose_stamped.pose.orientation.w=afterRotationQuat.w();
-//     this_pose_stamped.pose.orientation.x=afterRotationQuat.x();
-//     this_pose_stamped.pose.orientation.y=afterRotationQuat.y();
-//     this_pose_stamped.pose.orientation.z=afterRotationQuat.z();
-
-
-//     // this_pose_stamped.pose.position.y = pathMsg.end()->y;
-
-//     // geometry_msgs::Quaternion goal_quat = tf::createQuaternionMsgFromYaw(th);
-//     // this_pose_stamped.pose.orientation.x = goal_quat.x;
-//     // this_pose_stamped.pose.orientation.y = goal_quat.y;
-//     // this_pose_stamped.pose.orientation.z = goal_quat.z;
-//     // this_pose_stamped.pose.orientation.w = goal_quat.w;
-
-//     // this_pose_stamped.header.stamp=current_time;
-//     // this_pose_stamped.header.frame_id="odom";
-//     TransformedLiosamPath.poses.push_back(this_pose_stamped);
-
-//     pubTransformedLiosamPath.publish(TransformedLiosamPath);
-
-// }
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "CloudHandler");
