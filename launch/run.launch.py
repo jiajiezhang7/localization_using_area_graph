@@ -84,6 +84,7 @@ def generate_launch_description():
             executable='static_transform_publisher',
             name='transform_map_to_agmap',
             arguments=[
+                # 这里已经做出了坐标系的转换，因此params.yaml中的mapExtTrans不应该再在mapAGCB中被使用
                 '--frame-id', 'map',
                 '--child-frame-id', 'AGmap',
                 '--x', '-32.5',
@@ -99,7 +100,6 @@ def generate_launch_description():
             name='transform_agmap_to_hesailidar',
             arguments=[
                 '--frame-id', 'map',
-                # 如果照Fujing原来的意思，这里应该是hesai_lidar,但是这样的的话，在tf关系中, world→map→AGmap是一条线，这与rosbag中的odm→base_link→hesai_lidar这条线是断开的
                 # 归根结底是因为Fujing的定位根本没有用到odom，因此我的修改是：禁用rosbag中的tf发布
                 '--child-frame-id', 'hesai_lidar',
                 '--x', '0.0',
@@ -157,6 +157,7 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # 开启gridmap的用意是为了把AGmap和gridmap对齐，从而得到map->AGmap的转换矩阵
         # Map Server Node
         Node(
             package='nav2_map_server',

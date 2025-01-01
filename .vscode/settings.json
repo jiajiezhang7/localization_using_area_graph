@@ -1,0 +1,6 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/jay/AGLoc_ws/install/area_graph_data_parser/lib/python3.10/site-packages",
+        "/opt/ros/iron/lib/python3.10/site-packages"
+    ]
+}

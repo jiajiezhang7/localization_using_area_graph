@@ -190,8 +190,6 @@ public:
     // 添加虚析构函数
     virtual ~CloudBase() = default;
 
-    // 处理map相关info的回调函数
-    void mapCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
     void mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
     void AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg);
 
@@ -211,21 +209,11 @@ public:
     virtual void allocateMemory() = 0;
     virtual void resetParameters() = 0;
 
-    // Core processing functions
-    void initializedUsingMassCenter();
-    void liosamPathCB(const nav_msgs::msg::Path::SharedPtr pathMsg);
+
 
     // NOT USED functions (keeping for compatibility)
     void verticalRadiusFilter();
-    void test();
-    void glassReflectionFilter();
-    void optimization();
-    void checkMapinRay(int ring, int horizonIndex, int& last_index);
-    void mapInitCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);
-    void imuCB(const sensor_msgs::msg::Imu::SharedPtr imuMsg);
-    void getGTfromLiosam(std_msgs::msg::Header cloudHeader);
-    void formFurthestRing();
-    double calParticleDist(int ring, int horizonIndex, int& last_index);
+
     void saveTUMTraj(geometry_msgs::msg::PoseStamped& pose_stamped);
 
 
@@ -261,27 +249,10 @@ private:
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
         
-        // TODO /mapPC和/mapPCInit，由于禁用map_handler，所以不需要订阅
-        subMap = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/mapPC", qos,
-            std::bind(&CloudBase::mapCB, this, std::placeholders::_1));
-
-        subMapInit = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/mapPCInit", qos,
-            std::bind(&CloudBase::mapInitCB, this, std::placeholders::_1));
 
         subMapAG = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/mapPC_AG", qos,
-            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));
-            
-        subImu = this->create_subscription<sensor_msgs::msg::Imu>(
-            "imu/data", qos,
-            std::bind(&CloudBase::imuCB, this, std::placeholders::_1));
-            
-        subLiosamPath = this->create_subscription<nav_msgs::msg::Path>(
-            "/lio_sam/mapping/path", qos,
-            std::bind(&CloudBase::liosamPathCB, this, std::placeholders::_1));
-            
+            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));         
             
         subAGindex = this->create_subscription<area_graph_data_parser::msg::AGindex>(
             "/AGindex", qos,

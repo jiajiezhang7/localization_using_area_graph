@@ -1305,6 +1305,7 @@ void CloudHandler::optimizationICP() {
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     
+    // 创建CloudHandler实例
     auto cloudHandler = std::make_shared<CloudHandler>();
     
     // Set logging level
