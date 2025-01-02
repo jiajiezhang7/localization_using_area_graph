@@ -172,32 +172,6 @@ void CloudHandler::getInitialExtGuess(
     getGuessOnce = true;
 }
 
-
-void CloudHandler::liosamOdometryIncrementalCB(
-    const nav_msgs::msg::Odometry::SharedPtr odomMsg) {
-    // 将里程计数据保存为TUM格式
-    // TUM格式: timestamp tx ty tz qx qy qz qw
-    LiosamPoseTum << rclcpp::Time(odomMsg->header.stamp).seconds() << " "
-                  << odomMsg->pose.pose.position.x << " "
-                  << odomMsg->pose.pose.position.y << " "
-                  << odomMsg->pose.pose.position.z << " "
-                  << odomMsg->pose.pose.orientation.x << " "
-                  << odomMsg->pose.pose.orientation.y << " "
-                  << odomMsg->pose.pose.orientation.z << " "
-                  << odomMsg->pose.pose.orientation.w << std::endl;
-
-    // 转换并发布路径
-    geometry_msgs::msg::PoseStamped this_pose_stamped;
-    this_pose_stamped.header = odomMsg->header;  // 保持原始时间戳和坐标系
-    // 使用transformLiosamPathnew函数转换LIO-SAM的路径
-    this_pose_stamped.pose = transformLiosamPathnew(odomMsg);
-    
-    // 将转换后的位姿添加到路径中
-    TransformedLiosamPath.poses.push_back(this_pose_stamped);
-    // 发布转换后的LIO-SAM路径
-    pubTransformedLiosamPath->publish(TransformedLiosamPath);
-}
-
 /**
  * @brief 点云处理的主回调函数
  * @details 该函数负责处理接收到的激光雷达点云数据,主要功能包括:
@@ -247,11 +221,11 @@ void CloudHandler::cloudHandlerCB(
     mapHeader.frame_id = "map";
     globalPath.header = mapHeader;
 
-    // 将ROS点云消息转换为PCL点云格式
+    // lidar_points -> laserCloudMsg -> laserCloudIn
     sensor_msgs::msg::PointCloud2 temp_msg = *laserCloudMsg;
     pcl::fromROSMsg(temp_msg, *laserCloudIn);
     
-    // 组织点云数据(将无序点云组织成有序结构)
+    // laserCloudIn -> organizedCloudIn
     organizePointcloud();
     
     if(bFurthestRingTracking) {

@@ -89,7 +89,7 @@ private:
 
     // 回调方法
     void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 处理接收到的点云数据
-    void liosamOdometryIncrementalCB(const nav_msgs::msg::Odometry::SharedPtr odomMsg);  // 处理LIO-SAM里程计增量数据
+
     void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 获取初始外部猜测
 
     // 初始化发布器和订阅器
@@ -113,18 +113,7 @@ private:
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));
-            
-        // 订阅LIO-SAM里程计数据
-        subLiosamOdometry = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/lio_sam/mapping/odometry", qos,
-            std::bind(&CloudHandler::liosamOdometryIncrementalCB, this, std::placeholders::_1));
-
-        // 订阅LIO-SAM增量里程计数据（在Fujing的代码中没有使用）
-        // subLiosamodometry_incremental = this->create_subscription<nav_msgs::msg::Odometry>(
-        //     "/lio_sam/mapping/odometry_incremental", qos,
-        //     std::bind(&CloudHandler::liosamOdometryIncrementalCB, 
-        //              this, 
-        //              std::placeholders::_1));
+        
     }
 
     // 初始化变量

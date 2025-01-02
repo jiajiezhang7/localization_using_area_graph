@@ -139,8 +139,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(VelodynePointXYZIRT,
 struct HesaiPointXYZIRT {
     PCL_ADD_POINT4D
     PCL_ADD_INTENSITY
-    double timestamp;  // 8 bytes
-    uint32_t ring;    // 4 bytes
+    double timestamp; 
+    uint16_t ring;    
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
@@ -150,8 +150,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(HesaiPointXYZIRT,
     (double, timestamp, timestamp)(uint32_t, ring, ring))
 
 
-
-using PointXYZIRT = HesaiPointXYZIRT;
+// 还是用回和Fujing一样的点云结构
+using PointXYZIRT = VelodynePointXYZIRT;
 typedef pcl::PointXYZI PointType;
 
 enum class SensorType { VELODYNE, OUSTER };

@@ -112,7 +112,7 @@ public:
 
 
     // Point cloud containers
-    pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;  // 原始激光点云
+    pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;  // 原始激光点云  --- 在PCL中注册的自定义点云类型
     pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn;  // 组织化的点云
     pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudIn64;  // 64线组织化点云
     pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing;  // 最远环
@@ -201,8 +201,6 @@ public:
     void setEveryFrame();
 
     bool areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex);
-    geometry_msgs::msg::PoseStamped transformLiosamPath(const nav_msgs::msg::Path& pathMsg);
-    geometry_msgs::msg::Pose transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg);
     // VIRTUAL functions
     virtual void calClosestMapPoint(int inside_index) = 0;
     virtual bool checkMap(int ring, int horizonIndex, int& last_index, double& minDist, int inside_index) = 0;

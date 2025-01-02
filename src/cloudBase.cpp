@@ -44,7 +44,14 @@ void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
                  << " " << pose_stamped.pose.orientation.w << std::endl;
 }
 
-// 检查机器人是否在区域内
+
+
+// robotPose 是机器人的当前位置姿态（4x4矩阵），从中提取出机器人的x、y、z坐标位置。
+// map_pc 是一个点云，它存储了区域边界的顶点信息。每个点的intensity值用来标记边界的特征（比如是否是区域的结束点）。
+// 代码的核心逻辑是：
+    // 从机器人位置发射一条射线（通过创建一个远处的点robotInfinity）
+    // 检查这条射线与区域边界的交点数量（throughTimes）
+    // 如果交点数为奇数，说明点在区域内；如果为偶数，说明点在区域外
 bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex) {
     // 创建机器人当前位置点
     pcl::PointXYZI robot;
@@ -128,94 +135,6 @@ CloudBase::CloudBase(const std::string& node_name)
     setInitialPose(initialYawAngle, initialExtTrans);
 
     RCLCPP_INFO(this->get_logger(), "CloudBase initialized successfully");
-}
-
-// only call this for 2022-11-14-19-07-34 bag
-geometry_msgs::msg::PoseStamped CloudBase::transformLiosamPath(const nav_msgs::msg::Path& pathMsg) {
-    geometry_msgs::msg::PoseStamped this_pose_stamped;
-    this_pose_stamped = pathMsg.poses.back();
-
-    Eigen::Matrix3d rotation_matrix;
-    rotation_matrix << 0.9965, -0.0800, -0.0080,
-                      0.0800,  0.9966, -0.0006,
-                      0.0080, -0.0006,  0.9999;
-
-    Eigen::Quaterniond quaternion(rotation_matrix);
-    Eigen::Quaterniond quaternionLIO(
-        this_pose_stamped.pose.orientation.w,
-        this_pose_stamped.pose.orientation.x,
-        this_pose_stamped.pose.orientation.y,
-        this_pose_stamped.pose.orientation.z);
-        
-    Eigen::Quaterniond afterRotationQuat = quaternion * quaternionLIO;
-
-    double newx = 0.9965 * pathMsg.poses.back().pose.position.x - 
-                 0.08 * pathMsg.poses.back().pose.position.y -
-                 0.0080 * pathMsg.poses.back().pose.position.z - 0.1024;
-                 
-    double newy = 0.0800 * pathMsg.poses.back().pose.position.x +
-                 0.9966 * pathMsg.poses.back().pose.position.y -
-                 0.0006 * pathMsg.poses.back().pose.position.z - 0.2499;
-                 
-    double newz = 0.0080 * pathMsg.poses.back().pose.position.x -
-                 0.0006 * pathMsg.poses.back().pose.position.y +
-                 0.9999 * pathMsg.poses.back().pose.position.z + 0.0092;
-
-    this_pose_stamped.pose.position.x = newx;
-    this_pose_stamped.pose.position.y = newy;
-    this_pose_stamped.pose.position.z = newz;
-    this_pose_stamped.pose.orientation.w = afterRotationQuat.w();
-    this_pose_stamped.pose.orientation.x = afterRotationQuat.x();
-    this_pose_stamped.pose.orientation.y = afterRotationQuat.y();
-    this_pose_stamped.pose.orientation.z = afterRotationQuat.z();
-
-    return this_pose_stamped;
-}
-
-geometry_msgs::msg::Pose CloudBase::transformLiosamPathnew(const nav_msgs::msg::Odometry::SharedPtr pathMsg) {
-    // [[ 0.99968442 -0.02004835 -0.01513714]
-    //  [ 0.01981344  0.99968335 -0.01551225]
-    //  [ 0.01544334  0.01520744  0.99976509]]
-    // [ 1.65950261 -4.2548306   0.0313965 ]
-    geometry_msgs::msg::Pose this_pose_stamped;
-    this_pose_stamped = pathMsg->pose.pose;
-
-    Eigen::Matrix3d rotation_matrix;
-    // 0524 bag
-    rotation_matrix << -0.9817312, 0.19017827, 0.00600681,
-                      -0.19000758, -0.98153977, 0.02183553,
-                       0.01004857, 0.02029529, 0.99974353;
-                       
-    Eigen::Quaterniond quaternion(rotation_matrix);
-    Eigen::Quaterniond quaternionLIO(
-        this_pose_stamped.orientation.w,
-        this_pose_stamped.orientation.x,
-        this_pose_stamped.orientation.y,
-        this_pose_stamped.orientation.z);
-        
-    Eigen::Quaterniond afterRotationQuat = quaternion * quaternionLIO;
-
-    double newx = -0.9817312 * pathMsg->pose.pose.position.x + 
-                  0.19017827 * pathMsg->pose.pose.position.y + 
-                  0.00600681 * pathMsg->pose.pose.position.z - 1.06462496;
-                  
-    double newy = -0.19000758 * pathMsg->pose.pose.position.x - 
-                  0.98153977 * pathMsg->pose.pose.position.y + 
-                  0.02183553 * pathMsg->pose.pose.position.z - 3.08371366;
-                  
-    double newz = 0.01004857 * pathMsg->pose.pose.position.x + 
-                  0.02029529 * pathMsg->pose.pose.position.y + 
-                  0.99974353 * pathMsg->pose.pose.position.z + 0.06008223;
-
-    this_pose_stamped.position.x = newx;
-    this_pose_stamped.position.y = newy;
-    this_pose_stamped.position.z = newz;
-    this_pose_stamped.orientation.w = afterRotationQuat.w();
-    this_pose_stamped.orientation.x = afterRotationQuat.x();
-    this_pose_stamped.orientation.y = afterRotationQuat.y();
-    this_pose_stamped.orientation.z = afterRotationQuat.z();
-    
-    return this_pose_stamped;
 }
 
 // 接受到AGindex后的回调处理
@@ -360,18 +279,11 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
 }
 
 
-/**
- * @brief 组织点云数据的主要函数
- * @details 该函数负责将无序的点云数据组织成有序结构,主要功能包括:
- *          1. 验证扫描参数的有效性
- *          2. 记录点云统计信息
- *          3. 初始化数据结构
- *          4. 处理每个点并计算相关参数
- *          5. 根据ring信息组织点云
- * 
- * @note 该函数期望输入的点云数据包含ring信息(如Velodyne点云)
- *       如果输入数据不包含ring信息可能会导致错误
- */
+// 函数作用：将原始的无序激光点云数据组织成有序的格式（按行列排列）， 过滤掉无效和不需要的点（如地面点、太远或太近的点）
+// 输入： LaserCloudIn
+// 输出 --- 函数计算后的结果存储在：
+    // 1. organizedCloudIn64 -- 完整的64线点云
+    // 2. organizedCloudIn -- 筛选后的有序点云(根据运行模式不同而存储不同内容：降采样点云或最远点)
 void CloudBase::organizePointcloud() {
     // 添加参数验证
     if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
@@ -446,6 +358,7 @@ void CloudBase::organizePointcloud() {
             float range = std::sqrt(range_xy * range_xy + thisPoint.z * thisPoint.z);
 
             // 6. 获取行索引并验证
+            // 这里就是访问ring的地方
             int rowIdn = laserCloudIn->points[i].ring;
             if (rowIdn < 0 || rowIdn >= N_SCAN) {
                 RCLCPP_ERROR(get_logger(), 
