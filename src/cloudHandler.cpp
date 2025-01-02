@@ -1287,10 +1287,10 @@ int main(int argc, char** argv) {
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");
 
     // Use multi-threaded executor for better performance
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(cloudHandler);
-    executor.spin();
-
+    // rclcpp::executors::MultiThreadedExecutor executor;
+    // executor.add_node(cloudHandler);
+    // executor.spin();
+    rclcpp::spin(cloudHandler);
     rclcpp::shutdown();
     return 0;
 }
