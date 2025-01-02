@@ -78,7 +78,6 @@ void ParamServer::declare_parameters() {
     this->declare_parameter("downsampleRateHorizontal", 1);
 
     // Extrinsic parameters
-    this->declare_parameter("initialExtrinsicRot", std::vector<double>());
     this->declare_parameter("initialExtrinsicTrans", std::vector<double>());
     this->declare_parameter("mapExtrinsicTrans", std::vector<double>());
     this->declare_parameter("initialYawAngle", 0.0);
@@ -143,18 +142,10 @@ void ParamServer::get_parameters() {
     this->get_parameter("downsampleRateHorizontal", downsampleRateHorizontal);
 
     // Get extrinsic parameters
-    std::vector<double> extRotV, extTransV, mapextTransV;
-    this->get_parameter("initialExtrinsicRot", extRotV);
+    std::vector<double> extTransV, mapextTransV;
     this->get_parameter("initialExtrinsicTrans", extTransV);
     this->get_parameter("mapExtrinsicTrans", mapextTransV);
 
-    if(!extRotV.empty()) {
-        // 创建临时vector来存储转换后的float数据
-        std::vector<float> extRotVFloat(extRotV.begin(), extRotV.end());
-        initialExtRot = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
-            extRotVFloat.data(), 3, 3);
-    }
-    
     if(!extTransV.empty()) {
         std::vector<float> extTransVFloat(extTransV.begin(), extTransV.end());
         initialExtTrans = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(

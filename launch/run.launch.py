@@ -42,7 +42,7 @@ def generate_launch_description():
     # 添加start_offset参数声明，可以让bag从指定时间开始播放
     start_offset_arg = DeclareLaunchArgument(
         'start_offset',
-        default_value='0.0',
+        default_value='47.0',
         description='Start playing the bag from this time offset (in seconds)'
     )
 

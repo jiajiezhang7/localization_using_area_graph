@@ -32,6 +32,7 @@
  */
 #include "localization_using_area_graph/cloudBase.hpp"
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <opencv2/opencv.hpp>
 
 void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
     robotPoseTum << pose_stamped.header.stamp.sec + pose_stamped.header.stamp.nanosec * 1e-9 
@@ -150,6 +151,9 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     // 添加调试信息
     RCLCPP_INFO(this->get_logger(), "Receiving map from AG");
 
+    // 获取当前地图点云的大小
+    mapSize = map_pc->points.size();
+    
     // 检查条件
     if(!AGindexReceived || mapInit) {
         RCLCPP_WARN(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
@@ -157,13 +161,12 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
         return; 
     }
 
-    // 获取当前地图点云的大小
-    mapSize = map_pc->points.size();
 
     // 设置地图坐标系为"map"
     std_msgs::msg::Header tempHeader = laserCloudMsg->header;
+    // 设置发布的可视化topic的地图坐标系为"map"，这样才能检验map_pc的正确性
     tempHeader.frame_id = "map";
-    
+
     // 创建PCL点云对象用于存储原始和变换后的地图
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMap(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserAGMapTansformed(new pcl::PointCloud<pcl::PointXYZI>());
@@ -179,11 +182,11 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
         RCLCPP_ERROR(this->get_logger(), "PCL conversion failed: %s", e.what());
         return;
     }
-   
-    //    FIXME: 这里的map坐标系转换，由于launch文件中已经做出了坐标系的转换，因此params.yaml中的mapExtTrans不应该再在mapAGCB中被使用
+
     // 构建地图变换矩阵
     Eigen::Matrix4f mapPose = Eigen::Matrix4f::Zero();
     Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
+
     transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
     transform_initial.rotate(Eigen::AngleAxisf(mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
     mapPose = transform_initial.matrix();
@@ -191,7 +194,7 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     // 对点云进行坐标变换
     try {
         pcl::transformPointCloud(*laserAGMap, *laserAGMapTansformed, mapPose);
-        RCLCPP_INFO(this->get_logger(), "Point cloud transformation successful");
+        RCLCPP_INFO(this->get_logger(), "-----------Point cloud transformation successful------------");
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Transform failed: %s", e.what());
         return;
@@ -234,7 +237,6 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
                             i, thisPoint.intensity, intensityMod3);
             }
 
-            // 在这里，map_pc被laserAGMapTansformed覆盖掉了
             map_pc->points[i] = thisPoint;
             mapHistogram.push_back(0);
 
@@ -267,6 +269,64 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     pcl::toROSMsg(*map_pc, outMsgMap);
     outMsgMap.header = tempHeader;
     pubMapPC->publish(outMsgMap);
+
+    // 创建可视化图像
+    const int img_size = 800;
+    const int margin = 50;
+    cv::Mat visualization = cv::Mat::zeros(img_size + 2*margin, img_size + 2*margin, CV_8UC3);
+    
+    // 计算点云的边界框
+    float min_x = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::lowest();
+    float min_y = std::numeric_limits<float>::max();
+    float max_y = std::numeric_limits<float>::lowest();
+    
+    for (const auto& point : map_pc->points) {
+        min_x = std::min(min_x, point.x);
+        max_x = std::max(max_x, point.x);
+        min_y = std::min(min_y, point.y);
+        max_y = std::max(max_y, point.y);
+    }
+    
+    // 计算缩放因子
+    float scale = img_size / std::max(max_x - min_x, max_y - min_y);
+    
+    // 绘制地图点云（白色）
+    for (size_t i = 0; i < map_pc->points.size(); i++) {
+        int x = static_cast<int>((map_pc->points[i].x - min_x) * scale) + margin;
+        int y = static_cast<int>((map_pc->points[i].y - min_y) * scale) + margin;
+        cv::circle(visualization, cv::Point(x, y), 1, cv::Scalar(255, 255, 255), -1);
+        
+    }
+    
+    // 绘制地图中心点（绿色）
+    int center_x = static_cast<int>((mapCenterInitialization(0) - min_x) * scale) + margin;
+    int center_y = static_cast<int>((mapCenterInitialization(1) - min_y) * scale) + margin;
+    cv::circle(visualization, cv::Point(center_x, center_y), 5, cv::Scalar(0, 255, 0), -1);
+    
+    // 绘制初始位置（红色）
+    int init_x = static_cast<int>((initialExtTrans[0] - min_x) * scale) + margin;
+    int init_y = static_cast<int>((initialExtTrans[1] - min_y) * scale) + margin;
+    cv::circle(visualization, cv::Point(init_x, init_y), 5, cv::Scalar(0, 0, 255), -1);
+    
+    // 绘制初始方向箭头
+    float arrow_length = 20.0; // 箭头长度（像素）
+    float init_angle = initialYawAngle * M_PI / 180.0; // 转换为弧度
+    int arrow_x = init_x + static_cast<int>(arrow_length * cos(init_angle));
+    int arrow_y = init_y + static_cast<int>(arrow_length * sin(init_angle));
+    cv::arrowedLine(visualization, cv::Point(init_x, init_y), 
+                    cv::Point(arrow_x, arrow_y),
+                    cv::Scalar(0, 0, 255), 2, cv::LINE_AA, 0, 0.3);
+    
+    // 添加图例
+    cv::putText(visualization, "Map Center", cv::Point(margin, img_size + margin * 1.5), 
+                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+    cv::putText(visualization, "Initial Pose", cv::Point(margin + 150, img_size + margin * 1.5), 
+                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
+    
+    // 保存图像
+    cv::imwrite("/home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png", visualization);
+    RCLCPP_INFO(this->get_logger(), "Map visualization saved to /home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png");
 }
 
 

@@ -35,7 +35,6 @@
             # setInitialPose()：设置机器人初始姿态
             # mapAGCB()：处理地图坐标变换
 
-        # # Extrinsics (lidar -> IMU)
         # lidar to map
         # # 0510 bag
         # mapExtrinsicTrans: [9.8,-34.3, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]            # 地图到真实世界的平移
@@ -43,25 +42,16 @@
         # initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0]     # 初始位置猜测 （本应由WiFi给出）
         # mapYawAngle: -81.0 #0510                                                                      # 地图旋转角度
 
-        # Jiajie 现在复现代码做测试所用的是0524的配置
-        #  0524 bag
-        initialExtrinsicTrans: [-1.0,-3.2, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
-        initialYawAngle: 180.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
-        # transform ag to nearly zero
-        # 这里会把AGmap的坐标系变换到map的坐标系下，所以这里需要设置AGmap到map的平移和旋转，但是这里和run.launch.py中的设置tf关系是重复的
-        mapExtrinsicTrans: [146.0,-64.0, 0.0]  #transform AG 2022-11 bag  [9.8,-34.3, 0.0]
-        mapYawAngle: 0.0 #0524
+        # 机器人的初始姿态（平移 + 旋转） --- 在setInitialPose()中使用
+        #  Setting estimate pose: Frame:map, Position(-6.76983, -8.49974, 0), Orientation(0, 0, 0.00181106, 0.999998) = Angle: 0.00362212
+        initialExtrinsicTrans: [-6.76983, -8.49974, 0.0]
+        initialYawAngle: 0.00362212
 
-        # initialExtrinsicRot: [0.7071068, -0.7071068, 0,
-        #                 0.7071068, 0.7071068, 0,
-        #                 0, 0, 1]
-        # initialExtrinsicRot: [0.731, -0.682, 0,
-        # 0.682, 0.731, 0,
-        # 0, 0, 1]
-        initialExtrinsicRot: [1.0 ,0.0, 0.0, 
-                                0.0,1.0, 0.0, 
-                                0.0, 0.0, 1.0]                                    
-        # -------------------------------------------------
+
+        # 地图坐标系的外参平移向量，用于将AGmap坐标系下的mapPC的坐标值转换为map坐标系下的坐标值，存储在map_pc中
+        mapExtrinsicTrans: [-32.5, -7.0, -16.0]
+        mapYawAngle: 187.0   #单位:度 187.0
+
 
         opti: true
         ##LBFGS para

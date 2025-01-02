@@ -315,7 +315,7 @@ void CloudHandler::cloudHandlerCB(
             showImg1line("Pose tracking");
         }
 
-        RCLCPP_INFO(get_logger(), "NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML");
+        RCLCPP_INFO(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
         
         // 使用当前机器人位姿变换点云
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);

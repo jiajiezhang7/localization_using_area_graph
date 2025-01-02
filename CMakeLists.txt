@@ -76,6 +76,7 @@ ament_target_dependencies(utility
   cv_bridge
   image_transport
   area_graph_data_parser
+  OpenCV  # 添加这一行
 )
 
 target_link_libraries(utility
@@ -102,7 +103,7 @@ target_link_libraries(cloud_handler
   ${CERES_LIBRARIES}
   ${message_filters_LIBRARIES}
   OpenMP::OpenMP_CXX
-  tf2_geometry_msgs::tf2_geometry_msgs  # 修改这一行
+  tf2_geometry_msgs::tf2_geometry_msgs  
 )
 
 
@@ -134,10 +135,11 @@ foreach(target
     visualization_msgs
     tf2
     tf2_ros
-    tf2_geometry_msgs  # 添加这一行
+    tf2_geometry_msgs  
     cv_bridge
     image_transport
     area_graph_data_parser
+    OpenCV  # 添加这一行
   )
 endforeach()
 
