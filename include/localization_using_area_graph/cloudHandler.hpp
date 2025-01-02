@@ -32,7 +32,6 @@ public:
     // ROS2 订阅器
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subLaserCloud;    // 订阅激光点云数据
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;  // 订阅初始位姿猜测
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamOdometry;      // 订阅LIO-SAM里程计数据
 
     // ROS2 发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云

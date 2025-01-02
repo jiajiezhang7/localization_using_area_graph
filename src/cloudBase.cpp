@@ -123,15 +123,6 @@ CloudBase::CloudBase(const std::string& node_name)
     initializeSubscribers();
     allocateMemory();
 
-    // 通过LIO-SAM得到的GT数据保存路径
-    GTstream.open("/home/jay/AGLoc_ws/src/localization_using_area_graph/data/GT/GTliosam.txt", 
-                  std::ofstream::app);
-    GTstream.setf(std::ios::fixed);
-    GTstream.precision(2);
-
-    TransformedLiosamPath.header.stamp = this->now();
-    TransformedLiosamPath.header.frame_id = "map";
-
     setInitialPose(initialYawAngle, initialExtTrans);
 
     RCLCPP_INFO(this->get_logger(), "CloudBase initialized successfully");

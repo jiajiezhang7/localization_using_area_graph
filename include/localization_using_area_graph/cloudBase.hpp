@@ -38,9 +38,7 @@ public:
     
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;             //订阅 /mapPC_AG  --- 来自 topology_publisher (area_graph_data_parser)
     rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;    // 订阅AG_index话题 -- 来自 topology_publisher (area_graph_data_parser)
-    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu;                     // 订阅IMU数据
-    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr subLiosamPath;                // 订阅LIO-SAM路径数据
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subLiosamodometry_incremental; // 订阅LIO-SAM增量里程计数据
+    
    
 
     // 消息头部信息
@@ -63,14 +61,12 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOptiPC;              // 发布优化后的点云
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径
-    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubTransformedLiosamPath;         // 发布变换后的LIO-SAM路径
+
     rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;               // 发布完成信号
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubInsidePC;            // 发布内部点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOutsidePC;           // 发布外部点云
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubinfinity;          // 发布无穷远点标记
 
-    // 存储变换后的LIO-SAM路径数据
-    nav_msgs::msg::Path TransformedLiosamPath;
 
     // 标志位和状态变量
     bool bUseFurestestRing;      // 是否使用最远环点云
@@ -180,7 +176,6 @@ public:
     // 输出流
     std::ofstream GTstream;                         // 地面真值输出流
     std::ofstream robotPoseTum;                     // 机器人位姿TUM格式输出流
-    std::ofstream LiosamPoseTum;                    // LIO-SAM位姿TUM格式输出流
 
 
     
@@ -237,7 +232,7 @@ private:
         pubAGMapTransformedPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubAGMapTransformedPC", qos);
         pubOptiPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOptiPC", qos);
         pubRobotPath = this->create_publisher<nav_msgs::msg::Path>("RobotPath", qos);
-        pubTransformedLiosamPath = this->create_publisher<nav_msgs::msg::Path>("TransformedLiosamPath", qos);
+
         pubDONEsignal = this->create_publisher<geometry_msgs::msg::Pose>("doneInit", qos);
         pubInsidePC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubInsidePC", qos);
         pubOutsidePC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOutsidePC", qos);

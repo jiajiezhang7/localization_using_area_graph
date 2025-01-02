@@ -149,12 +149,6 @@ CloudHandler::CloudHandler()
                       std::ios::ate);
     robotPoseTum << std::fixed;
     robotPoseTum.precision(6);
-    
-    // 打开文件以保存LIO-SAM位姿结果（TUM格式）
-    LiosamPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/LiosamPoseTum.txt", 
-                       std::ios::ate);
-    LiosamPoseTum << std::fixed;
-    LiosamPoseTum.precision(6);
 
     // 分配内存
     allocateMemory();
