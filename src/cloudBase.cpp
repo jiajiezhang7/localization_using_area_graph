@@ -53,6 +53,8 @@ void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
     // 从机器人位置发射一条射线（通过创建一个远处的点robotInfinity）
     // 检查这条射线与区域边界的交点数量（throughTimes）
     // 如果交点数为奇数，说明点在区域内；如果为偶数，说明点在区域外
+
+// input: robotPose, Area的起始点
 bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex) {
     // 创建机器人当前位置点
     pcl::PointXYZI robot;
@@ -85,6 +87,7 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
     for(int i = areaStartIndex; i < areaStartIndex + 1000000; i++) {
         // 到达区域末尾时退出
         if((int)map_pc->points[i].intensity % 3 == 2) {
+            // intensity % 3 == 2 --> Area的结束点
             break;
         }
         bool b_inray;
@@ -110,10 +113,11 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
         line_strip->points.push_back(p);
         line_strip->points.push_back(p_);
         pubinfinity->publish(*line_strip);
-
+        RCLCPP_INFO(this->get_logger(), "------------------throughTimes: %d ---------------------------", throughTimes);
         return true;
+    } else {
+        return false;
     }
-    return false;
 }
 
 // 初始化CloudBase类
@@ -149,14 +153,14 @@ void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr 
  */
 void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     // 添加调试信息
-    RCLCPP_INFO(this->get_logger(), "Receiving map from AG");
+    RCLCPP_DEBUG(this->get_logger(), "Receiving map from AG");
 
     // 获取当前地图点云的大小
     mapSize = map_pc->points.size();
     
     // 检查条件
     if(!AGindexReceived || mapInit) {
-        RCLCPP_WARN(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
+        RCLCPP_DEBUG(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
                     AGindexReceived, mapInit);
         return; 
     }
@@ -173,9 +177,8 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
 
     // 将ROS消息转换为PCL点云格式
     try {
-        RCLCPP_INFO(this->get_logger(), "Starting PCL conversion...");
         pcl::fromROSMsg(*laserCloudMsg, *laserAGMap);
-        RCLCPP_INFO(this->get_logger(), "PCL conversion successful. Points: %zu", 
+        RCLCPP_INFO(this->get_logger(), "---------------PCL conversion successful. AGMap Points: %zu-----------------", 
                     laserAGMap->points.size());
 
     } catch (const std::exception& e) {
@@ -194,7 +197,7 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     // 对点云进行坐标变换
     try {
         pcl::transformPointCloud(*laserAGMap, *laserAGMapTansformed, mapPose);
-        RCLCPP_INFO(this->get_logger(), "-----------Point cloud transformation successful------------");
+        RCLCPP_INFO(this->get_logger(), "-----------AGmap Points transformation successful------------");
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Transform failed: %s", e.what());
         return;
@@ -477,7 +480,7 @@ void CloudBase::organizePointcloud() {
 
         // 14. 记录处理结果
         RCLCPP_INFO(get_logger(), 
-            "Point cloud organized: %d valid points, %d filtered points",
+            "-------------Point cloud organized: %d valid points, %d filtered points--------------",
             validPoints, filteredPoints);
 
         // rescue without initialization

@@ -5,7 +5,7 @@
         # 点云数据的预处理和组织
         # 过滤无效点
         # 实现论文中的"clutter removal"步骤
-        pointCloudTopic: "/lidar_points"            # Point cloud topic
+        pointCloudTopic: "/hesai/pandar"            # Point cloud topic  --- Jiajie's Version We got /lidar_points
         N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
         Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
         downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
@@ -42,16 +42,37 @@
         # initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0]     # 初始位置猜测 （本应由WiFi给出）
         # mapYawAngle: -81.0 #0510                                                                      # 地图旋转角度
 
+
+    # Jiajie's osmAG SIST1-2F-D
+        # mapExtrinsicTrans: [-32.5, -7.0, -16.0]
+        # mapYawAngle: 187.0   #单位:度 187.0
+
         # 机器人的初始姿态（平移 + 旋转） --- 在setInitialPose()中使用
         #  Setting estimate pose: Frame:map, Position(-6.76983, -8.49974, 0), Orientation(0, 0, 0.00181106, 0.999998) = Angle: 0.00362212
-        initialExtrinsicTrans: [-6.76983, -8.49974, 0.0]
-        initialYawAngle: 0.00362212
+        # initialExtrinsicTrans: [-6.76983, -8.49974, 0.0]
+        # initialYawAngle: 100.0
+
+        # -------------------------------
+
+    # Fujing's 0510 bag
+        # for osmAG map
+        mapExtrinsicTrans: [9.8,-34.3, -16.0] 
+        mapYawAngle: -81.0 #0510
+
+        # for Robot pose 0510 bag
+        initialYawAngle: 10.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
+        initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
 
 
-        # 地图坐标系的外参平移向量，用于将AGmap坐标系下的mapPC的坐标值转换为map坐标系下的坐标值，存储在map_pc中
-        mapExtrinsicTrans: [-32.5, -7.0, -16.0]
-        mapYawAngle: 187.0   #单位:度 187.0
+        # initialExtrinsicTrans: [10.0, -9.5, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
+    # -------------------------------------
+        # for Robot pose 0524 bag
 
+        # mapExtrinsicTrans: [146.0,-64.0, -16.0] 
+        # mapYawAngle: 0.0 #0524
+
+        # initialYawAngle: 180.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
+        # initialExtrinsicTrans: [-1.0, -3.2, 0.0] # 从pandarQT转到map下
 
         opti: true
         ##LBFGS para

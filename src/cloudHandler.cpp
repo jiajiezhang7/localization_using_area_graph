@@ -88,11 +88,13 @@ void CloudHandler::gettingInsideWhichArea() {
         
         // 检查新区域的开始
         if((int)map_pc->points[i].intensity % 3 == 0) {
+            // intensity % 3 == 0 --> Area的起始点
             binside = areaInsideChecking(robotPose, i);
             temp++;
         }
         
         if(binside) {
+            // TODO: 程序现在在这里出错 -- binside == false  --> insideTime == 0
             insideTime++;
             insideAreaStartIndex = i;
             insideAreaID = temp;
@@ -113,6 +115,7 @@ void CloudHandler::gettingInsideWhichArea() {
     if(insideTime > 1) {
         RCLCPP_ERROR(get_logger(), "错误: 机器人位置在多个区域内!");
     } else if(insideTime == 0) {
+        // TODO: 程序现在在这里出错
         RCLCPP_ERROR(get_logger(), "错误: 机器人位置在所有区域外!");
     } else {
         RCLCPP_INFO(get_logger(), "机器人位置在区域 %d 内", insideAreaStartIndex);
@@ -157,7 +160,7 @@ CloudHandler::CloudHandler()
     setInitialPose(initialYawAngle, initialExtTrans);
 
     // 输出警告信息，表示云处理器已准备就绪
-    RCLCPP_WARN(get_logger(), "CLOUD HANDLER READY");
+    RCLCPP_INFO(get_logger(), "CLOUD HANDLER READY");
 }
 
 // TODO 虽然照着Fujing写，但是对这个函数有疑问（它的参数没有被使用）
@@ -183,8 +186,8 @@ void CloudHandler::cloudHandlerCB(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
 
     // 输出当前地图初始化状态和大小
-    RCLCPP_INFO(get_logger(), "Received point cloud message, mapInit=%d", mapInit);
-    RCLCPP_INFO(get_logger(), "Map size: %zu", map_pc->points.size());
+    RCLCPP_DEBUG(get_logger(), "Received point cloud message, mapInit=%d", mapInit);
+    RCLCPP_DEBUG(get_logger(), "Map size: %zu", map_pc->points.size());
     
     // 显示全局定位开始的分隔线
     if(globalImgTimes == 0) {
@@ -203,7 +206,7 @@ void CloudHandler::cloudHandlerCB(
 
     // 检查地图是否初始化，未初始化则返回
     if(!mapInit) {
-        RCLCPP_WARN(get_logger(), "Map not initialized yet, waiting for map!");
+        RCLCPP_INFO(get_logger(), "Map not initialized yet, waiting for map!");
         return;
     }
 
@@ -222,10 +225,6 @@ void CloudHandler::cloudHandlerCB(
     // laserCloudIn -> organizedCloudIn
     organizePointcloud();
     
-    if(bFurthestRingTracking) {
-        // N_SCAN = 1; // 原代码中的注释
-    }
-
     // 发布组织化后的点云
     sensor_msgs::msg::PointCloud2 outMsg;
     pcl::toROSMsg(*organizedCloudIn, outMsg);
@@ -310,19 +309,21 @@ void CloudHandler::cloudHandlerCB(
                                      &cloudInitializer, 
                                      std::placeholders::_1));
                                      
-            RCLCPP_ERROR(get_logger(), "SETTING ERRORUPTHRED=3");
+            RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
             getGuessOnce = false;
             showImg1line("Pose tracking");
         }
 
-        RCLCPP_INFO(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
+        RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
         
         // 使用当前机器人位姿变换点云
+        // TODO: 核心问题可能出在这里 --- organizedCloudIn指的是在原来的坐标系下的点云，需要变换到机器人坐标系下,但是变换后的点云并没有和地图对上（在旋转角度上出现了问题）
+        // 这就导致filterUsefulPoints函数无法进行有效的点云筛选
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);
         RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]", 
                     robotPose(0,3), robotPose(1,3));
 
-        // 发布变换后的点云
+        // 发布变换后的点云(1*600)
         sensor_msgs::msg::PointCloud2 transformedMsg;
         pcl::toROSMsg(*transformed_pc, transformedMsg);
         transformedMsg.header = mapHeader;
@@ -354,12 +355,12 @@ void CloudHandler::cloudHandlerCB(
         startTime = this->now();
         optimizationICP();
         
-        // 发布优化后的变换点云
+        // 发布优化后的变换点云(1*600)
         pcl::toROSMsg(*transformed_pc, transformedMsg);
         transformedMsg.header = mapHeader;
         pubTransformedPC->publish(transformedMsg);
 
-        // 变换并发布完整点云
+        // 变换并发布完整点云(64*600)
         auto transformed_pc_ = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         transformed_pc_->resize(64 * Horizon_SCAN);
         pcl::transformPointCloud(*organizedCloudIn64, *transformed_pc_, robotPose);
@@ -535,7 +536,7 @@ bool CloudHandler::checkMap(int ring,
             continue;
         }
 
-        // 计算当前激光线与地图线段的交点
+        // 计算激光射线与地图线段的交点
         pcl::PointXYZI intersectionOnMapThisLine;
         bool inbetween = inBetween(PosePoint,
                                  PCPoint,
@@ -767,16 +768,29 @@ void CloudHandler::filterUsefulPoints() {
     
     // 调整记录数组大小
     outsideAreaIndexRecord.resize(transformed_pc->points.size(), 0);        // 区域外点索引记录
-    outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);                 // 最后一圈区域外点索引记录
+    outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);      
+
+    // Debug: 在 filterUsefulPoints() 函数中添加以下调试信息
+    RCLCPP_INFO(this->get_logger(), "transformed_pc size: %zu", transformed_pc->points.size());
+    RCLCPP_INFO(this->get_logger(), "intersectionOnMap size: %zu", intersectionOnMap->points.size());
+    RCLCPP_INFO(this->get_logger(), "Horizon_SCAN value: %d", Horizon_SCAN);
+    RCLCPP_INFO(this->get_logger(), "Valid points before filtering: %zu", transformed_pc->points.size());
 
     // 遍历所有变换后的点云
     for(size_t i = 0; i < transformed_pc->points.size(); i++) {
+        // 添加索引安全检查
+        if (i >= intersectionOnMap->points.size()) {
+            RCLCPP_ERROR(this->get_logger(), "Index out of bounds: i=%zu, intersectionOnMap size=%zu", 
+                        i, intersectionOnMap->points.size());
+            continue;
+        }
+
         // 检查点是否为NaN
         if(std::isnan(transformed_pc->points[i].x) || 
            std::isnan(transformed_pc->points[i].y) ||
            std::isnan(intersectionOnMap->points[i % Horizon_SCAN].x) || 
            std::isnan(intersectionOnMap->points[i % Horizon_SCAN].y)) {
-            RCLCPP_ERROR_ONCE(this->get_logger(), "NaN points in transformed pc!");
+            RCLCPP_INFO(this->get_logger(), "NaN point detected at index %zu", i);
             continue;
         }
 
@@ -936,6 +950,19 @@ void CloudHandler::filterUsefulPoints() {
                 }
             }
         }
+    }
+
+    // 在计算完所有点后添加安全检查和调试信息
+    RCLCPP_INFO(this->get_logger(), "Number of ICP points: %d", numIcpPoints);
+    RCLCPP_INFO(this->get_logger(), "Turkey weight sum: %f", weightSumTurkey);
+
+    if (numIcpPoints == 0) {
+        RCLCPP_WARN(this->get_logger(), "No valid ICP points found! This may cause tracking failure.");
+        return;
+    }
+
+    if (weightSumTurkey < 1e-6) {
+        RCLCPP_WARN(this->get_logger(), "Turkey weight sum is too small: %f", weightSumTurkey);
     }
 }
 
@@ -1129,6 +1156,19 @@ void CloudHandler::allocateMemory() {
                  intersectionOnMap->points.size());
 }
 
+
+// optimizationICP()函数本身没有显式的输入参数，但它使用了类内的成员变量作为输入数据：
+
+    // 输入（类成员变量）：
+    // transformed_pc：需要被配准的点云
+    // UsefulPoints1和UsefulPoints2：用于ICP匹配的源点云和目标点云
+    // robotPose：当前机器人的位姿估计
+
+    // 输出（更新的类成员变量）：
+    // robotPose：更新后的机器人位姿矩阵（4x4的变换矩阵）
+    // transformed_pc：经过新位姿变换后的点云
+    // globalPath：将新的位姿添加到全局路径中
+    // initialized：如果ICP收敛，会将这个标志设置为true
 // ICP优化函数，用于对点云进行迭代最近点匹配优化
 void CloudHandler::optimizationICP() {
     // 根据是否已初始化决定迭代次数
@@ -1138,7 +1178,7 @@ void CloudHandler::optimizationICP() {
     for(int iteration = 0; iteration < totalIteration; iteration++) {
         auto startTime = this->now();
         
-        // 重置每次迭代的相关变量
+        // 在每次ICP迭代开始时，函数会清空上一次迭代的数据
         averDistancePairedPoints = 0;  // 配对点的平均距离
         currentIteration = iteration;  // 当前迭代次数
         Vec_pcx.clear();  // 清空点云x坐标向量
@@ -1146,8 +1186,19 @@ void CloudHandler::optimizationICP() {
         Vec_pedalx.clear();  // 清空垂足x坐标向量
         Vec_pedaly.clear();  // 清空垂足y坐标向量
 
-        // 过滤并更新有效点
+        // 过滤和处理用于ICP匹配的有效点： 通过筛选得到高质量的点对（UsefulPoints1和UsefulPoints2 && usefulIndex）
         filterUsefulPoints();
+
+        // 在计算中心点之前添加检查
+        if (numIcpPoints == 0) {
+            RCLCPP_ERROR(this->get_logger(), "No valid points for ICP, skipping optimization");
+            return;
+        }
+        
+        if (use_weight && weightSumTurkey < 1e-6) {
+            RCLCPP_ERROR(this->get_logger(), "Invalid weight sum for Turkey weights");
+            return;
+        }
 
         // 如果启用了走廊检测，则处理走廊检测
         if(detect_corridor) {
@@ -1211,8 +1262,10 @@ void CloudHandler::optimizationICP() {
 
         // 发布中间结果点云
         sensor_msgs::msg::PointCloud2 cloud_msg;
-        pcl::toROSMsg(*UsefulPoints1, cloud_msg);
         cloud_msg.header = mapHeader;
+
+        // UsefulPoints1是源点云 --- 代表LiDAR帧点云中被筛选后的用于ICP的有效点，UsefulPoints2是目标点云 --- 来自地图
+        pcl::toROSMsg(*UsefulPoints1, cloud_msg);
         pubUsefulPoints1->publish(cloud_msg);
 
         pcl::toROSMsg(*UsefulPoints2, cloud_msg);
