@@ -94,7 +94,6 @@ void CloudHandler::gettingInsideWhichArea() {
         }
         
         if(binside) {
-            // TODO: 程序现在在这里出错 -- binside == false  --> insideTime == 0
             insideTime++;
             insideAreaStartIndex = i;
             insideAreaID = temp;
@@ -115,7 +114,6 @@ void CloudHandler::gettingInsideWhichArea() {
     if(insideTime > 1) {
         RCLCPP_ERROR(get_logger(), "错误: 机器人位置在多个区域内!");
     } else if(insideTime == 0) {
-        // TODO: 程序现在在这里出错
         RCLCPP_ERROR(get_logger(), "错误: 机器人位置在所有区域外!");
     } else {
         RCLCPP_INFO(get_logger(), "机器人位置在区域 %d 内", insideAreaStartIndex);
@@ -317,8 +315,6 @@ void CloudHandler::cloudHandlerCB(
         RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
         
         // 使用当前机器人位姿变换点云
-        // TODO: 核心问题可能出在这里 --- organizedCloudIn指的是在原来的坐标系下的点云，需要变换到机器人坐标系下,但是变换后的点云并没有和地图对上（在旋转角度上出现了问题）
-        // 这就导致filterUsefulPoints函数无法进行有效的点云筛选
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);
         RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]", 
                     robotPose(0,3), robotPose(1,3));
