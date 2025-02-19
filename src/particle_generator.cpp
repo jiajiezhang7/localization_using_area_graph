@@ -29,8 +29,8 @@ ParticleGenerator::ParticleGenerator()
 void ParticleGenerator::initializeParameters() 
 {
     // Declare and get parameters
-    this->declare_parameter("step", 2.0);  // 粒子采样步长
-    this->declare_parameter("radius", 6.0);  //搜索半径
+    this->declare_parameter("particle_generator_step", 2.0);  // 粒子采样步长
+    this->declare_parameter("particle_generator_radius", 6.0);  //搜索半径
     this->declare_parameter("bRescueRobot", false);
 
     // 读取参数值
@@ -49,7 +49,7 @@ void ParticleGenerator::initializePublishersSubscribers()
     auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
     
     // 发布用于初始化的采样粒子
-    particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud>(
+    particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/particles_for_init", qos);
         
     // 订阅1: LiDAR 点云话题
@@ -79,7 +79,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
 {
     // 获取ground truth中心(测试用途)
     // 在实际应用中，这应该来自WiFi定位 TODO 待MaXu部分完成后，接入WiFi接口
-    std::array<double, 2> gt_center = {0.0, 0.0};  // placeholder
+    std::array<double, 2> gt_center = {0.5, 0.15};  // placeholder
     
     // 添加噪声
     gt_center[0] += 0.25 * dist_(gen_);
@@ -92,12 +92,9 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
 void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
                                         const std::array<double, 2>& gt_center) 
 {
-    // Create point cloud message for particles
-    sensor_msgs::msg::PointCloud particles_msg;
-    particles_msg.header.frame_id = "map";
-    particles_msg.header.stamp = stamp;
+    // 创建PCL点云对象
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
     
-    // 1. 在中心点周围的圆形区域内采样粒子
     for (double x = gt_center[0] - radius_; x <= gt_center[0] + radius_; x += 1.0/step_) {
         for (double y = gt_center[1] - radius_; y <= gt_center[1] + radius_; y += 1.0/step_) {
             Eigen::Vector2d point(x, y);
@@ -110,15 +107,26 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
             // 检查每个粒子是否在Area Graph的有效区域内
             for (size_t i = 0; i < AGmaps_.size(); i++) {
                 if (checkIntersection(point, AGmaps_[i])) {
-                    geometry_msgs::msg::Point32 p;
+                    pcl::PointXYZI p;
                     p.x = x;
                     p.y = y;
                     p.z = i;  // Area index 区域索引
-                    particles_msg.points.push_back(p);
+                    p.intensity = 1.0;
+                    cloud->points.push_back(p);
                 }
             }
         }
     }
+    
+    cloud->width = cloud->points.size();
+    cloud->height = 1;
+    cloud->is_dense = true;
+
+    // 转换为ROS消息并发布
+    sensor_msgs::msg::PointCloud2 particles_msg;
+    pcl::toROSMsg(*cloud, particles_msg);
+    particles_msg.header.stamp = stamp;
+    particles_msg.header.frame_id = "map";
     
     // Publish particles
     particle_pub_->publish(particles_msg);

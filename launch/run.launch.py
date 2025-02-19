@@ -30,7 +30,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='false',
+        default_value='true',
         description='Whether to use global localization'
     )
 

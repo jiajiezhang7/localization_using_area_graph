@@ -32,7 +32,7 @@ private:
     std::vector<std::vector<Eigen::Vector2d>> AGmaps_; // Area Graph map data
     
     // Publishers & Subscribers
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr particle_pub_;        // 发布采样得到的
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr particle_pub_;        // 发布采样得到的
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;       // 订阅雷达点云话题
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr agmap_sub_;       // 订阅 ag_map (/pubAGMapTransformedPC)
