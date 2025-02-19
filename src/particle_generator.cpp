@@ -12,6 +12,7 @@
 
 #include "localization_using_area_graph/particle_generator.hpp"
 
+// 初始化部分
 ParticleGenerator::ParticleGenerator()
     : Node("particle_generator"), 
       gen_(rd_()), 
@@ -24,6 +25,7 @@ ParticleGenerator::ParticleGenerator()
     RCLCPP_INFO(this->get_logger(), "ParticleGenerator initialized");
 }
 
+// 参数配置
 void ParticleGenerator::initializeParameters() 
 {
     // Declare and get parameters
@@ -40,6 +42,7 @@ void ParticleGenerator::initializeParameters()
                 step_, radius_);
 }
 
+// 发布者订阅者初始化
 void ParticleGenerator::initializePublishersSubscribers() 
 {
     // Create QoS profile
@@ -49,17 +52,18 @@ void ParticleGenerator::initializePublishersSubscribers()
     particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud>(
         "/particles_for_init", qos);
         
-    // 订阅 LiDAR 点云话题
+    // 订阅1: LiDAR 点云话题
     lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/hesai/pandar", qos,
         std::bind(&ParticleGenerator::lidarCallback, this, std::placeholders::_1));
     
-    // 订阅osmAG地图中的node点云（经由mapAGCB处理，其坐标数值已被变换到map坐标系下）
+    // 订阅2: osmAG地图中的node点云（经由mapAGCB处理，其坐标数值已被变换到map坐标系下）
     agmap_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/pubAGMapTransformedPC", qos,
         std::bind(&ParticleGenerator::agmapCallback, this, std::placeholders::_1));
 }
 
+// 可能用于转换楼层后的地图加载逻辑，但现在单层情况下不需要，暂时不实现
 void ParticleGenerator::loadMapData() 
 {
     try {
@@ -93,12 +97,12 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     particles_msg.header.frame_id = "map";
     particles_msg.header.stamp = stamp;
     
-    // 在ground truth中心周围生成圆形搜索区域内的粒子
+    // 1. 在中心点周围的圆形区域内采样粒子
     for (double x = gt_center[0] - radius_; x <= gt_center[0] + radius_; x += 1.0/step_) {
         for (double y = gt_center[1] - radius_; y <= gt_center[1] + radius_; y += 1.0/step_) {
             Eigen::Vector2d point(x, y);
             
-            // 检查生成的粒子是否在搜索圆内
+            // 2. 检查是否在搜索圆内
             if ((point - Eigen::Vector2d(gt_center[0], gt_center[1])).norm() > radius_) {
                 continue;
             }

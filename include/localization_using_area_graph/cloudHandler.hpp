@@ -47,7 +47,7 @@ public:
     std::vector<bool> vbHistogramRemain;  // 直方图剩余标志
     std::chrono::steady_clock::time_point sumFrameRunTime; // 使用ROS2时间，累计帧运行时间
     int numofFrame;       // 帧数
-    bool getGuessOnce;    // 是否已获得一次猜测
+    bool hasGlobalPoseEstimate;    // 是否已从全局定位获得位姿估计
     int globalImgTimes;   // 全局图像次数
 
     explicit CloudHandler();  // 显式构造函数
@@ -88,8 +88,7 @@ private:
 
     // 回调方法
     void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 处理接收到的点云数据
-
-    void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 获取初始外部猜测
+    void setInitialGuessFlag(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 设置初始猜测标志
 
     // 初始化发布器和订阅器
     void initializePublishers() {
@@ -108,10 +107,10 @@ private:
             pointCloudTopic, qos,
             std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
             
-        // 订阅初始猜测粒子，一旦检测到生成的粒子，则使得标识符 getGuessOnce == True
+        // 订阅初始猜测粒子，一旦检测到生成的粒子，则使得标识符 hasGlobalPoseEstimate == True
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
-            std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));
+            std::bind(&CloudHandler::setInitialGuessFlag, this, std::placeholders::_1));
         
     }
 
@@ -122,7 +121,7 @@ private:
         insideAreaStartIndex = 0;  // 内部区域起始索引
         insideAreaID = 0;          // 内部区域ID
         numofFrame = 0;            // 帧数
-        getGuessOnce = false;      // 是否已获得一次猜测
+        hasGlobalPoseEstimate = false;      // 是否已从全局定位获得位姿估计
         globalImgTimes = 0;        // 全局图像次数
         
 

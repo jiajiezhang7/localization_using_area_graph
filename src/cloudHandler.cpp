@@ -137,7 +137,7 @@ CloudHandler::CloudHandler()
     : CloudBase("cloud_handler_node") {
     // 初始化变量
     globalImgTimes = 0;  // 全局图像计数器
-    getGuessOnce = false;  // 是否已获取初始猜测标志
+    hasGlobalPoseEstimate = false;  // 是否已获取全局位姿估计标志
     sumFrameRunTime = std::chrono::steady_clock::now();  // 累计帧运行时间
     numofFrame = 0;  // 帧数计数器
 
@@ -163,9 +163,9 @@ CloudHandler::CloudHandler()
 }
 
 // TODO 虽然照着Fujing写，但是对这个函数有疑问（它的参数没有被使用）
-void CloudHandler::getInitialExtGuess(
+void CloudHandler::setInitialGuessFlag(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
-    getGuessOnce = true;
+    hasGlobalPoseEstimate = true;
 }
 
 /**
@@ -264,8 +264,8 @@ void CloudHandler::cloudHandlerCB(
     }
     // 模式2: 救援机器人模式 - 全局定位(仅一次)和位姿跟踪
     else if(bRescueRobot) {
-        // 只有当 getGuessOnce == true时，才才会执行模式二后续的代码
-        if(!getGuessOnce) {
+        // 只有当 hasGlobalPoseEstimate == true时，才才会执行模式二后续的代码
+        if(!hasGlobalPoseEstimate) {
             return;
         }
 
@@ -296,14 +296,14 @@ void CloudHandler::cloudHandlerCB(
         bRescueRobot = false;
 
         subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/none", 10, std::bind(&CloudHandler::getInitialExtGuess, 
+            "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag, 
                                  this, std::placeholders::_1));
         return;
     }
     // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿 （目前能跑通的模式）
     else {
-        // 如果从模式2的全局定位环节得到了初始位姿，则使用它，并且覆盖从params中读取的默认值
-        if(getGuessOnce) {
+        // 如果从模式2的全局定位环节计算得到了初始位姿，则使用它，并且覆盖从params中读取的默认值
+        if(hasGlobalPoseEstimate) {
             // 使用全局定位的结果
             robotPose = cloudInitializer.MaxRobotPose;
             errorUpThred = 3;
@@ -314,7 +314,7 @@ void CloudHandler::cloudHandlerCB(
                                        std::placeholders::_1));
                                        
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
-            getGuessOnce = false;
+            hasGlobalPoseEstimate = false;
             showImg1line("Pose tracking");
         }
         // 如果没有从模式2中得到初始位姿，则使用params中读取的默认值
