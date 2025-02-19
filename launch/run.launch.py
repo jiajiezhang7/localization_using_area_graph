@@ -14,7 +14,7 @@ def generate_launch_description():
     # # Jiajie's Version
     # bag_file_arg = DeclareLaunchArgument(
     #     'bag_file',
-    #     default_value='/home/jay/AGLoc_ws/rosbag/1226/1226.mcap',  # 注意不需要.db3后缀
+    #     default_value='/home/jay/AGLoc_ws/rosbag/1226/1226.mcap', 
     #     description='Path to ROS2 bag file'
     # )
 
@@ -24,6 +24,7 @@ def generate_launch_description():
         default_value='/home/jay/AGLoc_ws/rosbag/seq01',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
+
     osm_file = os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_F2_All_Sec.osm')
     params_file = os.path.join(pkg_dir, 'config', 'params.yaml')
 
@@ -173,6 +174,8 @@ def generate_launch_description():
                 ),
             ]
         ),
+
+        # 播放Jiajie录的bag，但有个问题是，无法给出机器人初始的准确位姿，因此会跟丢
         # Jiajie's Version: Play Bag File
         # ExecuteProcess(
         #     cmd=['ros2', 'bag', 'play', '-s', 'mcap',

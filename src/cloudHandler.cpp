@@ -155,6 +155,7 @@ CloudHandler::CloudHandler()
     allocateMemory();
     
     // 从params.yaml文件中读取并设置初始位姿
+    // 在模式1和模式2 -- 开启全局定位下， 造时设置初始位姿（会被覆盖），会通过getInitialExtGuess和rescueRobot重新估计位姿
     setInitialPose(initialYawAngle, initialExtTrans);
 
     // 输出警告信息，表示云处理器已准备就绪
@@ -242,11 +243,12 @@ void CloudHandler::cloudHandlerCB(
     if(bTestRescue) {  
         RCLCPP_WARN(get_logger(), "TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE");
         
-        // 设置初始位姿估计的回调函数
+        // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
                                             &cloudInitializer, 
                                             std::placeholders::_1);
-                                            
+
+        // 实际上调用的就是CloudInitializer::getInitialExtGuess                                    
         cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
@@ -262,6 +264,7 @@ void CloudHandler::cloudHandlerCB(
     }
     // 模式2: 救援机器人模式 - 全局定位(仅一次)和位姿跟踪
     else if(bRescueRobot) {
+        // 只有当 getGuessOnce == true时，才才会执行模式二后续的代码
         if(!getGuessOnce) {
             return;
         }
@@ -291,27 +294,30 @@ void CloudHandler::cloudHandlerCB(
         
         // 关闭救援模式并重置订阅器
         bRescueRobot = false;
+
         subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/none", 10, std::bind(&CloudHandler::getInitialExtGuess, 
                                  this, std::placeholders::_1));
         return;
     }
-    // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿
+    // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿 （目前能跑通的模式）
     else {
+        // 如果从模式2的全局定位环节得到了初始位姿，则使用它，并且覆盖从params中读取的默认值
         if(getGuessOnce) {
+            // 使用全局定位的结果
             robotPose = cloudInitializer.MaxRobotPose;
             errorUpThred = 3;
             
             cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess, 
-                                     &cloudInitializer, 
-                                     std::placeholders::_1));
-                                     
+                                       &cloudInitializer, 
+                                       std::placeholders::_1));
+                                       
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
             getGuessOnce = false;
             showImg1line("Pose tracking");
         }
-
+        // 如果没有从模式2中得到初始位姿，则使用params中读取的默认值
         RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
         
         // 使用当前机器人位姿变换点云
@@ -1335,10 +1341,6 @@ int main(int argc, char** argv) {
 
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");
 
-    // Use multi-threaded executor for better performance
-    // rclcpp::executors::MultiThreadedExecutor executor;
-    // executor.add_node(cloudHandler);
-    // executor.spin();
     rclcpp::spin(cloudHandler);
     rclcpp::shutdown();
     return 0;

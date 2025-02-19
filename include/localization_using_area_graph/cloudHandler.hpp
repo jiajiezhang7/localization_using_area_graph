@@ -36,7 +36,7 @@ public:
     // ROS2 发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云
 
-    // 核心功能对象
+    // cloudInitializer时在CloudHandler类构造时就已经被实例化了的
     CloudInitializer cloudInitializer;  // 云初始化器对象
 
     // 地图相关索引
@@ -108,7 +108,7 @@ private:
             pointCloudTopic, qos,
             std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
             
-        // 订阅初始猜测粒子
+        // 订阅初始猜测粒子，一旦检测到生成的粒子，则使得标识符 getGuessOnce == True
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::getInitialExtGuess, this, std::placeholders::_1));

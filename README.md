@@ -34,10 +34,18 @@ sudo apt-get install -y libceres-dev
 
 ## 4. complie and run:
 ```bash
+(由于自定义消息格式原因，以下编译area_graph_data_parser命令需要执行两次)
 colcon build --symlink-install --packages-select area_graph_data_parser 
 colcon build --symlink-install --packages-select localization_using_area_graph
 source install/setup.bash
 ros2 launch localization_using_area_graph run.launch.py
 ```
 ## 4. output:
- - global robot path published as a ROS2 topic "/RobotPath" estimated by AGLoc system.
+ - global robot path published as a ROS2 topic "/RobotPath" under frame_id=map estimated by AGLoc system.
+
+
+## 与Maxu确认的点
+ - 确保双方的osmAG地图的root_node为: root: lat = "31.17947960435" lon="121.59139728509
+ - 确认WiFi-Module的output为:
+  - long lat 坐标
+  - 机器人楼层信息

@@ -5,7 +5,7 @@
         # 点云数据的预处理和组织
         # 过滤无效点
         # 实现论文中的"clutter removal"步骤
-        pointCloudTopic: "/hesai/pandar"            # Point cloud topic  --- Jiajie's Version We got /lidar_points
+        pointCloudTopic: "/hesai/pandar"            # Point cloud topic  --- Jiajie's Version bag We got /lidar_points
         N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
         Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
         downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
@@ -54,20 +54,24 @@
 
         # -------------------------------
 
-    # Fujing's 0510 bag
-        # for osmAG map
+    # Fujing's 0510 bag - 也即 seq01 在SIST1-D
+        # for osmAG map, 这是拿来把mapPC_AG坐标系下的node点云转换到map_PC坐标系下，使他们有正确的坐标值
+        # 对于确定的osmAG地图确定的root_node，以下参数无须改动 - root: lat = "31.17947960435" lon="121.59139728509
         mapExtrinsicTrans: [9.8,-34.3, -16.0] 
-        mapYawAngle: -81.0 #0510
+        mapYawAngle: -81.0 # seq01
 
-        # for Robot pose 0510 bag
+        # for Robot pose seq01 bag， 这些参数在 setInitialPose()中被使用
+            # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值
         initialYawAngle: 10.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
         initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
 
 
         # initialExtrinsicTrans: [10.0, -9.5, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
     # -------------------------------------
-        # for Robot pose 0524 bag
 
+        # for Robot pose 0524 bag - 也即 seq02 在SIST1-A
+        # 这里seq02所使用的osmAG地图的root_node是不规范的权宜之计（与所有的osmAG不同）
+            # 因此这里的参数也不同，但没有参考价值
         # mapExtrinsicTrans: [146.0,-64.0, -16.0] 
         # mapYawAngle: 0.0 #0524
 
@@ -148,14 +152,16 @@
 
         # case1: bRescueRobot: true, bTestRescue: true
                         # test rescue robot, meaning all frames are supposed to get a rescue result
-                        # start sendData in launch
         # case2: bRescueRobot: true, bTestRescue: false
                         # rescue robot once, then go to nominal localization
                         # this is how the real robot operate, rescue then localization
         # case3: bRescueRobot: false, bTestRescue: fasle
                         # given initial pose, only localization, only set initialied in code
 
+        # 是否全局定位+位姿跟踪（模式2）
         bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        
+        # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
         bTestRescue:  false                  # 是否测试 [全局定位准不准] 模式
 
         # 添加particle_generator参数

@@ -7,76 +7,7 @@
  * @version 0.1
  * @date 2024-11-09
  * 
- * @details Implementation details of the global localization algorithms:
- * 
- * 1. Initialization Algorithm Implementation:
- *    - Particle Generation:
- *      * Uniform sampling around WiFi position
- *      * Efficient search space reduction
- *      * Memory-efficient particle storage
- *    - Score Calculation:
- *      * Optimized ray casting implementation
- *      * Fast intersection computation
- *      * Parallel score evaluation where possible
- * 
- * 2. Rescue Algorithm Optimization:
- *    - Multi-threaded particle evaluation
- *    - Early termination for poor candidates
- *    - Adaptive search space refinement
- *    - Efficient hypothesis tracking
- *
- * 3. Critical Implementation Optimizations:
- *    - Point cloud intersection caching
- *    - Efficient geometric calculations
- *    - Memory pool for particles
- *    - Quick reject strategies for invalid poses
- *
- * 4. Real-time Performance Features:
- *    - Map data structure optimization
- *    - Bounded computation time guarantees
- *    - Efficient data structure updates
- *    - Minimal memory allocation in core loops
- *
- * Algorithm Performance Metrics:
- * - Global localization time: ~88ms average
- * - Success rate: >80% within 0.5m error
- * - Memory usage: <200MB peak
- * 
- * Key Implementation Functions:
- * - showImgIni(): Real-time visualization with efficiency considerations
- * - rescueRobot(): Optimized recovery with early termination
- * - setLaserCloudin(): Efficient point cloud processing
- * - initializationICP(): Fast initial alignment
- *
- * Critical Sections:
- * - Particle evaluation loop
- * - Score calculation
- * - ICP initialization
- * - Map intersection computation
- *
- * Error Handling:
- * - Invalid particle detection
- * - Degenerate case handling
- * - Numerical stability checks
- * - Timeout mechanisms
- *
- * @implementation_notes
- * - Uses OpenMP for parallel particle evaluation
- * - Critical sections protected with proper synchronization
- * - Memory management optimized for real-time operation
- * - Visualization overhead minimized
- *
- * @performance_considerations
- * - Particle count vs accuracy tradeoff
- * - Search space vs computation time
- * - Memory usage vs caching benefits
- * - Visualization impact on performance
- *
- * @todo Potential Optimizations:
- * - GPU acceleration for particle evaluation
- * - Adaptive particle count based on uncertainty
- * - Dynamic parameter tuning
- * - Further parallelization opportunities
+ * @details Implementation details of the global localization algorithms
  *
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
@@ -156,23 +87,25 @@ void CloudInitializer::setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_) {
 
 
 void CloudInitializer::getInitialExtGuess(
+    // 这里的laserCloudMsg 即为 particle_for_init
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     
     RCLCPP_WARN(this->get_logger(), "CloudInitializer GETTING INITIAL GUESS");
 
     // 处理 particle_generator 提供的初始粒子
-    // 将ROS2 PointCloud2消息转换为PCL点云
+        // 创建一个PCL点云指针
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        // 点云格式转换： PointCloud2 -> PCL
     pcl::fromROSMsg(*laserCloudMsg, *cloud);
+        // 获取粒子数量
     int GuessSize = cloud->points.size();
 
-    // 清空corridorGuess向量为新的数据做准备
+    // 清空之前的猜测数据
     corridorGuess.clear();
 
-    // 遍历所有点,构建guess
+    // 遍历所有点,构建3D向量 -- x,y表示猜测的位置坐标， z表示猜测属于哪个Area
     for (int i = 0; i < GuessSize; i++) {
         Eigen::Vector3f tempGuess;
-        // z表示这个guess属于哪个区域 - 保持原来的逻辑不变
         tempGuess << cloud->points[i].x,
                     cloud->points[i].y,
                     cloud->points[i].z;
@@ -184,6 +117,7 @@ void CloudInitializer::getInitialExtGuess(
 
     // 计算救援时间
     auto startTime = this->now();
+    // 重点处理步骤在此
     rescueRobot();
     robotPose = MaxRobotPose;
     auto endTime = this->now();
@@ -195,9 +129,9 @@ void CloudInitializer::getInitialExtGuess(
                 (endTime - startTime).seconds() * 1000);
 }
 
-
+// 这个函数等待被理解
 void CloudInitializer::rescueRobot() {
-    RCLCPP_INFO(this->get_logger(), "Guess is ready, start rescue");
+    RCLCPP_INFO(this->get_logger(), "----------- Guess is ready, start rescue -----------------");
 
     // Prepare output file
     std::ostringstream ts;

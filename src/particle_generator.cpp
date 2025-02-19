@@ -54,7 +54,7 @@ void ParticleGenerator::initializePublishersSubscribers()
         "/hesai/pandar", qos,
         std::bind(&ParticleGenerator::lidarCallback, this, std::placeholders::_1));
     
-    // TODO 这是什么话题？有什么用？
+    // 订阅osmAG地图中的node点云（经由mapAGCB处理，其坐标数值已被变换到map坐标系下）
     agmap_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/pubAGMapTransformedPC", qos,
         std::bind(&ParticleGenerator::agmapCallback, this, std::placeholders::_1));
