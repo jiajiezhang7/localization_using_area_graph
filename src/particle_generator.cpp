@@ -79,7 +79,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
 {
     // 获取ground truth中心(测试用途)
     // 在实际应用中，这应该来自WiFi定位 TODO 待MaXu部分完成后，接入WiFi接口
-    std::array<double, 2> gt_center = {0.5, 0.15};  // placeholder
+    std::array<double, 2> gt_center = {0.0, 0.0};  // placeholder
     
     // 添加噪声
     gt_center[0] += 0.25 * dist_(gen_);

@@ -134,7 +134,8 @@ void CloudHandler::gettingInsideWhichArea() {
 }
 
 CloudHandler::CloudHandler() 
-    : CloudBase("cloud_handler_node") {
+    : CloudBase("cloud_handler_node"),
+      cloudInitializer() {  // 显式调用CloudInitializer的构造函数
     // 初始化变量
     globalImgTimes = 0;  // 全局图像计数器
     hasGlobalPoseEstimate = false;  // 是否已获取全局位姿估计标志
@@ -241,7 +242,7 @@ void CloudHandler::cloudHandlerCB(
 
     // 模式1: 测试全局定位 - 每帧都执行全局定位
     if(bTestRescue) {  
-        RCLCPP_WARN(get_logger(), "TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE");
+        RCLCPP_WARN(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
         
         // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
@@ -1334,9 +1335,9 @@ int main(int argc, char** argv) {
     // Set logging level
     if(rcutils_logging_set_logger_level(
         cloudHandler->get_logger().get_name(),
-        RCUTILS_LOG_SEVERITY_INFO)) {
+        RCUTILS_LOG_SEVERITY_DEBUG)) {
         auto logger = rclcpp::get_logger("CloudHandler");
-        RCLCPP_INFO(logger, "Logger level set to INFO");
+        RCLCPP_INFO(logger, "Logger level set to DEBUG");
     }
 
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");

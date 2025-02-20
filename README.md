@@ -45,7 +45,6 @@ ros2 launch localization_using_area_graph run.launch.py
 
 
 ## 与Maxu确认的点
- - 确保双方的osmAG地图的root_node为: root: lat = "31.17947960435" lon="121.59139728509"
  - 确认WiFi-Module的output为:
   - long lat 坐标
   - 机器人楼层信息
@@ -54,4 +53,3 @@ ros2 launch localization_using_area_graph run.launch.py
  -  将params 中的 bRescueRobot 设置为 true
  -  将run.launch.py中的 use_global_localization 设置为 true （或者在命令行中显式赋值）
 
- 

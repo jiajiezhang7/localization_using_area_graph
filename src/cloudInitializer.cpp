@@ -122,6 +122,7 @@ void CloudInitializer::getInitialExtGuess(
     robotPose = MaxRobotPose;
     auto endTime = this->now();
 
+    // 线索：在这行输出之前，程序已经崩溃了
     // 输出处理信息
     RCLCPP_INFO(this->get_logger(), 
                 "Number of guesses: %d, Rescue robot run time: %f ms",
@@ -152,6 +153,7 @@ void CloudInitializer::rescueRobot() {
 
     auto startC = std::chrono::high_resolution_clock::now();
     
+    // 如果 initialization_imu 为 false，才会进行救援
     if (!initialization_imu) {
         size_t try_time = static_cast<size_t>(360/rescue_angle_interval);
         auto organizedCloudInDS = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
@@ -164,12 +166,16 @@ void CloudInitializer::rescueRobot() {
         downSizeFurthestRing.setInputCloud(furthestRing);
         downSizeFurthestRing.filter(*organizedCloudInDS);
         
+        // 线索：这一行被打印了
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
+        // 线索：在以下程序中崩溃了，没有出这个函数
         // Try different angles
         for(size_t i = 0; i < try_time; i++) {
+            RCLCPP_INFO(this->get_logger(), "开始尝试第 %zu 个角度", i);
             for(size_t j = 0; j < corridorGuess.size(); j++) {
+                RCLCPP_INFO(this->get_logger(), "处理第 %zu 个粒子猜测", j);
                 auto startTime = this->now();
                 
                 // Publish current guess
@@ -178,9 +184,11 @@ void CloudInitializer::rescueRobot() {
                 this_guess_stamped.point.x = corridorGuess[j][0];
                 this_guess_stamped.point.y = corridorGuess[j][1];
                 this_guess_stamped.point.z = 0;
+                RCLCPP_INFO(this->get_logger(), "当前猜测位置: x=%.2f, y=%.2f", corridorGuess[j][0], corridorGuess[j][1]);
                 pubRobotGuessMarker->publish(this_guess_stamped);
 
                 // Reset parameters for new guess
+                RCLCPP_INFO(this->get_logger(), "重置参数");
                 accumulateAngle = 0;
                 averDistancePairedPoints = 0;
                 numofInsidePoints = 0;
@@ -192,19 +200,52 @@ void CloudInitializer::rescueRobot() {
                 turkeyScore = 0;
 
                 // Set initial pose for this guess
+                RCLCPP_INFO(this->get_logger(), "设置初始位姿, 角度=%.2f", std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
                 Eigen::Vector3f tempinitialExtTrans;
                 tempinitialExtTrans << corridorGuess[j][0], corridorGuess[j][1], 0;
                 setInitialPose(static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
                              tempinitialExtTrans);
                              
+                RCLCPP_INFO(this->get_logger(), "robotPose矩阵:\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f",
+                    robotPose(0,0), robotPose(0,1), robotPose(0,2), robotPose(0,3),
+                    robotPose(1,0), robotPose(1,1), robotPose(1,2), robotPose(1,3),
+                    robotPose(2,0), robotPose(2,1), robotPose(2,2), robotPose(2,3),
+                    robotPose(3,0), robotPose(3,1), robotPose(3,2), robotPose(3,3));
+                
                 // Transform point cloud
+                RCLCPP_INFO(this->get_logger(), "开始点云变换, 输入点云大小=%zu", organizedCloudInDS->points.size());
+                transformed_pc->points.clear();  // 清空点云
+                transformed_pc->points.resize(organizedCloudInDS->points.size());  // 调整大小以匹配输入点云
                 pcl::transformPointCloud(*organizedCloudInDS, *transformed_pc, robotPose);
+                RCLCPP_INFO(this->get_logger(), "点云变换完成, 输出点云大小=%zu", transformed_pc->points.size());
                 
                 // Publish transformed point cloud
                 sensor_msgs::msg::PointCloud2 outMsg;
                 pcl::toROSMsg(*transformed_pc, outMsg);
                 outMsg.header = mapHeader;
                 pubTransformedPC->publish(outMsg);
+
+                RCLCPP_INFO(this->get_logger(), "当前corridorGuess[%zu]的值: x=%.2f, y=%.2f, z=%.2f",
+                           j, corridorGuess[j][0], corridorGuess[j][1], corridorGuess[j][2]);
+
+
+
+                RCLCPP_INFO(this->get_logger(), "organizedCloudInDS->is_dense: %d", organizedCloudInDS->is_dense);
+                RCLCPP_INFO(this->get_logger(), "transformed_pc->is_dense: %d", transformed_pc->is_dense);
+                RCLCPP_INFO(this->get_logger(), "organizedCloudInDS->size: %zu", organizedCloudInDS->size());
+                RCLCPP_INFO(this->get_logger(), "transformed_pc->size: %zu", transformed_pc->size());
+
+                //线索： 打印完以上语句后，程序崩溃
+
+                // Check if corridorGuess[j] is valid
+                if (std::isnan(corridorGuess[j][0]) || std::isnan(corridorGuess[j][1]) || std::isnan(corridorGuess[j][2])) {
+                    RCLCPP_ERROR(this->get_logger(), "corridorGuess[%zu] contains NaN values!", j);
+                    continue; // Skip this guess
+                }
+                if (std::isinf(corridorGuess[j][0]) || std::isinf(corridorGuess[j][1]) || std::isinf(corridorGuess[j][2])) {
+                    RCLCPP_ERROR(this->get_logger(), "corridorGuess[%zu] contains Inf values!", j);
+                    continue; // Skip this guess
+                }
 
                 if(bInitializationWithICP) {
                     if(pause_iter) {
@@ -222,6 +263,7 @@ void CloudInitializer::rescueRobot() {
                     pubTransformedPC->publish(outMsg);
                 } else {
                     // If not using ICP initialization
+                    RCLCPP_INFO(this->get_logger(), "corridorGuess[j][2] = %.2f", corridorGuess[j][2]);
                     calClosestMapPoint(corridorGuess[j][2]);
                 }
 
@@ -553,7 +595,20 @@ void CloudInitializer::initializationICP(int insideAGIndex) {
     saveTUMTraj(pose_stamped);
 }
 
+// 线索，问题出现在这个函数中
 void CloudInitializer::calClosestMapPoint(int inside_index) {
+    // 首先检查AG_index是否已初始化
+    if (!AGindexReceived) {
+        RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
+        return;
+    }
+
+    // 检查发布器是否有效
+    if (!pubIntersection) {
+        RCLCPP_ERROR(get_logger(), "Publisher not initialized!");
+        return;
+    }
+
     int last_index = 0;
     size_t transformed_pc_size = transformed_pc->points.size();
     numIcpPoints = 0;
@@ -577,11 +632,37 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     outsidePC->clear();
     outsidePC->points.resize(transformed_pc_size);
 
+    RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环前还没有崩溃--------------------------");
+    RCLCPP_INFO(get_logger(), "transformed_pc_size = %zu", transformed_pc_size);
     for(size_t i = 0; i < transformed_pc_size; i++) {
+        RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
+        
+        // 检查点云数据的有效性
+        RCLCPP_DEBUG(get_logger(), "当前点坐标: x=%f, y=%f", 
+                     transformed_pc->points[i].x, 
+                     transformed_pc->points[i].y);
+        
         bool findIntersection = false;
         double minDist = 0;
+        
+        // 检查ringMapP1和ringMapP2的访问
+        RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
+                     i, ringMapP1->points[i].x, ringMapP1->points[i].y);
+        RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
+                     i, ringMapP2->points[i].x, ringMapP2->points[i].y);
+        
+        // 在这里崩溃
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
+        RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
+                     findIntersection, minDist);
+        
         double pedalx, pedaly;
+        RCLCPP_DEBUG(get_logger(), "开始计算垂足");
+        if (ringMapP1->points[i].x == ringMapP2->points[i].x && 
+            ringMapP1->points[i].y == ringMapP2->points[i].y) {
+            RCLCPP_DEBUG(get_logger(), "跳过重合点 %zu", i);
+            continue;
+        }
         calPedal(ringMapP1->points[i].x,
                  ringMapP1->points[i].y,
                  ringMapP2->points[i].x,
@@ -590,9 +671,11 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
                  transformed_pc->points[i].y,
                  pedalx,
                  pedaly);
+        RCLCPP_DEBUG(get_logger(), "垂足计算结果: x=%f, y=%f", pedalx, pedaly);
 
         double error = sqrt(pow(pedalx-transformed_pc->points[i].x, 2) +
                           pow(pedaly-transformed_pc->points[i].y, 2));
+        RCLCPP_DEBUG(get_logger(), "计算得到的error=%f", error);
 
         if(!findIntersection) {
             RCLCPP_ERROR_ONCE(get_logger(), 
@@ -600,25 +683,36 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
             continue;
         }
 
+        RCLCPP_DEBUG(get_logger(), "检查点 %zu: inRayDis=%f", i, inRayDis[i]);
         if(inRayDis[i] < 1e-6 && 
            (transformed_pc->points[i].x != 0 || transformed_pc->points[i].y != 0) && 
            findIntersection) {
             inRayDis[i] = error;
             inRayRange[i] = sqrt(minDist);
+            RCLCPP_DEBUG(get_logger(), "更新inRayDis[%zu]=%f, inRayRange[%zu]=%f", 
+                         i, inRayDis[i], i, inRayRange[i]);
         }
 
         if(!findIntersection) {
+            RCLCPP_DEBUG(get_logger(), "设置intersection点 %zu 为零", i);
             intersectionOnMap->points[i].x = 0;
             intersectionOnMap->points[i].y = 0;
             intersectionOnMap->points[i].z = 0;
         }
+        
+        RCLCPP_DEBUG(get_logger(), "完成处理第 %zu 个点", i);
     }
-
-    // Publish intersection points
-    sensor_msgs::msg::PointCloud2 outMsg;
-    pcl::toROSMsg(*intersectionOnMap, outMsg);
-    outMsg.header = mapHeader;
-    pubIntersection->publish(outMsg);
+    RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环后还没有崩溃--------------------------");
+    
+    // 只有当所有处理都成功完成时才发布消息
+    try {
+        sensor_msgs::msg::PointCloud2 outMsg;
+        pcl::toROSMsg(*intersectionOnMap, outMsg);
+        outMsg.header = mapHeader;
+        pubIntersection->publish(outMsg);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
+    }
 }
 
 
@@ -882,6 +976,28 @@ bool CloudInitializer::checkMap(int ring,
                               int& last_index,
                               double& minDist,
                               int inside_index) {
+    // 添加调试信息
+    RCLCPP_DEBUG(get_logger(), "checkMap: ring=%d, horizonIndex=%d, inside_index=%d", 
+                 ring, horizonIndex, inside_index);
+    RCLCPP_DEBUG(get_logger(), "mapSize=%d, map_pc size=%zu", 
+                 mapSize, map_pc ? map_pc->size() : 0);
+    
+    // 验证输入参数
+    if (inside_index < 0 || inside_index >= AG_index.area_index.size()) {
+        RCLCPP_ERROR(get_logger(), "Invalid inside_index: %d, area_index size: %zu", 
+                    inside_index, AG_index.area_index.size());
+        return false;
+    }
+    
+    if (!map_pc || map_pc->empty()) {
+        RCLCPP_ERROR(get_logger(), "map_pc is null or empty");
+        return false;
+    }
+    
+    RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
+                 AG_index.area_index[inside_index].start,
+                 AG_index.area_index[inside_index].end);
+    
     // Get current point coordinates
     pcl::PointXYZI PCPoint;
     PCPoint.x = transformed_pc->points[horizonIndex].x;
