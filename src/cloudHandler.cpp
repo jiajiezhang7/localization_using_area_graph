@@ -242,6 +242,12 @@ void CloudHandler::cloudHandlerCB(
 
     // 模式1: 测试全局定位 - 每帧都执行全局定位
     if(bTestRescue) {  
+        if (!AGindexReceived) {
+            RCLCPP_WARN(get_logger(), "等待接收到AGindex...................."); 
+        return;
+        }
+        
+         
         RCLCPP_WARN(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
         
         // 设置初始位姿估计的回调函数 --- 包装器
@@ -426,7 +432,7 @@ void CloudHandler::calClosestMapPoint(int inside_index) {
     // 记录上一次找到交点的地图索引，用于加速后续搜索
     int last_index = 0;
     
-    // 遍历激光雷达的��一个水平角度
+    // 遍历激光雷达的每一个水平角度
     for(int i = 0; i < Horizon_SCAN; i++) {
         bool findIntersection = false;
         

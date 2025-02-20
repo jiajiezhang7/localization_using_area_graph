@@ -110,7 +110,7 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
                     pcl::PointXYZI p;
                     p.x = x;
                     p.y = y;
-                    p.z = i;  // Area index 区域索引
+                    p.z = 0;  // 原来是 Area index 区域索引，但我改成了0
                     p.intensity = 1.0;
                     cloud->points.push_back(p);
                 }

@@ -235,7 +235,6 @@ void CloudInitializer::rescueRobot() {
                 RCLCPP_INFO(this->get_logger(), "organizedCloudInDS->size: %zu", organizedCloudInDS->size());
                 RCLCPP_INFO(this->get_logger(), "transformed_pc->size: %zu", transformed_pc->size());
 
-                //线索： 打印完以上语句后，程序崩溃
 
                 // Check if corridorGuess[j] is valid
                 if (std::isnan(corridorGuess[j][0]) || std::isnan(corridorGuess[j][1]) || std::isnan(corridorGuess[j][2])) {
@@ -246,6 +245,7 @@ void CloudInitializer::rescueRobot() {
                     RCLCPP_ERROR(this->get_logger(), "corridorGuess[%zu] contains Inf values!", j);
                     continue; // Skip this guess
                 }
+                //线索： 打印完以上语句后，程序崩溃
 
                 if(bInitializationWithICP) {
                     if(pause_iter) {
@@ -264,6 +264,7 @@ void CloudInitializer::rescueRobot() {
                 } else {
                     // If not using ICP initialization
                     RCLCPP_INFO(this->get_logger(), "corridorGuess[j][2] = %.2f", corridorGuess[j][2]);
+                    //  ----------------------------------出错点-----------------------------------
                     calClosestMapPoint(corridorGuess[j][2]);
                 }
 
@@ -598,10 +599,10 @@ void CloudInitializer::initializationICP(int insideAGIndex) {
 // 线索，问题出现在这个函数中
 void CloudInitializer::calClosestMapPoint(int inside_index) {
     // 首先检查AG_index是否已初始化
-    if (!AGindexReceived) {
-        RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
-        return;
-    }
+    // if (!AGindexReceived) {
+    //     RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
+    //     return;
+    // }
 
     // 检查发布器是否有效
     if (!pubIntersection) {
@@ -651,7 +652,6 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
         RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
                      i, ringMapP2->points[i].x, ringMapP2->points[i].y);
         
-        // 在这里崩溃
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
         RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
                      findIntersection, minDist);
