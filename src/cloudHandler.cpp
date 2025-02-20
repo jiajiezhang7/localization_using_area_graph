@@ -242,9 +242,10 @@ void CloudHandler::cloudHandlerCB(
 
     // 模式1: 测试全局定位 - 每帧都执行全局定位
     if(bTestRescue) {  
-        if (!AGindexReceived) {
-            RCLCPP_WARN(get_logger(), "等待接收到AGindex...................."); 
-        return;
+        if (!isAGIndexReceived()) {
+            RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
+            RCLCPP_WARN(get_logger(), "CloudBase::AGindexReceived: %d", isAGIndexReceived());
+            throw std::bad_weak_ptr();
         }
         
          

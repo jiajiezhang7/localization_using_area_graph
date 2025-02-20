@@ -34,6 +34,10 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <opencv2/opencv.hpp>
 
+// 静态成员变量的定义
+std::mutex CloudBase::agIndexMutex;
+bool CloudBase::AGindexReceived = false;
+
 void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
     robotPoseTum << pose_stamped.header.stamp.sec + pose_stamped.header.stamp.nanosec * 1e-9 
                  << " " << pose_stamped.pose.position.x 
@@ -123,6 +127,10 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
 // 初始化CloudBase类
 CloudBase::CloudBase(const std::string& node_name)
     : ParamServer(node_name) {
+    {
+        std::lock_guard<std::mutex> lock(agIndexMutex);
+        AGindexReceived = false;
+    }
     initializeVariables();
     initializePublishers();
     initializeSubscribers();
@@ -136,7 +144,13 @@ CloudBase::CloudBase(const std::string& node_name)
 // 接受到AGindex后的回调处理
 void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr msg) {
     AG_index = *msg;
-    AGindexReceived = true;
+    {
+        std::lock_guard<std::mutex> lock(agIndexMutex);
+        AGindexReceived = true;
+    }
+    RCLCPP_INFO(get_logger(), 
+            "Successfully Received AG_index with %zu areas", 
+            AG_index.area_index.size());
 }
 
 
@@ -159,9 +173,9 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     mapSize = map_pc->points.size();
     
     // 检查条件
-    if(!AGindexReceived || mapInit) {
+    if(!isAGIndexReceived() || mapInit) {
         RCLCPP_DEBUG(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
-                    AGindexReceived, mapInit);
+                    isAGIndexReceived(), mapInit);
         return; 
     }
 
@@ -637,6 +651,10 @@ void CloudBase::allocateMemory() {
 }
 
 void CloudBase::resetParameters() {
+    {
+        std::lock_guard<std::mutex> lock(agIndexMutex);
+        AGindexReceived = false;
+    }
     // Clear or resize point clouds
     laserCloudIn->clear();
     organizedCloudIn->clear();
@@ -660,4 +678,9 @@ void CloudBase::resetParameters() {
     averDistancePairedPoints = 0;
     
     RCLCPP_DEBUG(this->get_logger(), "Parameters reset");
+}
+
+bool CloudBase::isAGIndexReceived() const {
+    std::lock_guard<std::mutex> lock(agIndexMutex);
+    return AGindexReceived;
 }

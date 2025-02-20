@@ -110,7 +110,7 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
                     pcl::PointXYZI p;
                     p.x = x;
                     p.y = y;
-                    p.z = 0;  // 原来是 Area index 区域索引，但我改成了0
+                    p.z = i;  // 是 Area index 区域索引，这里的合理性在哪里？- (这里的i是区域索引，不是点云索引)
                     p.intensity = 1.0;
                     cloud->points.push_back(p);
                 }

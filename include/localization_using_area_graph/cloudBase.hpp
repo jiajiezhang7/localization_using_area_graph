@@ -30,6 +30,8 @@
 #define _CLOUD_BASE_HPP_
 
 #include "utility.hpp"
+#include <mutex> // 添加互斥锁头文件
+
 class CloudBase : public ParamServer {
 public:
     // ROS2 Subscribers
@@ -71,7 +73,6 @@ public:
     // 标志位和状态变量
     bool bUseFurestestRing;      // 是否使用最远环点云
     bool bPCA;                   // 是否使用PCA分析判断机器人是否在走廊中(用于救援模式)
-    bool AGindexReceived;        // 是否接收到Area Graph索引数据
     int lastInsideIndex;         // 记录机器人当前所在区域的索引
     int globalImgTimes;          // 全局定位迭代次数计数器
 
@@ -211,9 +212,13 @@ public:
 
 
 protected:
+    // 互斥锁用于保护AGindexReceived
+    static std::mutex agIndexMutex;
+    static bool AGindexReceived;
 
+    // 线程安全地获取AGindexReceived的值
+    bool isAGIndexReceived() const;
 
-    
 private:
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));

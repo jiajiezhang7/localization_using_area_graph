@@ -599,10 +599,10 @@ void CloudInitializer::initializationICP(int insideAGIndex) {
 // 线索，问题出现在这个函数中
 void CloudInitializer::calClosestMapPoint(int inside_index) {
     // 首先检查AG_index是否已初始化
-    // if (!AGindexReceived) {
-    //     RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
-    //     return;
-    // }
+    if (!isAGIndexReceived()) {
+        RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!, CloudBase::AGindexReceived = %d", isAGIndexReceived());
+        throw std::runtime_error("AG_index not initialized");
+    }
 
     // 检查发布器是否有效
     if (!pubIntersection) {
@@ -983,6 +983,7 @@ bool CloudInitializer::checkMap(int ring,
                  mapSize, map_pc ? map_pc->size() : 0);
     
     // 验证输入参数
+    // TODO 这里出现了错误，AG_index.area_index.size() == 0 
     if (inside_index < 0 || inside_index >= AG_index.area_index.size()) {
         RCLCPP_ERROR(get_logger(), "Invalid inside_index: %d, area_index size: %zu", 
                     inside_index, AG_index.area_index.size());
