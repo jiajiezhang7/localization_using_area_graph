@@ -167,7 +167,7 @@ public:
     std::vector<double> Vec_pedaly;                 // 垂足Y坐标向量
     std::vector<Eigen::Vector3f> corridorGuess;     // 走廊猜测
     std::vector<Eigen::Vector3f> roomGuess;         // 房间猜测
-    area_graph_data_parser::msg::AGindex AG_index;  // 区域图索引
+    static area_graph_data_parser::msg::AGindex AG_index;  // 区域图索引
     
     // 计数器
     int numTotalHistogram;                          // 总直方图数

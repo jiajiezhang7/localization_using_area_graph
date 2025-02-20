@@ -51,6 +51,7 @@ void CloudInitializer::showImgIni(double x, double y, int yaw) {
 }
 
 CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
+    RCLCPP_DEBUG(get_logger(), "Constructing CloudInitializer");
     RCLCPP_INFO(this->get_logger(), "start of construct main CloudInitializer");
     
     bGuessReady = false;
@@ -68,6 +69,10 @@ CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
     
     // Allocate memory for point clouds
     allocateMemory();
+    
+    // 添加调试信息
+    RCLCPP_INFO(get_logger(), "CloudInitializer constructed. AGindexReceived=%d, AG_index size=%zu",
+                isAGIndexReceived(), AG_index.area_index.size());
 }
 
 void CloudInitializer::setLaserCloudin(
@@ -636,31 +641,31 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环前还没有崩溃--------------------------");
     RCLCPP_INFO(get_logger(), "transformed_pc_size = %zu", transformed_pc_size);
     for(size_t i = 0; i < transformed_pc_size; i++) {
-        RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
+        // RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
         
         // 检查点云数据的有效性
-        RCLCPP_DEBUG(get_logger(), "当前点坐标: x=%f, y=%f", 
-                     transformed_pc->points[i].x, 
-                     transformed_pc->points[i].y);
+        // RCLCPP_DEBUG(get_logger(), "当前点坐标: x=%f, y=%f", 
+        //              transformed_pc->points[i].x, 
+        //              transformed_pc->points[i].y);
         
         bool findIntersection = false;
         double minDist = 0;
         
         // 检查ringMapP1和ringMapP2的访问
-        RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
-                     i, ringMapP1->points[i].x, ringMapP1->points[i].y);
-        RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
-                     i, ringMapP2->points[i].x, ringMapP2->points[i].y);
+        // RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
+        //              i, ringMapP1->points[i].x, ringMapP1->points[i].y);
+        // RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
+        //              i, ringMapP2->points[i].x, ringMapP2->points[i].y);
         
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
-        RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
-                     findIntersection, minDist);
+        // RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
+        //              findIntersection, minDist);
         
         double pedalx, pedaly;
-        RCLCPP_DEBUG(get_logger(), "开始计算垂足");
+        // RCLCPP_DEBUG(get_logger(), "开始计算垂足");
         if (ringMapP1->points[i].x == ringMapP2->points[i].x && 
             ringMapP1->points[i].y == ringMapP2->points[i].y) {
-            RCLCPP_DEBUG(get_logger(), "跳过重合点 %zu", i);
+            // RCLCPP_DEBUG(get_logger(), "跳过重合点 %zu", i);
             continue;
         }
         calPedal(ringMapP1->points[i].x,
@@ -671,11 +676,11 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
                  transformed_pc->points[i].y,
                  pedalx,
                  pedaly);
-        RCLCPP_DEBUG(get_logger(), "垂足计算结果: x=%f, y=%f", pedalx, pedaly);
+        // RCLCPP_DEBUG(get_logger(), "垂足计算结果: x=%f, y=%f", pedalx, pedaly);
 
         double error = sqrt(pow(pedalx-transformed_pc->points[i].x, 2) +
                           pow(pedaly-transformed_pc->points[i].y, 2));
-        RCLCPP_DEBUG(get_logger(), "计算得到的error=%f", error);
+        // RCLCPP_DEBUG(get_logger(), "计算得到的error=%f", error);
 
         if(!findIntersection) {
             RCLCPP_ERROR_ONCE(get_logger(), 

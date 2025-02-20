@@ -37,6 +37,7 @@
 // 静态成员变量的定义
 std::mutex CloudBase::agIndexMutex;
 bool CloudBase::AGindexReceived = false;
+area_graph_data_parser::msg::AGindex CloudBase::AG_index;
 
 void CloudBase::saveTUMTraj(geometry_msgs::msg::PoseStamped & pose_stamped) {
     robotPoseTum << pose_stamped.header.stamp.sec + pose_stamped.header.stamp.nanosec * 1e-9 
@@ -151,6 +152,12 @@ void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr 
     RCLCPP_INFO(get_logger(), 
             "Successfully Received AG_index with %zu areas", 
             AG_index.area_index.size());
+    
+    // 添加详细日志
+    RCLCPP_DEBUG(get_logger(), "First few area indices:");
+    for(size_t i = 0; i < std::min(size_t(3), AG_index.area_index.size()); i++) {
+        RCLCPP_DEBUG(get_logger(), "Area[%zu]: id=%d", i, AG_index.area_index[i]);
+    }
 }
 
 
