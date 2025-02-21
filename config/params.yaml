@@ -75,7 +75,7 @@
         # 25.2.20在测试这个模式-希望跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
         bTestRescue:  true               # 是否测试 [全局定位准不准] 模式
-
+        bInitializationWithICP: false
         # initialExtrinsicTrans: [10.0, -9.5, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
     # -------------------------------------
 
@@ -191,4 +191,4 @@
         # both false, check passage and whole map, for paper experiments
         bAllPassageOpen: false
         bAllPassageClose: false
-        bInitializationWithICP: false
+

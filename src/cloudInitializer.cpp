@@ -12,45 +12,34 @@
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
  */
+
 #include "localization_using_area_graph/cloudInitializer.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
 #include <thread>
 
-// void CloudInitializer::showImgIni(double x, double y, int yaw) {
-//     // 懒加载方式初始化 image_transport
-//     if (!image_transport_) {
-//         image_transport_ = std::make_shared<image_transport::ImageTransport>(Node::shared_from_this());
-//         image_pub_ = image_transport_->advertise("Things2say", 1);
-//     }
-    
-//     // Create image
-//     cv::Mat image(200, 600, CV_8UC3, cv::Scalar(0,0,0));
-    
-//     // Format text
-//     std::string text1 = "Initializing,";
-//     std::string text2 = "current best guess: ";
-//     std::string text3 = "x=" + std::to_string(x).substr(0, std::to_string(y).size()-5) + 
-//                        ", y=" + std::to_string(y).substr(0, std::to_string(y).size()-5) + 
-//                        ", yaw=" + std::to_string(yaw).substr(0, std::to_string(y).size()-5);
-                       
-//     // Add text to image
-//     cv::putText(image, text1, cv::Point(20,60), cv::FONT_HERSHEY_DUPLEX, 1, 
-//                 cv::Scalar(255,255,255), 1, 8);
-//     cv::putText(image, text2, cv::Point(20,100), cv::FONT_HERSHEY_DUPLEX, 1, 
-//                 cv::Scalar(255,255,255), 1, 8);
-//     cv::putText(image, text3, cv::Point(20,140), cv::FONT_HERSHEY_DUPLEX, 1, 
-//                 cv::Scalar(255,255,255), 1, 8);
+// 常量定义
+constexpr size_t MAX_POINT_CLOUD_SIZE = 1000000;  // 设置一个合理的最大点云大小
 
-//     // Convert to ROS message and publish
-//     sensor_msgs::msg::Image::SharedPtr msg = 
-//         cv_bridge::CvImage(mapHeader, "bgr8", image).toImageMsg();
-        
-//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-//     image_pub_.publish(*msg);
-    
-//     RCLCPP_ERROR(this->get_logger(), "THINGS TO SAY!!!!!!!!!!!!!!!!!!!!!! ini");
-// }
+// 函数声明
+bool isValidPoint(const pcl::PointXYZI& point);
+
+// 函数实现
+bool isValidPoint(const pcl::PointXYZI& point) {
+    // 检查点是否为NaN
+    if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
+        return false;
+    }
+    // 检查点是否为无穷大
+    if (std::isinf(point.x) || std::isinf(point.y) || std::isinf(point.z)) {
+        return false;
+    }
+    // 检查点是否为零点（可选，取决于您的应用）
+    if (point.x == 0 && point.y == 0 && point.z == 0) {
+        return false;
+    }
+    return true;
+}
 
 CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
     RCLCPP_DEBUG(get_logger(), "Constructing CloudInitializer");
@@ -614,14 +603,19 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
         throw std::runtime_error("AG_index not initialized");
     }
 
-    // 检查发布器是否有效
-    if (!pubIntersection) {
-        RCLCPP_ERROR(get_logger(), "Publisher not initialized!");
+    const int MAX_ITERATIONS = 1000;
+    int iteration_count = 0;
+
+    // 获取点云大小
+    size_t transformed_pc_size = transformed_pc->points.size();
+
+    // 添加点云大小的合法性检查
+    if (transformed_pc_size == 0 || transformed_pc_size > MAX_POINT_CLOUD_SIZE) {
+        RCLCPP_ERROR(get_logger(), "Invalid point cloud size: %zu", transformed_pc_size);
         return;
     }
 
     int last_index = 0;
-    size_t transformed_pc_size = transformed_pc->points.size();
     numIcpPoints = 0;
     weightSumTurkey = 0;
     weightSumCauchy = 0;
@@ -643,9 +637,28 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     outsidePC->clear();
     outsidePC->points.resize(transformed_pc_size);
 
-    RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环前还没有崩溃--------------------------");
     RCLCPP_INFO(get_logger(), "transformed_pc_size = %zu", transformed_pc_size);
     for(size_t i = 0; i < transformed_pc_size; i++) {
+
+        iteration_count++;
+        if (iteration_count > MAX_ITERATIONS) {
+            RCLCPP_ERROR(get_logger(), "Maximum iterations reached, breaking loop");
+            break;
+        }
+
+        // 添加点的有效性检查
+        if (!isValidPoint(transformed_pc->points[i])) {
+            RCLCPP_WARN(get_logger(), "Skipping invalid point at index %zu", i);
+            continue;
+        }
+
+        // 检查索引访问的合法性
+        if (i >= ringMapP1->points.size() || i >= ringMapP2->points.size()) {
+            RCLCPP_ERROR(get_logger(), "Index out of bounds");
+            break;
+        }
+
+
         RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
         
         // 检查点云数据的有效性
@@ -728,7 +741,6 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     //     RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
     // }
 }
-
 
 bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint, 
                                    const pcl::PointXYZI &PosePoint,
@@ -940,7 +952,6 @@ void CloudInitializer::scoreParticles() {
     geometry_msgs::msg::Pose pose;
     pubDONEsignal->publish(pose);
 }
-
 
 void CloudInitializer::checkingGuess() {
     insideScore = 0;
