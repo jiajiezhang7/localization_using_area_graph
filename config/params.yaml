@@ -61,10 +61,20 @@
         mapYawAngle: -81.0 # seq01
 
         # for Robot pose seq01 bag， 这些参数在 setInitialPose()中被使用
-            # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值
-        initialYawAngle: 10.0 # 247 #174 #184 #corridor:180 # 20 #43     20s:90
-        initialExtrinsicTrans: [0.5, 0.15, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
+                    # seq01 - [0.5, 0.15, 0.0]  yaw:10.0
+                    # 95 - [4.0, -6.0, 0.0] yaw: 90.0
 
+            # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值,因为不用他们了
+        initialYawAngle: 90.0 
+        # Robot pose in tracking: [3.661183, -2.742963]
+        initialExtrinsicTrans: [3.6, -2.7, 0.0] 
+
+        # 是否全局定位+位姿跟踪（模式2）
+        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        
+        # 25.2.20在测试这个模式-希望跑通
+        # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
+        bTestRescue:  true               # 是否测试 [全局定位准不准] 模式
 
         # initialExtrinsicTrans: [10.0, -9.5, 0.0]   #a rather good initial guess [0.5, 0.15, 0.0] 
     # -------------------------------------
@@ -158,16 +168,9 @@
         # case3: bRescueRobot: false, bTestRescue: fasle
                         # given initial pose, only localization, only set initialied in code
 
-        # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
-        
-        # 25.2.20在测试这个模式-希望跑通
-        # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
-        bTestRescue:  false               # 是否测试 [全局定位准不准] 模式
-
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 3.0     # 搜索半径(米)
+        particle_generator_radius: 6.0     # 搜索半径(米)
         # --------------------------------------------------------
 
         bOnlyScoreParticles: false

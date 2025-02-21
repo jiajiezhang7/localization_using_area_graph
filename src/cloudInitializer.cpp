@@ -17,38 +17,40 @@
 #include <chrono>
 #include <thread>
 
-void CloudInitializer::showImgIni(double x, double y, int yaw) {
-    // Create image transport
-    auto it = std::make_shared<image_transport::ImageTransport>(shared_from_this());
-    auto pub = it->advertise("Things2say", 1);
+// void CloudInitializer::showImgIni(double x, double y, int yaw) {
+//     // 懒加载方式初始化 image_transport
+//     if (!image_transport_) {
+//         image_transport_ = std::make_shared<image_transport::ImageTransport>(Node::shared_from_this());
+//         image_pub_ = image_transport_->advertise("Things2say", 1);
+//     }
     
-    // Create image
-    cv::Mat image(200, 600, CV_8UC3, cv::Scalar(0,0,0));
+//     // Create image
+//     cv::Mat image(200, 600, CV_8UC3, cv::Scalar(0,0,0));
     
-    // Format text
-    std::string text1 = "Initializing,";
-    std::string text2 = "current best guess: ";
-    std::string text3 = "x=" + std::to_string(x).substr(0, std::to_string(y).size()-5) + 
-                       ", y=" + std::to_string(y).substr(0, std::to_string(y).size()-5) + 
-                       ", yaw=" + std::to_string(yaw).substr(0, std::to_string(y).size()-5);
+//     // Format text
+//     std::string text1 = "Initializing,";
+//     std::string text2 = "current best guess: ";
+//     std::string text3 = "x=" + std::to_string(x).substr(0, std::to_string(y).size()-5) + 
+//                        ", y=" + std::to_string(y).substr(0, std::to_string(y).size()-5) + 
+//                        ", yaw=" + std::to_string(yaw).substr(0, std::to_string(y).size()-5);
                        
-    // Add text to image
-    cv::putText(image, text1, cv::Point(20,60), cv::FONT_HERSHEY_DUPLEX, 1, 
-                cv::Scalar(255,255,255), 1, 8);
-    cv::putText(image, text2, cv::Point(20,100), cv::FONT_HERSHEY_DUPLEX, 1, 
-                cv::Scalar(255,255,255), 1, 8);
-    cv::putText(image, text3, cv::Point(20,140), cv::FONT_HERSHEY_DUPLEX, 1, 
-                cv::Scalar(255,255,255), 1, 8);
+//     // Add text to image
+//     cv::putText(image, text1, cv::Point(20,60), cv::FONT_HERSHEY_DUPLEX, 1, 
+//                 cv::Scalar(255,255,255), 1, 8);
+//     cv::putText(image, text2, cv::Point(20,100), cv::FONT_HERSHEY_DUPLEX, 1, 
+//                 cv::Scalar(255,255,255), 1, 8);
+//     cv::putText(image, text3, cv::Point(20,140), cv::FONT_HERSHEY_DUPLEX, 1, 
+//                 cv::Scalar(255,255,255), 1, 8);
 
-    // Convert to ROS message and publish
-    sensor_msgs::msg::Image::SharedPtr msg = 
-        cv_bridge::CvImage(mapHeader, "bgr8", image).toImageMsg();
+//     // Convert to ROS message and publish
+//     sensor_msgs::msg::Image::SharedPtr msg = 
+//         cv_bridge::CvImage(mapHeader, "bgr8", image).toImageMsg();
         
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    pub.publish(*msg);
+//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//     image_pub_.publish(*msg);
     
-    RCLCPP_ERROR(this->get_logger(), "THINGS TO SAY!!!!!!!!!!!!!!!!!!!!!! ini");
-}
+//     RCLCPP_ERROR(this->get_logger(), "THINGS TO SAY!!!!!!!!!!!!!!!!!!!!!! ini");
+// }
 
 CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
     RCLCPP_DEBUG(get_logger(), "Constructing CloudInitializer");
@@ -124,18 +126,17 @@ void CloudInitializer::getInitialExtGuess(
     auto startTime = this->now();
     // 重点处理步骤在此
     rescueRobot();
+    RCLCPP_INFO(this->get_logger(), "-------------------rescueRobot finished---------");
     robotPose = MaxRobotPose;
     auto endTime = this->now();
 
     // 线索：在这行输出之前，程序已经崩溃了
-    // 输出处理信息
     RCLCPP_INFO(this->get_logger(), 
                 "Number of guesses: %d, Rescue robot run time: %f ms",
                 GuessSize,
                 (endTime - startTime).seconds() * 1000);
 }
 
-// 这个函数等待被理解
 void CloudInitializer::rescueRobot() {
     RCLCPP_INFO(this->get_logger(), "----------- Guess is ready, start rescue -----------------");
 
@@ -301,7 +302,6 @@ void CloudInitializer::rescueRobot() {
                                    << outsideTotalScore << ","
                                    << turkeyScore << std::endl;
                 }
-
                 // Update best pose if current score is better
                 if(MaxScore < 1.0/(insideScore + outsideScore)) {
                     MaxScore = 1.0/(insideScore + outsideScore);
@@ -315,9 +315,14 @@ void CloudInitializer::rescueRobot() {
                     pose_max_stamped.point.z = 0;
                     pubCurrentMaxRobotPose->publish(pose_max_stamped);
                     
-                    showImgIni(robotPose(0,3), 
-                              robotPose(1,3),
-                              static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
+                    // 定位：就是这个函数的问题
+                    // showImgIni(robotPose(0,3), 
+                    //           robotPose(1,3),
+                    //           static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
+                    RCLCPP_INFO(this->get_logger(), 
+                        "Current best guess: x=%.2f, y=%.2f, yaw=%d",
+                        robotPose(0,3), robotPose(1,3), 
+                        static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
                 }
 
                 if(pause_iter) {
@@ -641,31 +646,31 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环前还没有崩溃--------------------------");
     RCLCPP_INFO(get_logger(), "transformed_pc_size = %zu", transformed_pc_size);
     for(size_t i = 0; i < transformed_pc_size; i++) {
-        // RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
+        RCLCPP_DEBUG(get_logger(), "处理第 %zu 个点", i);
         
         // 检查点云数据的有效性
-        // RCLCPP_DEBUG(get_logger(), "当前点坐标: x=%f, y=%f", 
-        //              transformed_pc->points[i].x, 
-        //              transformed_pc->points[i].y);
+        RCLCPP_DEBUG(get_logger(), "当前点坐标: x=%f, y=%f", 
+                     transformed_pc->points[i].x, 
+                     transformed_pc->points[i].y);
         
         bool findIntersection = false;
         double minDist = 0;
         
         // 检查ringMapP1和ringMapP2的访问
-        // RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
-        //              i, ringMapP1->points[i].x, ringMapP1->points[i].y);
-        // RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
-        //              i, ringMapP2->points[i].x, ringMapP2->points[i].y);
+        RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
+                     i, ringMapP1->points[i].x, ringMapP1->points[i].y);
+        RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
+                     i, ringMapP2->points[i].x, ringMapP2->points[i].y);
         
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
-        // RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
-        //              findIntersection, minDist);
+        RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
+                     findIntersection, minDist);
         
         double pedalx, pedaly;
-        // RCLCPP_DEBUG(get_logger(), "开始计算垂足");
+        RCLCPP_DEBUG(get_logger(), "开始计算垂足");
         if (ringMapP1->points[i].x == ringMapP2->points[i].x && 
             ringMapP1->points[i].y == ringMapP2->points[i].y) {
-            // RCLCPP_DEBUG(get_logger(), "跳过重合点 %zu", i);
+            RCLCPP_DEBUG(get_logger(), "跳过重合点 %zu", i);
             continue;
         }
         calPedal(ringMapP1->points[i].x,
@@ -676,11 +681,11 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
                  transformed_pc->points[i].y,
                  pedalx,
                  pedaly);
-        // RCLCPP_DEBUG(get_logger(), "垂足计算结果: x=%f, y=%f", pedalx, pedaly);
+        RCLCPP_DEBUG(get_logger(), "垂足计算结果: x=%f, y=%f", pedalx, pedaly);
 
         double error = sqrt(pow(pedalx-transformed_pc->points[i].x, 2) +
                           pow(pedaly-transformed_pc->points[i].y, 2));
-        // RCLCPP_DEBUG(get_logger(), "计算得到的error=%f", error);
+        RCLCPP_DEBUG(get_logger(), "计算得到的error=%f", error);
 
         if(!findIntersection) {
             RCLCPP_ERROR_ONCE(get_logger(), 
@@ -709,15 +714,19 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     }
     RCLCPP_WARN(get_logger(), "--------------------------程序运行到了for循环后还没有崩溃--------------------------");
     
-    // 只有当所有处理都成功完成时才发布消息
-    try {
-        sensor_msgs::msg::PointCloud2 outMsg;
-        pcl::toROSMsg(*intersectionOnMap, outMsg);
-        outMsg.header = mapHeader;
-        pubIntersection->publish(outMsg);
-    } catch (const std::exception& e) {
-        RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
-    }
+    // // 只有当所有处理都成功完成时才发布消息
+    // try {
+    //     if (pubIntersection && pubIntersection.get()) {  // 添加发布器有效性检查
+    //         sensor_msgs::msg::PointCloud2 outMsg;
+    //         pcl::toROSMsg(*intersectionOnMap, outMsg);
+    //         outMsg.header = mapHeader;
+    //         pubIntersection->publish(outMsg);
+    //     } else {
+    //         RCLCPP_WARN(get_logger(), "pubIntersection is not valid, skipping publish");
+    //     }
+    // } catch (const std::exception& e) {
+    //     RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
+    // }
 }
 
 
@@ -993,6 +1002,9 @@ bool CloudInitializer::checkMap(int ring,
         RCLCPP_ERROR(get_logger(), "Invalid inside_index: %d, area_index size: %zu", 
                     inside_index, AG_index.area_index.size());
         return false;
+    } else {
+        RCLCPP_INFO(get_logger(), "we have got inside_index: %d, area_index size: %zu", 
+            inside_index, AG_index.area_index.size());
     }
     
     if (!map_pc || map_pc->empty()) {
@@ -1000,9 +1012,9 @@ bool CloudInitializer::checkMap(int ring,
         return false;
     }
     
-    RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
-                 AG_index.area_index[inside_index].start,
-                 AG_index.area_index[inside_index].end);
+    // RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
+    //              AG_index.area_index[inside_index].start,
+    //              AG_index.area_index[inside_index].end);
     
     // Get current point coordinates
     pcl::PointXYZI PCPoint;

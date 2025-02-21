@@ -81,8 +81,10 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include <cv_bridge/cv_bridge.hpp>
+#include <image_transport/image_transport.hpp>
 
-class CloudInitializer : public CloudBase {
+class CloudInitializer : public CloudBase, 
+                        public std::enable_shared_from_this<CloudInitializer> {
 public:
     // 变换和评分变量
     Eigen::Matrix4f MaxRobotPose;                    // 最佳位姿估计
@@ -115,6 +117,10 @@ public:
     // 消息存储
     geometry_msgs::msg::PointStamped robotGuess;  // 机器人猜测位置
 
+    // ImageTransport 和发布者
+    std::shared_ptr<image_transport::ImageTransport> image_transport_;
+    image_transport::Publisher image_pub_;
+
     // 构造函数和析构函数
     explicit CloudInitializer();
     ~CloudInitializer() override = default;
@@ -123,7 +129,7 @@ public:
     void setLaserCloudin(pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing_,
                         std_msgs::msg::Header mapHeader_);  // 设置输入激光点云数据
     void setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_);  // 设置参考地图点云
-    void showImgIni(double x, double y, int yaw);  // 可视化初始化状态
+    // void showImgIni(double x, double y, int yaw);  // 可视化初始化状态
     void rescueRobot();  // 执行恢复定位
     void scoreParticlesDist();  // 基于距离评估位姿粒子
     void scoreParticles();  // 评估位姿粒子

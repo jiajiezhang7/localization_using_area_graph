@@ -21,7 +21,7 @@ def generate_launch_description():
     # Fujing's Version
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/seq01',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/95',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
 
@@ -30,7 +30,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='false',
+        default_value='true',
         description='Whether to use global localization'
     )
 
@@ -120,6 +120,7 @@ def generate_launch_description():
         # ),
 
         # Fujing's Version
+        # PandarQT坐标系在全系统中没用到，真的只是为了在Rviz里定个标，你无论把它设在哪里，都是Ok的，和位姿追踪没任何关系
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -127,9 +128,12 @@ def generate_launch_description():
             arguments=[
                 '--frame-id', 'map',
                 '--child-frame-id', 'PandarQT',
-                '--x', '0.0',
-                '--y', '0.0',
-                '--z', '0.0'
+                '--x', '4.0',
+                '--y', '-6.0',
+                '--z', '0.0',
+                '--roll', '0',
+                '--pitch', '0',
+                '--yaw', '1.5708'
             ]
         ),
         # Area Graph Data Parser

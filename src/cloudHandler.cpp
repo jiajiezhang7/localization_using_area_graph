@@ -134,8 +134,7 @@ void CloudHandler::gettingInsideWhichArea() {
 }
 
 CloudHandler::CloudHandler() 
-    : CloudBase("cloud_handler_node"),
-      cloudInitializer() {  // 显式调用CloudInitializer的构造函数
+    : CloudBase("cloud_handler_node") {  // 只初始化基类
     // 初始化变量
     globalImgTimes = 0;  // 全局图像计数器
     hasGlobalPoseEstimate = false;  // 是否已获取全局位姿估计标志
@@ -159,8 +158,8 @@ CloudHandler::CloudHandler()
     // 在模式1和模式2 -- 开启全局定位下， 造时设置初始位姿（会被覆盖），会通过getInitialExtGuess和rescueRobot重新估计位姿
     setInitialPose(initialYawAngle, initialExtTrans);
 
-    // 输出警告信息，表示云处理器已准备就绪
-    RCLCPP_INFO(get_logger(), "CLOUD HANDLER READY");
+    // 创建 CloudInitializer 的智能指针
+    cloudInitializer = std::make_shared<CloudInitializer>();
 }
 
 // TODO 虽然照着Fujing写，但是对这个函数有疑问（它的参数没有被使用）
@@ -212,7 +211,7 @@ void CloudHandler::cloudHandlerCB(
 
     // 准备新帧的处理
     setEveryFrame();
-    cloudInitializer.setMapPC(map_pc);
+    cloudInitializer->setMapPC(map_pc);
     cloudHeader = laserCloudMsg->header;
     mapHeader = cloudHeader;
     mapHeader.frame_id = "map";
@@ -253,11 +252,11 @@ void CloudHandler::cloudHandlerCB(
         
         // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
-                                            &cloudInitializer, 
+                                            cloudInitializer.get(),
                                             std::placeholders::_1);
 
         // 实际上调用的就是CloudInitializer::getInitialExtGuess                                    
-        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
+        cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
         // 发布最远环点云
@@ -266,7 +265,7 @@ void CloudHandler::cloudHandlerCB(
         furthestMsg.header = mapHeader;
         pubtest->publish(furthestMsg);
         
-        cloudInitializer.setLaserCloudin(furthestRing, mapHeader);
+        cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
         resetParameters();
         return;
     }
@@ -281,10 +280,10 @@ void CloudHandler::cloudHandlerCB(
         
         // 设置初始位姿估计的回调函数
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
-                                            &cloudInitializer, 
+                                            cloudInitializer.get(),
                                             std::placeholders::_1);
                                             
-        cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
+        cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
         // 发布最远环点云
@@ -293,9 +292,9 @@ void CloudHandler::cloudHandlerCB(
         furthestMsg.header = mapHeader;
         pubtest->publish(furthestMsg);
         
-        cloudInitializer.setLaserCloudin(furthestRing, mapHeader);
+        cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
         resetParameters();
-        robotPose = cloudInitializer.MaxRobotPose;
+        robotPose = cloudInitializer->MaxRobotPose;
         
         RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]", 
                     robotPose(0,3), robotPose(1,3));
@@ -313,12 +312,12 @@ void CloudHandler::cloudHandlerCB(
         // 如果从模式2的全局定位环节计算得到了初始位姿，则使用它，并且覆盖从params中读取的默认值
         if(hasGlobalPoseEstimate) {
             // 使用全局定位的结果
-            robotPose = cloudInitializer.MaxRobotPose;
+            robotPose = cloudInitializer->MaxRobotPose;
             errorUpThred = 3;
             
-            cloudInitializer.subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
+            cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess, 
-                                       &cloudInitializer, 
+                                       cloudInitializer.get(), 
                                        std::placeholders::_1));
                                        
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");

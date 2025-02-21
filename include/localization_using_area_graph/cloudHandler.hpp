@@ -37,7 +37,7 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云
 
     // cloudInitializer时在CloudHandler类构造时就已经被实例化了的
-    CloudInitializer cloudInitializer;  // 云初始化器对象
+    std::shared_ptr<CloudInitializer> cloudInitializer;  // 使用智能指针管理云初始化器对象
 
     // 地图相关索引
     int insideAreaStartIndex;  // 地图点云索引
