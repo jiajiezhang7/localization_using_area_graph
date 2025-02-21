@@ -16,11 +16,11 @@
 ParticleGenerator::ParticleGenerator()
     : Node("particle_generator"), 
       gen_(rd_()), 
-      dist_(0.0, 1.0)
+      dist_(0.0, 1.0),
+      received_wifi_location_(false)  // 新增标记变量
 {
     initializeParameters();
     initializePublishersSubscribers();
-    loadMapData();
     
     RCLCPP_INFO(this->get_logger(), "ParticleGenerator initialized");
 }
@@ -32,14 +32,32 @@ void ParticleGenerator::initializeParameters()
     this->declare_parameter("particle_generator_step", 2.0);  // 粒子采样步长
     this->declare_parameter("particle_generator_radius", 6.0);  //搜索半径
     this->declare_parameter("bRescueRobot", false);
+    this->declare_parameter("root_long", 0.0);
+    this->declare_parameter("root_lat", 0.0);
+    
+    // 声明地图变换参数
+    this->declare_parameter("mapExtrinsicTrans", std::vector<double>{0.0, 0.0, 0.0});
+    this->declare_parameter("mapYawAngle", 0.0);
 
     // 读取参数值
     step_ = this->get_parameter("particle_generator_step").as_double();
     radius_ = this->get_parameter("particle_generator_radius").as_double();
     bRescueRobot_ = this->get_parameter("bRescueRobot").as_bool();
+    root_longitude_ = this->get_parameter("root_long").as_double();
+    root_latitude_ = this->get_parameter("root_lat").as_double();
+    
+    // 读取地图变换参数
+    auto trans_vec = this->get_parameter("mapExtrinsicTrans").as_double_array();
+    if (trans_vec.size() >= 3) {
+        map_extrinsic_trans_ = {trans_vec[0], trans_vec[1], trans_vec[2]};
+    }
+    map_yaw_angle_ = this->get_parameter("mapYawAngle").as_double() * M_PI / 180.0;  // 转换为弧度
 
     RCLCPP_INFO(this->get_logger(), "Loaded parameters - step: %.2f, radius: %.2f", 
                 step_, radius_);
+    RCLCPP_INFO(this->get_logger(), "Map transform - trans: [%.1f, %.1f, %.1f], yaw: %.1f deg", 
+                map_extrinsic_trans_[0], map_extrinsic_trans_[1], map_extrinsic_trans_[2],
+                map_yaw_angle_ * 180.0 / M_PI);
 }
 
 // 发布者订阅者初始化
@@ -61,46 +79,100 @@ void ParticleGenerator::initializePublishersSubscribers()
     agmap_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/pubAGMapTransformedPC", qos,
         std::bind(&ParticleGenerator::agmapCallback, this, std::placeholders::_1));
+    
+    // 订阅3: WiFi定位结果
+    wifi_sub_ = this->create_subscription<rss::msg::WifiLocation>(
+        "/WifiLocation", qos,
+        std::bind(&ParticleGenerator::wifiCallback, this, std::placeholders::_1));
 }
 
-// 可能用于转换楼层后的地图加载逻辑，但现在单层情况下不需要，暂时不实现
-void ParticleGenerator::loadMapData() 
-{
-    try {
-        // Load map data from file
-        // TODO: Implement map loading logic
-        RCLCPP_INFO(this->get_logger(), "Map data loaded successfully");
-    } catch (const std::exception& e) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to load map data: %s", e.what());
-    }
+Eigen::Vector3d CoordinateTransform(const GeoCoordinate& init, const GeoCoordinate& cur) {
+    std::array<double, 2> reference{init.latitude, init.longitude};
+    std::array<double, 2> current{cur.latitude, cur.longitude};
+    std::array<double, 2> cur_xy;
+
+    // 使用WGS84转换，不考虑旋转
+    cur_xy = wgs84::toCartesian(reference, current);
+    
+    // 简单处理高度差，如果没有高度信息就默认为0
+    double z = (cur.altitude - init.altitude);
+    
+    return {cur_xy[0], cur_xy[1], z};
+}
+
+
+
+void ParticleGenerator::wifiCallback(const rss::msg::WifiLocation::SharedPtr msg) {
+    std::lock_guard<std::mutex> lock(wifi_mutex_);
+    latest_wifi_location_ = msg;
+    received_wifi_location_ = true;  // 标记已收到WiFi定位结果
 }
 
 void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) 
 {
-    // 获取ground truth中心(测试用途)
-    // 在实际应用中，这应该来自WiFi定位 TODO 待MaXu部分完成后，接入WiFi接口
-    std::array<double, 2> gt_center = {4.0, -6.0};  // placeholder
+    // 检查是否已收到WiFi定位结果
+    {
+        std::lock_guard<std::mutex> lock(wifi_mutex_);
+        if (!received_wifi_location_) {
+            RCLCPP_INFO(this->get_logger(), "等待WiFi定位结果...");
+            return;  // 如果还没有收到WiFi定位结果，直接返回
+        }
+    }
+
+    std::array<double, 2> wifi_center;
+    
+    // 获取最新的WiFi定位结果
+    {
+        std::lock_guard<std::mutex> lock(wifi_mutex_);
+        GeoCoordinate root_coord;
+        root_coord.longitude = root_longitude_;
+        root_coord.latitude = root_latitude_;
+        root_coord.altitude = 0.0;  // 高度设为0
+        
+        GeoCoordinate wifi_coord;
+        wifi_coord.longitude = latest_wifi_location_->longitude;
+        wifi_coord.latitude = latest_wifi_location_->latitude;
+        wifi_coord.altitude = 0.0;  // 高度设为0
+        
+        // 转换为AGmap局部坐标
+        Eigen::Vector3d local_pos = CoordinateTransform(root_coord, wifi_coord);
+        
+        // 应用AGmap到map的变换
+        // 1. 旋转变换
+        double cos_yaw = std::cos(map_yaw_angle_);
+        double sin_yaw = std::sin(map_yaw_angle_);
+        double x_rotated = local_pos.x() * cos_yaw - local_pos.y() * sin_yaw;
+        double y_rotated = local_pos.x() * sin_yaw + local_pos.y() * cos_yaw;
+        
+        // 2. 平移变换
+        wifi_center = {
+            x_rotated + map_extrinsic_trans_[0],
+            y_rotated + map_extrinsic_trans_[1]
+        };
+        // 已经通过检验，变换后的WiFi-location这里是正确的
+        RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+    }
     
     // 添加噪声
-    gt_center[0] += 0.25 * dist_(gen_);
-    gt_center[1] += 0.25 * dist_(gen_);
+    wifi_center[0] += 0.25 * dist_(gen_);
+    wifi_center[1] += 0.25 * dist_(gen_);
     
     // 生成并发布粒子
-    generateParticles(msg->header.stamp, gt_center);
+    generateParticles(msg->header.stamp, wifi_center);
 }
 
 void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
-                                        const std::array<double, 2>& gt_center) 
+                                        const std::array<double, 2>& wifi_center) 
 {
     // 创建PCL点云对象
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
     
-    for (double x = gt_center[0] - radius_; x <= gt_center[0] + radius_; x += 1.0/step_) {
-        for (double y = gt_center[1] - radius_; y <= gt_center[1] + radius_; y += 1.0/step_) {
+    for (double x = wifi_center[0] - radius_; x <= wifi_center[0] + radius_; x += 1.0/step_) {
+        for (double y = wifi_center[1] - radius_; y <= wifi_center[1] + radius_; y += 1.0/step_) {
             Eigen::Vector2d point(x, y);
             
             // 2. 检查是否在搜索圆内
-            if ((point - Eigen::Vector2d(gt_center[0], gt_center[1])).norm() > radius_) {
+            if ((point - Eigen::Vector2d(wifi_center[0], wifi_center[1])).norm() > radius_) {   
                 continue;
             }
             

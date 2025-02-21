@@ -40,6 +40,7 @@ find_package(rosbag2_cpp REQUIRED)
 find_package(rosbag2_storage REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(rss REQUIRED)
 find_package(PCL REQUIRED COMPONENTS
   common
   io
@@ -117,6 +118,13 @@ add_executable(particle_generator
 target_link_libraries(particle_generator
   utility
   ${PCL_LIBRARIES}
+)
+
+ament_target_dependencies(particle_generator
+  rclcpp
+  sensor_msgs
+  pcl_conversions
+  rss
 )
 
 
