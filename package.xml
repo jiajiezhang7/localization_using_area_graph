@@ -26,6 +26,7 @@
   <depend>libpcl-all-dev</depend>
   <depend>area_graph_data_parser</depend>
   <depend>message_filters</depend>
+  <depend>rss</depend>
   
   <!-- New dependencies for refactored nodes -->
   <depend>yaml-cpp</depend>

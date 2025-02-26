@@ -5,6 +5,17 @@ if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
 
+# 处理 Anaconda 环境中的库冲突
+if(DEFINED ENV{CONDA_PREFIX})
+  message(STATUS "Conda environment detected: $ENV{CONDA_PREFIX}")
+  # 设置 RPATH 以优先使用系统库而不是 Conda 库
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+  set(CMAKE_INSTALL_RPATH "/usr/lib/x86_64-linux-gnu:/usr/lib/gcc/x86_64-linux-gnu/11")
+  # 忽略 Conda 库的警告
+  set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0057 NEW)
+endif()
+
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)

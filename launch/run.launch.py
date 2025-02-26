@@ -11,14 +11,7 @@ def generate_launch_description():
     pkg_dir = get_package_share_directory('localization_using_area_graph')
     topology_pkg_dir = get_package_share_directory('area_graph_data_parser')
 
-    # # Jiajie's Version
-    # bag_file_arg = DeclareLaunchArgument(
-    #     'bag_file',
-    #     default_value='/home/jay/AGLoc_ws/rosbag/1226/1226.mcap', 
-    #     description='Path to ROS2 bag file'
-    # )
 
-    # Fujing's Version
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
         default_value='/home/jay/AGLoc_ws/rosbag/95',  # 注意不需要.db3后缀
@@ -200,6 +193,19 @@ def generate_launch_description():
             package='localization_using_area_graph',
             executable='particle_generator',
             name='particle_generator',
+            parameters=[
+                params_file,
+                {'use_sim_time': LaunchConfiguration('use_sim_time')}
+            ],
+            condition=IfCondition(LaunchConfiguration('use_global_localization')),
+            output='screen',
+        ),
+        
+        # Robot Localization node
+        Node(
+            package='wifi_loc',
+            executable='robot_loc',
+            name='robot_loc',
             parameters=[
                 params_file,
                 {'use_sim_time': LaunchConfiguration('use_sim_time')}
