@@ -45,7 +45,6 @@
  * Public Methods:
  * @fn setLaserCloudin() Sets input point cloud data
  * @fn setMapPC()        Sets reference map point cloud
- * @fn showImgIni()      Visualizes initialization status
  * @fn rescueRobot()     Performs recovery localization
  * @fn scoreParticles()  Evaluates pose particles
  * @fn checkingGuess()   Validates pose hypotheses
@@ -129,7 +128,6 @@ public:
     void setLaserCloudin(pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing_,
                         std_msgs::msg::Header mapHeader_);  // 设置输入激光点云数据
     void setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_);  // 设置参考地图点云
-    // void showImgIni(double x, double y, int yaw);  // 可视化初始化状态
     void rescueRobot();  // 执行恢复定位
     void scoreParticlesDist();  // 基于距离评估位姿粒子
     void scoreParticles();  // 评估位姿粒子

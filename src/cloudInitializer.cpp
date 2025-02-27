@@ -304,10 +304,6 @@ void CloudInitializer::rescueRobot() {
                     pose_max_stamped.point.z = 0;
                     pubCurrentMaxRobotPose->publish(pose_max_stamped);
                     
-                    // 定位：就是这个函数的问题
-                    // showImgIni(robotPose(0,3), 
-                    //           robotPose(1,3),
-                    //           static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
                     RCLCPP_INFO(this->get_logger(), 
                         "Current best guess: x=%.2f, y=%.2f, yaw=%d",
                         robotPose(0,3), robotPose(1,3), 
