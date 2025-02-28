@@ -69,11 +69,11 @@
         initialExtrinsicTrans: [4.0, -6.0, 0.0] 
 
         # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bRescueRobot: true                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
         
-        # 25.2.20在测试这个模式-希望跑通
+        # 25.2.20在测试这个模式-希望跑通 -- 2.28已跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
-        bTestRescue:  true               # 是否测试 [全局定位准不准] 模式
+        bTestRescue:  false               # 是否测试 [全局定位准不准] 模式
         bInitializationWithICP: false
         root_long: 121.59139728509
         root_lat: 31.17947960435
@@ -170,8 +170,8 @@
                         # given initial pose, only localization, only set initialied in code
 
         # 添加particle_generator参数
-        particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 6.0     # 搜索半径(米)
+        particle_generator_step: 1.0       # 粒子采样步长
+        particle_generator_radius: 3.0     # 搜索半径(米)
         # --------------------------------------------------------
 
         bOnlyScoreParticles: false
@@ -184,7 +184,7 @@
         checkingGuessY: 35.25
 
         bCHENGNODE: true
-        bGenerateResultFile: false
+        bGenerateResultFile: true
         bFurthestRingTracking: true
         # set to 0 means don't pause
         turkeyPauseThred: 0.0

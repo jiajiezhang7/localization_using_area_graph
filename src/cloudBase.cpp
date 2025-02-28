@@ -149,15 +149,15 @@ void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr 
         std::lock_guard<std::mutex> lock(agIndexMutex);
         AGindexReceived = true;
     }
-    RCLCPP_INFO(get_logger(), 
-            "Successfully Received AG_index with %zu areas", 
-            AG_index.area_index.size());
+    // RCLCPP_INFO(get_logger(), 
+    //         "Successfully Received AG_index with %zu areas", 
+    //         AG_index.area_index.size());
     
     // 添加详细日志
-    RCLCPP_DEBUG(get_logger(), "First few area indices:");
-    for(size_t i = 0; i < std::min(size_t(3), AG_index.area_index.size()); i++) {
-        RCLCPP_DEBUG(get_logger(), "Area[%zu]: id=%d", i, AG_index.area_index[i]);
-    }
+    // RCLCPP_DEBUG(get_logger(), "First few area indices:");
+    // for(size_t i = 0; i < std::min(size_t(3), AG_index.area_index.size()); i++) {
+    //     RCLCPP_DEBUG(get_logger(), "Area[%zu]: id=%d", i, AG_index.area_index[i]);
+    // }
 }
 
 
@@ -382,7 +382,7 @@ void CloudBase::organizePointcloud() {
     }
     try {
         // 3. 初始化数据结构
-        RCLCPP_DEBUG(get_logger(), "Resizing point clouds for organization...");
+        // RCLCPP_DEBUG(get_logger(), "Resizing point clouds for organization...");
         organizedCloudIn64->resize(64 * Horizon_SCAN);
         
         // 正确初始化 furthestRing
@@ -409,7 +409,7 @@ void CloudBase::organizePointcloud() {
         }
         if(bFurthestRingTracking) {
             N_SCAN = 64;
-            RCLCPP_DEBUG(get_logger(), "FurthestRingTracking enabled, N_SCAN set to 64");
+            // RCLCPP_DEBUG(get_logger(), "FurthestRingTracking enabled, N_SCAN set to 64");
         }
         
         int cloudSize = laserCloudIn->points.size();
@@ -500,9 +500,9 @@ void CloudBase::organizePointcloud() {
         }
 
         // 14. 记录处理结果
-        RCLCPP_INFO(get_logger(), 
-            "-------------Point cloud organized: %d valid points, %d filtered points--------------",
-            validPoints, filteredPoints);
+        // RCLCPP_INFO(get_logger(), 
+        //     "-------------Point cloud organized: %d valid points, %d filtered points--------------",
+        //     validPoints, filteredPoints);
 
         // rescue without initialization
         if(!initialized && bRescueRobot) {
@@ -584,7 +584,7 @@ void CloudBase::setInitialPose(double initialYawAngle, Eigen::Vector3f initialEx
     // 仅PoseTracking模式下，直接将yaml中的参数转换为初始位姿矩阵
     robotPose = transform_initial.matrix();
     
-    RCLCPP_DEBUG(this->get_logger(), "Initial robot pose set with yaw angle: %f", initialYawAngle);
+    // RCLCPP_DEBUG(this->get_logger(), "Initial robot pose set with yaw angle: %f", initialYawAngle);
 }
 
 void CloudBase::pubPclCloud(

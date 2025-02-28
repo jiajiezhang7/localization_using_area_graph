@@ -89,6 +89,7 @@ public:
     Eigen::Matrix4f MaxRobotPose;                    // 最佳位姿估计
     double MaxScore;                                 // 最佳得分
     bool bGuessReady;                                // 粒子初始化就绪标志
+    bool isRescueFinished = false;    // 标记rescueRobot是否已完成
 
     // 射线交叉计算的向量
     std::vector<int> numofIntersection;     // 记录射线与地图的交叉次数
@@ -140,9 +141,6 @@ public:
                       double& minDist,
                       bool& findIntersection);  // 检查整个地图
 
-    double getScoreFromTwoPC(const Eigen::Matrix4f& robotPose,
-                            pcl::PointCloud<pcl::PointXYZI>::Ptr PC1,
-                            pcl::PointCloud<pcl::PointXYZI>::Ptr PC2);  // 从两个点云获取得分
 
     // 重写CloudBase方法
     void calClosestMapPoint(int inside_index) override;  // 计算最近的地图点

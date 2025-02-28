@@ -162,7 +162,6 @@ CloudHandler::CloudHandler()
     cloudInitializer = std::make_shared<CloudInitializer>();
 }
 
-// TODO 虽然照着Fujing写，但是对这个函数有疑问（它的参数没有被使用）
 void CloudHandler::setInitialGuessFlag(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     hasGlobalPoseEstimate = true;
@@ -190,7 +189,7 @@ void CloudHandler::cloudHandlerCB(
     
     // 显示全局定位开始的分隔线
     if(globalImgTimes == 0) {
-        showImg1line("---------------------------Global localizing---------------------------");
+        RCLCPP_INFO(get_logger(), "---------------------------Global localizing---------------------------");
     }
     globalImgTimes++;
 
@@ -248,7 +247,7 @@ void CloudHandler::cloudHandlerCB(
         }
         
          
-        RCLCPP_WARN(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
+        RCLCPP_INFO(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
         
         // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
@@ -269,42 +268,58 @@ void CloudHandler::cloudHandlerCB(
         resetParameters();
         return;
     }
-    // 模式2: 救援机器人模式 - 全局定位(仅一次)和位姿跟踪
+    // 模式2: 救援机器人模式 - 全局定位(仅一次)，然后跳转到模式3 - 位姿跟踪
     else if(bRescueRobot) {
-        // 只有当 hasGlobalPoseEstimate == true时，才才会执行模式二后续的代码
+        // 首次执行：创建订阅并处理点云
         if(!hasGlobalPoseEstimate) {
+            RCLCPP_INFO(get_logger(), "-------------STARTING RESCUE ROBOT (ONCE)---------------");
+            
+            // 设置初始位姿估计的回调函数
+            auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
+                                              cloudInitializer.get(),
+                                              std::placeholders::_1);
+                                              
+            cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
+                "/particles_for_init", 10, initialGuessCallback);
+
+            // 发布最远环点云
+            sensor_msgs::msg::PointCloud2 furthestMsg;
+            pcl::toROSMsg(*furthestRing, furthestMsg);
+            furthestMsg.header = mapHeader;
+            pubtest->publish(furthestMsg);
+            
+            cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
+            
+            // 标记已开始全局定位流程
+            hasGlobalPoseEstimate = true;
             return;
         }
-
-        RCLCPP_WARN(get_logger(), "ONLY ONE FRAME GOES TO RESCUE ROBOT");
         
-        // 设置初始位姿估计的回调函数
-        auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
-                                            cloudInitializer.get(),
-                                            std::placeholders::_1);
-                                            
-        cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/particles_for_init", 10, initialGuessCallback);
-
-        // 发布最远环点云
-        sensor_msgs::msg::PointCloud2 furthestMsg;
-        pcl::toROSMsg(*furthestRing, furthestMsg);
-        furthestMsg.header = mapHeader;
-        pubtest->publish(furthestMsg);
+        // 检查rescueRobot是否已完成
+        if(cloudInitializer->isRescueFinished) {
+            RCLCPP_INFO(get_logger(), "-------------RESCUE ROBOT COMPLETED---------------");
+            
+            // 应用最佳估计位姿
+            robotPose = cloudInitializer->MaxRobotPose;
+            
+            RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]", 
+                        robotPose(0,3), robotPose(1,3));
+            
+            // 关闭救援模式
+            bRescueRobot = false;
+            cloudInitializer->isRescueFinished = false;
+            
+            // 取消对粒子消息的订阅，防止再次触发rescueRobot
+            cloudInitializer->subInitialGuess.reset();
+            
+            subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
+                "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag, 
+                                     this, std::placeholders::_1));
+            return;
+        }
         
-        cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
-        resetParameters();
-        robotPose = cloudInitializer->MaxRobotPose;
-        
-        RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]", 
-                    robotPose(0,3), robotPose(1,3));
-        
-        // 关闭救援模式并重置订阅器
-        bRescueRobot = false;
-
-        subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag, 
-                                 this, std::placeholders::_1));
+        // 等待rescueRobot完成
+        RCLCPP_INFO(get_logger(), "-------------WAITING FOR RESCUE ROBOT TO COMPLETE---------------");
         return;
     }
     // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿 （目前能跑通的模式）
@@ -322,11 +337,11 @@ void CloudHandler::cloudHandlerCB(
                                        
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
             hasGlobalPoseEstimate = false;
-            showImg1line("Pose tracking");
+        } else {
+            // 如果没有从模式2中得到初始位姿，则使用params中读取的默认值
+            RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
         }
-        // 如果没有从模式2中得到初始位姿，则使用params中读取的默认值
-        RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
-        
+
         // 使用当前机器人位姿变换点云
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);
         RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]", 
@@ -1341,9 +1356,9 @@ int main(int argc, char** argv) {
     // Set logging level
     if(rcutils_logging_set_logger_level(
         cloudHandler->get_logger().get_name(),
-        RCUTILS_LOG_SEVERITY_DEBUG)) {
+        RCUTILS_LOG_SEVERITY_INFO)) {
         auto logger = rclcpp::get_logger("CloudHandler");
-        RCLCPP_INFO(logger, "Logger level set to DEBUG");
+        RCLCPP_INFO(logger, "Logger level set to INFO");
     }
 
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");

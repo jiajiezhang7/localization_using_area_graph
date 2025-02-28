@@ -150,7 +150,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
             y_rotated + map_extrinsic_trans_[1]
         };
         // 已经通过检验，变换后的WiFi-location这里是正确的
-        RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+        RCLCPP_DEBUG(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
     }
     
     // 添加噪声
@@ -204,6 +204,7 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     particle_pub_->publish(particles_msg);
 }
 
+// 它所订阅的是已经转换到map坐标系下的Area Graph的 node point
 void ParticleGenerator::agmapCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) 
 {
     // Convert point cloud to PCL format
@@ -215,11 +216,14 @@ void ParticleGenerator::agmapCallback(const sensor_msgs::msg::PointCloud2::Share
     AGmaps_.clear();
     
     for (const auto& point : cloud->points) {
+        // intensity % 3 = 0 --- Area的起始点
         if (static_cast<int>(point.intensity) % 3 == 0) {
             area.clear();
             area.emplace_back(point.x, point.y);
+        // intensity % 3 = 1 --- Area的中间点
         } else if (static_cast<int>(point.intensity) % 3 == 1) {
             area.emplace_back(point.x, point.y);
+        // intensity % 3 = 2 --- Area的结束点
         } else if (static_cast<int>(point.intensity) % 3 == 2) {
             area.emplace_back(point.x, point.y);
             AGmaps_.push_back(area);
