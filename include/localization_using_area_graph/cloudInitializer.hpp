@@ -46,8 +46,7 @@
  * @fn setLaserCloudin() Sets input point cloud data
  * @fn setMapPC()        Sets reference map point cloud
  * @fn rescueRobot()     Performs recovery localization
- * @fn scoreParticles()  Evaluates pose particles
- * @fn checkingGuess()   Validates pose hypotheses
+ 
  *
  * Key Features:
  * - Robust to partial map observations
@@ -130,9 +129,6 @@ public:
                         std_msgs::msg::Header mapHeader_);  // 设置输入激光点云数据
     void setMapPC(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pc_);  // 设置参考地图点云
     void rescueRobot();  // 执行恢复定位
-    void scoreParticlesDist();  // 基于距离评估位姿粒子
-    void scoreParticles();  // 评估位姿粒子
-    void checkingGuess();  // 验证位姿假设
 
     // 点云处理方法
     bool checkWholeMap(const pcl::PointXYZI& PCPoint,

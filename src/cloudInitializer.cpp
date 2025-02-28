@@ -302,10 +302,18 @@ void CloudInitializer::rescueRobot() {
                     pubCurrentMaxRobotPose->publish(pose_max_stamped);
                     
                     RCLCPP_INFO(this->get_logger(), 
-                    // TODO 为什么多次调用rescueRobot的情况下， Current best guess只输出一次？
                         "Current best guess: x=%.2f, y=%.2f, yaw=%d",
                         robotPose(0,3), robotPose(1,3), 
                         static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
+                }
+                else {
+                    // 添加调试信息：为什么当前粒子没有成为最佳位姿
+                    // RCLCPP_INFO(this->get_logger(),
+                    //     "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
+                    //     robotPose(0,3), robotPose(1,3), 
+                    //     static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
+                    //     1.0/(insideScore + outsideScore), MaxScore,
+                    //     insideScore, outsideScore);
                 }
 
                 if(pause_iter) {
@@ -355,6 +363,12 @@ void CloudInitializer::rescueRobot() {
 
         bGuessReady = false;
     }
+    // 函数结束前添加调试语句，输出最终的MaxScore和对应位姿
+    RCLCPP_WARN(this->get_logger(), 
+                "最终评分: MaxScore=%.6f，对应位姿: x=%.2f, y=%.2f, yaw=%d",
+                MaxScore, MaxRobotPose(0,3), MaxRobotPose(1,3),
+                static_cast<int>(std::fmod(atan2(MaxRobotPose(1,0), MaxRobotPose(0,0)) * 180.0 / M_PI, 360.0)));
+
     // 函数结束前标记为未运行并记录完成信息
     auto end_time = this->now();
     RCLCPP_WARN(this->get_logger(), 
@@ -367,6 +381,9 @@ void CloudInitializer::rescueRobot() {
     
     // 标记rescueRobot已完成
     isRescueFinished = true;
+
+    // 重置MaxScore为一个较低的值，确保下次能够更新
+    MaxScore = 0.0;
 }
 
 bool CloudInitializer::insideOldArea(int mapPCindex) {
@@ -643,7 +660,7 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
 
         iteration_count++;
         if (iteration_count > MAX_ITERATIONS) {
-            // RCLCPP_ERROR(get_logger(), "Maximum iterations reached, breaking loop");
+            RCLCPP_ERROR(get_logger(), "Maximum iterations reached, breaking loop");
             break;
         }
 
@@ -705,14 +722,14 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
             continue;
         }
 
-        // RCLCPP_DEBUG(get_logger(), "检查点 %zu: inRayDis=%f", i, inRayDis[i]);
+        RCLCPP_DEBUG(get_logger(), "检查点 %zu: inRayDis=%f", i, inRayDis[i]);
         if(inRayDis[i] < 1e-6 && 
            (transformed_pc->points[i].x != 0 || transformed_pc->points[i].y != 0) && 
            findIntersection) {
             inRayDis[i] = error;
             inRayRange[i] = sqrt(minDist);
-            // RCLCPP_DEBUG(get_logger(), "更新inRayDis[%zu]=%f, inRayRange[%zu]=%f", 
-            //              i, inRayDis[i], i, inRayRange[i]);
+            RCLCPP_DEBUG(get_logger(), "更新inRayDis[%zu]=%f, inRayRange[%zu]=%f", 
+                         i, inRayDis[i], i, inRayRange[i]);
         }
 
         if(!findIntersection) {
@@ -737,6 +754,217 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
         }
     } catch (const std::exception& e) {
         RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
+    }
+
+    // 添加第二个循环，用于计算评分和分类点云
+    // RCLCPP_INFO(get_logger(), "开始第二个循环，计算评分...");
+    usefulIndex.clear();
+    Vec_pcx.clear();
+    Vec_pcy.clear();
+    Vec_pedalx.clear();
+    Vec_pedaly.clear();
+    
+    // 初始化中心点坐标
+    PCCenter.setZero();
+    mapCenter.setZero();
+    
+    // 记录外部区域总分
+    outsideTotalScore = 0;
+
+    for(size_t i = 0; i < transformed_pc_size; i++) {
+        // 累加外部区域分数
+        outsideTotalScore += match_with_outside[i];
+        
+        // 获取当前点坐标
+        double pcx = transformed_pc->points[i].x;
+        double pcy = transformed_pc->points[i].y;
+        
+        // 计算垂足
+        double pedalx, pedaly;
+        calPedal(ringMapP1->points[i].x,
+                 ringMapP1->points[i].y,
+                 ringMapP2->points[i].x,
+                 ringMapP2->points[i].y,
+                 transformed_pc->points[i].x,
+                 transformed_pc->points[i].y,
+                 pedalx,
+                 pedaly);
+        
+        // 只处理有效点
+        if(transformed_pc->points[i].x != 0 || transformed_pc->points[i].y != 0) {
+            // 根据交叉点数量判断点是内部点还是外部点
+            // 偶数次交叉（加上机器人位置）意味着在地图内部
+            if(numofIntersection[i] % 2 == 0 && intersectionOnMap->points[i].intensity == 1) {
+                // 处理内部点
+                insidePC->points[i] = transformed_pc->points[i];
+                numofInsidePoints++;
+                
+                // 计算Turkey权重
+                double weight = calWeightTurkey(inRayDis[i], errorLowThred, false, errorUpThred);
+                
+                // 计算内部点得分
+                if(inRayDis[i] < 50) {
+                    if(inRayDis[i] < 0.8) {
+                        insideScore += inRayDis[i];
+                    } else {
+                        insideScore += 2;
+                    }
+                    turkeyScore += weight;
+                }
+                
+                // 累加内部范围
+                insideTotalRange += inRayRange[i];
+                
+                // 如果误差小于初始化阈值，用于ICP
+                if(inRayDis[i] < errorLowThredInit) {
+                    numIcpPoints++;
+                    usefulIndex.push_back(i);
+                    
+                    // 保存有用点
+                    UsefulPoints1->points[i] = transformed_pc->points[i];
+                    UsefulPoints2->points[i].x = pedalx;
+                    UsefulPoints2->points[i].y = pedaly;
+                    UsefulPoints2->points[i].z = transformed_pc->points[i].z;
+                    
+                    // 累加权重
+                    weightSumTurkey += weight;
+                    weightsTurkey.push_back(weight);
+                    
+                    // 如果使用ICP初始化
+                    if(bInitializationWithICP) {
+                        if(use_weight) {
+                            // 使用权重
+                            double tempx = weight * pcx;
+                            double tempy = weight * pcy;
+                            PCCenter(0) += tempx;
+                            PCCenter(1) += tempy;
+                            
+                            double tempx_ = weight * pedalx;
+                            double tempy_ = weight * pedaly;
+                            mapCenter(0) += tempx_;
+                            mapCenter(1) += tempy_;
+                            
+                            // 保存向量
+                            Vec_pcx.push_back(tempx);
+                            Vec_pcy.push_back(tempy);
+                            Vec_pedalx.push_back(tempx_);
+                            Vec_pedaly.push_back(tempy_);
+                        } else {
+                            // 不使用权重
+                            PCCenter(0) += pcx;
+                            PCCenter(1) += pcy;
+                            mapCenter(0) += pedalx;
+                            mapCenter(1) += pedaly;
+                            
+                            // 保存向量
+                            Vec_pcx.push_back(pcx);
+                            Vec_pcy.push_back(pcy);
+                            Vec_pedalx.push_back(pedalx);
+                            Vec_pedaly.push_back(pedaly);
+                        }
+                    }
+                }
+            } else {
+                // 处理外部点
+                outsidePC->points[i] = transformed_pc->points[i];
+                numofOutsidePoints++;
+                
+                // 计算Turkey权重
+                double weight = calWeightTurkey(inRayDis[i], errorLowThred, true, errorUpThred);
+                
+                // 计算外部点得分
+                if(inRayDis[i] < 50) {
+                    turkeyScore += weight;
+                    if(inRayDis[i] < 0.8) {
+                        outsideScore += inRayDis[i];
+                    } else {
+                        outsideScore += 2;
+                    }
+                    
+                    // 如果误差小于初始化上限阈值，用于ICP
+                    if(inRayDis[i] < errorUpThredInit) {
+                        numIcpPoints++;
+                        usefulIndex.push_back(i);
+                        
+                        // 保存有用点
+                        UsefulPoints1->points[i] = transformed_pc->points[i];
+                        UsefulPoints2->points[i].x = pedalx;
+                        UsefulPoints2->points[i].y = pedaly;
+                        UsefulPoints2->points[i].z = transformed_pc->points[i].z;
+                        
+                        // 累加权重
+                        weightSumTurkey += weight;
+                        weightsTurkey.push_back(weight);
+                        
+                        // 如果使用ICP初始化
+                        if(bInitializationWithICP) {
+                            if(use_weight) {
+                                // 使用权重
+                                double tempx = weight * pcx;
+                                double tempy = weight * pcy;
+                                PCCenter(0) += tempx;
+                                PCCenter(1) += tempy;
+                                
+                                double tempx_ = weight * pedalx;
+                                double tempy_ = weight * pedaly;
+                                mapCenter(0) += tempx_;
+                                mapCenter(1) += tempy_;
+                                
+                                // 保存向量
+                                Vec_pcx.push_back(tempx);
+                                Vec_pcy.push_back(tempy);
+                                Vec_pedalx.push_back(tempx_);
+                                Vec_pedaly.push_back(tempy_);
+                            } else {
+                                // 不使用权重
+                                PCCenter(0) += pcx;
+                                PCCenter(1) += pcy;
+                                mapCenter(0) += pedalx;
+                                mapCenter(1) += pedaly;
+                                
+                                // 保存向量
+                                Vec_pcx.push_back(pcx);
+                                Vec_pcy.push_back(pcy);
+                                Vec_pedalx.push_back(pedalx);
+                                Vec_pedaly.push_back(pedaly);
+                            }
+                        }
+                    }
+                }
+                
+                // 如果误差小于0.5，累加内部范围
+                if(inRayDis[i] < 0.5) {
+                    insideTotalRange += inRayRange[i];
+                }
+            }
+        }
+    }
+    
+    // 输出评分结果
+    // RCLCPP_INFO(get_logger(), "评分结果: 内部点=%d, 内部得分=%.2f, 外部点=%d, 外部得分=%.2f, 内部范围=%.2f",
+    //             numofInsidePoints, insideScore, numofOutsidePoints, outsideScore, insideTotalRange);
+    
+    // 发布内部和外部点云
+    try {
+        if(pubInsidePC && pubInsidePC.get()) {
+            sensor_msgs::msg::PointCloud2 outMsg;
+            pcl::toROSMsg(*insidePC, outMsg);
+            outMsg.header = mapHeader;
+            pubInsidePC->publish(outMsg);
+        } else {
+            RCLCPP_WARN(get_logger(), "pubInsidePC is not valid, skipping publish");
+        }
+        
+        if(pubOutsidePC && pubOutsidePC.get()) {
+            sensor_msgs::msg::PointCloud2 outMsg;
+            pcl::toROSMsg(*outsidePC, outMsg);
+            outMsg.header = mapHeader;
+            pubOutsidePC->publish(outMsg);
+        } else {
+            RCLCPP_WARN(get_logger(), "pubOutsidePC is not valid, skipping publish");
+        }
+    } catch(const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "Error publishing inside/outside points: %s", e.what());
     }
 }
 
@@ -818,185 +1046,16 @@ bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,
     return bMatchWithPass && (min_error > 1);
 }
 
-void CloudInitializer::scoreParticlesDist() {
-    std::ostringstream ts;
-    ts.precision(2);
-    ts << std::fixed << rclcpp::Time(cloudHeader.stamp).seconds();
-    std::string filename = "/home/jay/AGLoc_ws/frameResult/" +
-                          ts.str() + "rescueRoom.txt";
-                          
-    rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
-    rescueRoomStream.setf(std::ios::fixed);
-    rescueRoomStream.precision(2);
-
-    pcl::PointCloud<pcl::PointXYZI>::Ptr organizedCloudInDS(
-        new pcl::PointCloud<pcl::PointXYZI>());
-
-    pcl::VoxelGrid<pcl::PointXYZI> downSizeFurthestRing;
-    downSizeFurthestRing.setLeafSize(scoreDownsampleRate, 
-                                    scoreDownsampleRate,
-                                    scoreDownsampleRate);
-    downSizeFurthestRing.setInputCloud(furthestRing);
-    downSizeFurthestRing.filter(*organizedCloudInDS);
-
-    RCLCPP_INFO(get_logger(), "Downsample size = %lu", 
-                organizedCloudInDS->points.size());
-
-    for(const auto& guess : corridorGuess) {
-        insideScore = 0;
-        outsideScore = 0;
-        insideTotalRange = 0;
-        numofInsidePoints = 0;
-        numofOutsidePoints = 0;
-
-        setInitialPose(initialYawAngle, guess);
-        pcl::transformPointCloud(*organizedCloudInDS, *transformed_pc, robotPose);
-
-        sensor_msgs::msg::PointCloud2 outMsg;
-        pcl::toROSMsg(*transformed_pc, outMsg);
-        outMsg.header = mapHeader;
-        pubTransformedPC->publish(outMsg);
-
-        calClosestMapPoint(guess[2]);
-
-        initialized = false;
-
-        if(bGenerateResultFile) {
-            rescueRoomStream << rclcpp::Time(mapHeader.stamp).seconds() << ","
-                           << initialYawAngle << ","
-                           << guess(0) << "," << guess(1) << ","
-                           << robotPose(0,3) << "," << robotPose(1,3) << ","
-                           << numofInsidePoints << "," << insideScore << ","
-                           << numofOutsidePoints << "," << outsideScore << ","
-                           << insideTotalRange << std::endl;
-        }
-        resetParameters();
-    }
-
-    rescueRoomStream.close();
-    geometry_msgs::msg::Pose pose;
-    pubDONEsignal->publish(pose);
-}
-
-// TODO 我发现这个函数没有被用到
-void CloudInitializer::scoreParticles() {
-    RCLCPP_INFO(get_logger(), "Starting scoreParticles");
-    
-    double currentTime = rclcpp::Time(cloudHeader.stamp).seconds();
-
-    if(bTestRescue || bRescueRobot) {
-        int try_time = 360 / rescue_angle_interval;
-        
-        auto organizedCloudInRecord = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
-        pcl::VoxelGrid<pcl::PointXYZI> downSizeFurthestRing;
-        downSizeFurthestRing.setLeafSize(scoreDownsampleRate, 
-                                        scoreDownsampleRate,
-                                        scoreDownsampleRate);
-        downSizeFurthestRing.setInputCloud(furthestRing);
-        downSizeFurthestRing.filter(*organizedCloudInRecord);
-
-        for(size_t i = 0; i < static_cast<size_t>(try_time); i++) {
-            for(size_t j = 0; j < corridorGuess.size(); j++) {
-                insideScore = 0;
-                outsideScore = 0;
-                insideTotalRange = 0;
-                numofInsidePoints = 0;
-                numofOutsidePoints = 0;
-
-                Eigen::Vector3f tempinitialExtTrans = corridorGuess[j];
-                double currentAngle = initialYawAngle + i * rescue_angle_interval;
-                int discreteAngle = static_cast<int>(currentAngle) % 360;
-                setInitialPose(discreteAngle, tempinitialExtTrans);
-                                        
-                pcl::transformPointCloud(*organizedCloudInRecord, 
-                                       *transformed_pc,
-                                       robotPose);
-
-                sensor_msgs::msg::PointCloud2 outMsg;
-                pcl::toROSMsg(*transformed_pc, outMsg);
-                outMsg.header = mapHeader;
-                pubTransformedPC->publish(outMsg);
-
-                calClosestMapPoint(j);
-                initialized = false;
-
-                double inoutsideRatio = numofInsidePoints != 0 ? 
-                    static_cast<double>(numofOutsidePoints) / numofInsidePoints : 10000;
-
-                if(bGenerateResultFile) {
-                    rescueRoomStream << rclcpp::Time(mapHeader.stamp).seconds() << ","
-                                   << static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)) << ","
-                                   << corridorGuess[j](0) << "," 
-                                   << corridorGuess[j](1) << ","
-                                   << robotPose(0,3) << "," 
-                                   << robotPose(1,3) << ","
-                                   << inoutsideRatio << ","
-                                   << numofInsidePoints << "," 
-                                   << insideScore << ","
-                                   << numofOutsidePoints << "," 
-                                   << outsideScore << ","
-                                   << insideTotalRange << std::endl;
-                }
-
-                resetParameters();
-            }
-        }
-
-        if(!bTestRescue) {
-            initialized = true;
-        }
-    }
-
-    rescueRoomStream.close();
-    geometry_msgs::msg::Pose pose;
-    pubDONEsignal->publish(pose);
-}
-
-void CloudInitializer::checkingGuess() {
-    insideScore = 0;
-    outsideScore = 0;
-    insideTotalRange = 0;
-
-    auto organizedCloudInRecord = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
-    
-    pcl::VoxelGrid<pcl::PointXYZI> downSizeFurthestRing;
-    downSizeFurthestRing.setLeafSize(scoreDownsampleRate, 
-                                    scoreDownsampleRate,
-                                    scoreDownsampleRate);
-    downSizeFurthestRing.setInputCloud(furthestRing);
-    downSizeFurthestRing.filter(*organizedCloudInRecord);
-
-    RCLCPP_INFO(get_logger(), "Downsample size = %lu", 
-                organizedCloudInRecord->points.size());
-
-    Eigen::Vector3f guessTemp;
-    guessTemp << checkingGuessX, checkingGuessY, 0;
-    
-    setInitialPose(checkingAngle, guessTemp);
-    pcl::transformPointCloud(*organizedCloudInRecord, *transformed_pc, robotPose);
-    
-    sensor_msgs::msg::PointCloud2 outMsg;
-    pcl::toROSMsg(*transformed_pc, outMsg);
-    outMsg.header = mapHeader;
-    pubTransformedPC->publish(outMsg);
-
-    initialized = false;
-    resetParameters();
-    
-    RCLCPP_INFO(get_logger(), "CheckingGuess completed");
-}
-
-
 bool CloudInitializer::checkMap(int ring, 
                               int horizonIndex, 
                               int& last_index,
                               double& minDist,
                               int inside_index) {
     // 添加调试信息
-    // RCLCPP_DEBUG(get_logger(), "checkMap: ring=%d, horizonIndex=%d, inside_index=%d", 
-    //              ring, horizonIndex, inside_index);
-    // RCLCPP_DEBUG(get_logger(), "mapSize=%d, map_pc size=%zu", 
-    //              mapSize, map_pc ? map_pc->size() : 0);
+    RCLCPP_DEBUG(get_logger(), "checkMap: ring=%d, horizonIndex=%d, inside_index=%d", 
+                 ring, horizonIndex, inside_index);
+    RCLCPP_DEBUG(get_logger(), "mapSize=%d, map_pc size=%zu", 
+                 mapSize, map_pc ? map_pc->size() : 0);
     
     // 验证输入参数
     if (inside_index < 0 || inside_index >= AG_index.area_index.size()) {
@@ -1004,7 +1063,7 @@ bool CloudInitializer::checkMap(int ring,
                     inside_index, AG_index.area_index.size());
         return false;
     } else {
-        // RCLCPP_INFO(get_logger(), "we have got inside_index: %d, area_index size: %zu", 
+        // RCLCPP_DEBUG(get_logger(), "we have got inside_index: %d, area_index size: %zu", 
         //     inside_index, AG_index.area_index.size());
     }
     
@@ -1013,9 +1072,9 @@ bool CloudInitializer::checkMap(int ring,
         return false;
     }
     
-    // RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
-    //              AG_index.area_index[inside_index].start,
-    //              AG_index.area_index[inside_index].end);
+    RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
+                 AG_index.area_index[inside_index].start,
+                 AG_index.area_index[inside_index].end);
     
     // Get current point coordinates
     pcl::PointXYZI PCPoint;
