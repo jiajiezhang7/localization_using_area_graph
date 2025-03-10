@@ -150,7 +150,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
             y_rotated + map_extrinsic_trans_[1]
         };
         // 已经通过检验，变换后的WiFi-location这里是正确的
-        RCLCPP_DEBUG(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+        RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
     }
     
     // 添加噪声

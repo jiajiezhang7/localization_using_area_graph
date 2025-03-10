@@ -186,6 +186,8 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
+        // FIXME: 两重循环 -- Maxu:多线程
+        // 
         // Try different angles， 360 /2 = 180个角度
         for(size_t i = 0; i < try_time; i++) {
             RCLCPP_DEBUG(this->get_logger(), "开始尝试第 %zu 个角度", i);
@@ -687,11 +689,6 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
         bool findIntersection = false;
         double minDist = 0;
         
-        // 检查ringMapP1和ringMapP2的访问 --- FIXME: ringMapP1和P2的意义是什么？现在输出全是0，意味着什么
-        // RCLCPP_DEBUG(get_logger(), "ringMapP1点 %zu: x=%f, y=%f", 
-        //              i, ringMapP1->points[i].x, ringMapP1->points[i].y);
-        // RCLCPP_DEBUG(get_logger(), "ringMapP2点 %zu: x=%f, y=%f", 
-        //              i, ringMapP2->points[i].x, ringMapP2->points[i].y);
         
         findIntersection = checkMap(0, i, last_index, minDist, inside_index);
         // RCLCPP_DEBUG(get_logger(), "checkMap结果: findIntersection=%d, minDist=%f", 
