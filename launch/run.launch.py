@@ -14,7 +14,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/96',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/95',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
 
@@ -209,7 +209,10 @@ def generate_launch_description():
             name='robot_loc',
             parameters=[
                 params_file,
-                {'use_sim_time': LaunchConfiguration('use_sim_time')}
+                {
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'use_true_ap_positions': False
+                }
             ],
             condition=IfCondition(LaunchConfiguration('use_global_localization')),
             output='screen',

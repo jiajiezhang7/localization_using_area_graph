@@ -21,6 +21,7 @@
 #include <rss/msg/wifi_location.hpp>
 #include "WGS84toCartesian.h"
 #include <eigen3/Eigen/Dense>
+#include <visualization_msgs/msg/marker.hpp>
 
 struct GeoCoordinate {
     double longitude;
@@ -44,6 +45,7 @@ private:
     
     // Publishers & Subscribers
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr particle_pub_;        // 发布采样得到的
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr wifi_marker_pub_;   // 发布WiFi中心点标记
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;       // 订阅雷达点云话题
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr agmap_sub_;       // 订阅 ag_map (/pubAGMapTransformedPC)
@@ -70,6 +72,7 @@ private:
     // Utility functions
     void generateParticles(const rclcpp::Time& stamp, const std::array<double, 2>& wifi_center);
     bool checkIntersection(const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& polygon);
+    void publishWifiCenterMarker(const rclcpp::Time& stamp, double x, double y);
 
     // Random number generator
     std::random_device rd_;

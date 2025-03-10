@@ -70,6 +70,10 @@ void ParticleGenerator::initializePublishersSubscribers()
     particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/particles_for_init", qos);
         
+    // 发布WiFi中心点标记
+    wifi_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+        "/wifi_center_marker", qos);
+        
     // 订阅1: LiDAR 点云话题
     lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/hesai/pandar", qos,
@@ -149,8 +153,11 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
             x_rotated + map_extrinsic_trans_[0],
             y_rotated + map_extrinsic_trans_[1]
         };
-        // 已经通过检验，变换后的WiFi-location这里是正确的
+        // 已经通过检验，变换后的WiFi-location这里是正确的，输出顺序是先x，后y
         RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+        
+        // 创建并发布WiFi中心点标记
+        publishWifiCenterMarker(msg->header.stamp, wifi_center[0], wifi_center[1]);
     }
     
     // 添加噪声
@@ -194,9 +201,23 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     cloud->height = 1;
     cloud->is_dense = true;
 
+    // 创建一个用于可视化的点云副本，将z值设为0
+    pcl::PointCloud<pcl::PointXYZI>::Ptr viz_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    viz_cloud->points.reserve(cloud->points.size());
+    
+    for (const auto& point : cloud->points) {
+        pcl::PointXYZI viz_point = point;
+        viz_point.z = 0.0;  // 可视化时z值设为0
+        viz_cloud->points.push_back(viz_point);
+    }
+    
+    viz_cloud->width = viz_cloud->points.size();
+    viz_cloud->height = 1;
+    viz_cloud->is_dense = true;
+    
     // 转换为ROS消息并发布
     sensor_msgs::msg::PointCloud2 particles_msg;
-    pcl::toROSMsg(*cloud, particles_msg);
+    pcl::toROSMsg(*viz_cloud, particles_msg);
     particles_msg.header.stamp = stamp;
     particles_msg.header.frame_id = "map";
     
@@ -229,6 +250,43 @@ void ParticleGenerator::agmapCallback(const sensor_msgs::msg::PointCloud2::Share
             AGmaps_.push_back(area);
         }
     }
+}
+
+// 发布WiFi中心点标记
+void ParticleGenerator::publishWifiCenterMarker(const rclcpp::Time& stamp, double x, double y) {
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = stamp;
+    marker.ns = "wifi_center";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    
+    // 设置位置
+    marker.pose.position.x = x;
+    marker.pose.position.y = y;
+    marker.pose.position.z = 0.0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+    
+    // 设置大小（直径为0.5米的球）
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
+    
+    // 设置颜色（绿色）
+    marker.color.r = 0.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;  // 不透明
+    
+    // 设置持续时间（秒）
+    marker.lifetime = rclcpp::Duration(0, 0);  // 0表示永久存在
+    
+    // 发布标记
+    wifi_marker_pub_->publish(marker);
 }
 
 bool ParticleGenerator::checkIntersection(const Eigen::Vector2d& point,
