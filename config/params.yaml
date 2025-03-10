@@ -64,7 +64,7 @@
                     # seq01 - [0.5, 0.15, 0.0]  yaw:10.0
                     # 95 - [4.0, -6.0, 0.0] yaw: 90.0
 
-            # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值,因为不用他们了
+        # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值,因为不用他们了   
         initialYawAngle: 90.0 
         initialExtrinsicTrans: [4.0, -6.0, 0.0] 
 
@@ -78,9 +78,13 @@
         root_long: 121.59139728509
         root_lat: 31.17947960435
 
+
+        # 是否用多线程优化rescueRobot
+        use_multithread: false
+
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 10.0     # 搜索半径(米)
+        particle_generator_radius: 5.0     # 搜索半径(米)
         # without icp initialization 
         rescue_angle_interval: 5.0
         # --------------------------------------------------------

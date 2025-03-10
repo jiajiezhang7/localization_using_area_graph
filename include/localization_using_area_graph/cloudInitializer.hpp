@@ -19,6 +19,10 @@
  *          2. Score Functions:
  *             - Distance based scoring
  *             - Outside/inside point ratio evaluation 
+ *
+ * 多线程优化控制宏
+ * 取消注释以下宏定义可启用调试功能
+ *
  *             - Turkey weight robust scoring
  *             - Hybrid scoring approaches
  *
@@ -72,8 +76,14 @@
 #ifndef _CLOUD_INITIALIZER_HPP_
 #define _CLOUD_INITIALIZER_HPP_
 
+// 多线程优化控制宏
+// 取消注释以下宏定义可启用调试功能
+#define DEBUG_PUBLISH    // 启用此宏将在多线程中发布中间结果
+#define DETAILED_TIMING  // 启用此宏将记录详细的时间信息
+
 #include "utility.hpp"
 #include "cloudBase.hpp"
+#include "thread_pool.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -136,6 +146,9 @@ public:
                       int horizonIndex,
                       double& minDist,
                       bool& findIntersection);  // 检查整个地图
+    
+    // 点云验证方法
+    bool isValidPoint(const pcl::PointXYZI& point);  // 验证点是否有效
 
 
     // 重写CloudBase方法
@@ -149,6 +162,31 @@ public:
     void initializationICP(int insideAGIndex);  // 使用ICP进行初始化
     bool checkICPmovingDist(Eigen::Matrix4f robotPoseGuess);  // 检查ICP移动距离
     bool insideOldArea(int mapPCindex);  // 检查是否在旧区域内
+    
+    // 多线程优化相关方法
+    void rescueRobotMultiThread(); // 使用多线程的救援机器人方法
+    
+    // 线程安全的方法
+    void setInitialPoseThreadSafe(int yaw, const Eigen::Vector3f& trans, Eigen::Matrix4f& localRobotPose);
+    void initializationICPThreadSafe(int insideAGIndex, Eigen::Matrix4f& localRobotPose, 
+                                  pcl::PointCloud<pcl::PointXYZI>::Ptr& localTransformedPC,
+                                  double& localInsideScore, double& localOutsideScore,
+                                  int& localNumofInsidePoints, int& localNumofOutsidePoints,
+                                  double& localTurkeyScore);
+    void calClosestMapPointThreadSafe(int inside_index, Eigen::Matrix4f& localRobotPose,
+                                    pcl::PointCloud<pcl::PointXYZI>::Ptr& localTransformedPC,
+                                    double& localInsideScore, double& localOutsideScore,
+                                    int& localNumofInsidePoints, int& localNumofOutsidePoints,
+                                    double& localTurkeyScore);
+    void writeResultToFile(double result_angle, size_t particleIdx, const Eigen::Matrix4f& localRobotPose,
+                         int localNumofInsidePoints, double localInsideScore,
+                         int localNumofOutsidePoints, double localOutsideScore,
+                         double localInsideTotalRange, double localOutsideTotalScore,
+                         double localTurkeyScore);
+    bool checkMapThreadSafe(int ring, int horizonIndex, int& last_index, double& minDist, int inside_index,
+                         pcl::PointCloud<pcl::PointXYZI>::Ptr& localRingMapP1,
+                         pcl::PointCloud<pcl::PointXYZI>::Ptr& localRingMapP2,
+                         pcl::PointCloud<pcl::PointXYZI>::Ptr& localTransformedPC);
     // 回调方法
     void getInitialExtGuess(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 获取初始外部猜测
 
@@ -156,6 +194,12 @@ private:
     // 成员变量
     double intersectionx;  // 交叉点x坐标
     double intersectiony;  // 交叉点y坐标
+    
+    // 多线程同步相关
+    std::mutex score_mutex;     // 用于保护MaxScore和MaxRobotPose
+    std::mutex publish_mutex;   // 用于保护发布操作
+    std::mutex file_mutex;      // 用于保护文件写入
+    std::mutex map_mutex;       // 用于保护地图数据
 
     // 初始化发布器
     void initializePublishers() {

@@ -128,6 +128,10 @@ void ParamServer::declare_parameters() {
     this->declare_parameter("bAllPassageOpen", false);
     this->declare_parameter("bAllPassageClose", false);
     this->declare_parameter("bInitializationWithICP", false);
+    
+    // 多线程参数
+    this->declare_parameter("use_multithread", true);
+    this->declare_parameter("max_thread_num", 8);
 }
 
 void ParamServer::get_parameters() {
@@ -203,6 +207,10 @@ void ParamServer::get_parameters() {
     this->get_parameter("bAllPassageOpen", bAllPassageOpen);
     this->get_parameter("bAllPassageClose", bAllPassageClose);
     this->get_parameter("bInitializationWithICP", bInitializationWithICP);
+    
+    // 获取多线程参数
+    this->get_parameter("use_multithread", use_multithread);
+    this->get_parameter("max_thread_num", max_thread_num);
 }
 
 void ParamServer::calPedal(double x1, double y1, double x2, double y2,

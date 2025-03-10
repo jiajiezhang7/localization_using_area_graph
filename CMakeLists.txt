@@ -106,6 +106,8 @@ add_executable(cloud_handler
   src/cloudHandler.cpp
   src/cloudBase.cpp
   src/cloudInitializer.cpp
+  src/cloudInitializer_multithread.cpp
+  src/cloudInitializer_thread_safe.cpp
 )
 
 target_link_libraries(cloud_handler

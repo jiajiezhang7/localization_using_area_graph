@@ -131,7 +131,7 @@ void CloudInitializer::rescueRobot() {
     // 当前调用ID
     int current_call_id = ++call_count;
     
-    RCLCPP_WARN(this->get_logger(), 
+    RCLCPP_DEBUG(this->get_logger(), 
                "[调用 #%d] 开始执行rescueRobot，距离上次调用间隔: %.3f秒，是否已有实例在运行: %s", 
                current_call_id,
                (current_time - last_call_time).seconds(),
@@ -147,6 +147,14 @@ void CloudInitializer::rescueRobot() {
     // 标记为正在运行
     is_running = true;
     last_call_time = current_time;
+    
+    // 如果启用了多线程，则调用多线程版本
+    if(use_multithread) {
+        RCLCPP_INFO(this->get_logger(), "使用多线程模式执行救援机器人");
+        rescueRobotMultiThread();
+        is_running = false; // 恢复运行标志
+        return;
+    }
 
     RCLCPP_INFO(this->get_logger(), "----------- Guess is ready, start rescue -----------------");
 
@@ -186,8 +194,7 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
-        // FIXME: 两重循环 -- Maxu:多线程
-        // 
+        // TODO: 两重循环 -- maybe多线程优化
         // Try different angles， 360 /2 = 180个角度
         for(size_t i = 0; i < try_time; i++) {
             RCLCPP_DEBUG(this->get_logger(), "开始尝试第 %zu 个角度", i);

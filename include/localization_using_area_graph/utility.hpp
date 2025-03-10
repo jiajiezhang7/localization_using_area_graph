@@ -199,6 +199,10 @@ protected:
     double percentageThred;
     double averDistanceThred;
     double radiusDisthred;
+    
+    // 多线程相关参数
+    bool use_multithread;       // 是否使用多线程优化
+    int max_thread_num;         // 最大线程数量
     double groundThred;
     double ceilingThred;
     double parallelThred;
