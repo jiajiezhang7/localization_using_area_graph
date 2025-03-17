@@ -153,8 +153,12 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
             x_rotated + map_extrinsic_trans_[0],
             y_rotated + map_extrinsic_trans_[1]
         };
-        // 已经通过检验，变换后的WiFi-location这里是正确的，输出顺序是先x，后y
-        RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+        // 只在首次收到WiFi定位结果时打印信息
+        static bool first_wifi_location = true;
+        if (first_wifi_location) {
+            RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+            first_wifi_location = false;
+        }
         
         // 创建并发布WiFi中心点标记
         publishWifiCenterMarker(msg->header.stamp, wifi_center[0], wifi_center[1]);

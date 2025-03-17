@@ -77,8 +77,10 @@ void CloudInitializer::rescueRobotMultiThread() {
                     organizedCloudInDS->points.size());
 
         // 创建线程池
-        // 获取硬件支持的线程数，并限制最大线程数为16
-        unsigned int num_threads = std::min(std::thread::hardware_concurrency(), 16u);
+        // 直接将线程数限制为8个，减少线程管理开销
+        unsigned int num_threads = 8u;
+        // 如果硬件核心数少于8个，则使用硬件支持的线程数
+        num_threads = std::min(num_threads, std::thread::hardware_concurrency());
         // 至少使用2个线程
         num_threads = std::max(num_threads, 2u);
         
@@ -87,18 +89,28 @@ void CloudInitializer::rescueRobotMultiThread() {
         
         // 任务队列
         std::vector<std::future<void>> futures;
-        size_t total_tasks = try_time * corridorGuess.size();
+        size_t total_tasks = try_time; // 修改为只统计角度数量，因为每个线程处理一个角度
         futures.reserve(total_tasks);
         
-        // 提交所有任务到线程池
+        // 提交任务到线程池 - 修改为每个线程处理一个角度的所有粒子
         for(size_t i = 0; i < try_time; i++) {
-            for(size_t j = 0; j < corridorGuess.size(); j++) {
-                // 将每个(i,j)组合作为一个任务提交到线程池
-                futures.emplace_back(
-                    pool.enqueue([this, i, j, &organizedCloudInDS]() {
+            // 将每个角度作为一个任务提交到线程池
+            futures.emplace_back(
+                pool.enqueue([this, i, &organizedCloudInDS]() {
+                    // 获取当前角度
+                    int current_angle = static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
+                    RCLCPP_DEBUG(this->get_logger(), "线程开始处理角度 %d", current_angle);
+                    
+                    // 用于跟踪线程内部的最佳位姿和分数
+                    double thread_max_score = 0.0;
+                    Eigen::Matrix4f thread_max_pose = Eigen::Matrix4f::Identity();
+                    bool thread_has_better_pose = false;
+                    
+                    // 处理此角度下的所有粒子
+                    for(size_t j = 0; j < corridorGuess.size(); j++) {
                         auto startTime = this->now();
                         
-                        // 为每个线程创建独立的临时变量
+                        // 为每个粒子评估创建独立的临时变量
                         double local_insideScore = 0;
                         double local_outsideScore = 0;
                         double local_insideTotalRange = 0;
@@ -106,9 +118,6 @@ void CloudInitializer::rescueRobotMultiThread() {
                         double local_turkeyScore = 0;
                         int local_numofInsidePoints = 0;
                         int local_numofOutsidePoints = 0;
-                        // 这些变量在当前实现中未使用，但保留以便未来扩展
-                        // double local_accumulateAngle = 0;
-                        // double local_averDistancePairedPoints = 0;
                         
                         // 创建线程本地的点云对象
                         auto local_transformed_pc = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
@@ -123,17 +132,16 @@ void CloudInitializer::rescueRobotMultiThread() {
                         
                         // 线程安全地设置初始位姿
                         this->setInitialPoseThreadSafe(
-                            static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
+                            current_angle,
                             tempinitialExtTrans,
                             local_robotPose);
                         
                         // 变换点云
                         pcl::transformPointCloud(*organizedCloudInDS, *local_transformed_pc, local_robotPose);
                         
-                        // 移除每次迭代的消息发布，减少锁竞争
-                        // 只在调试模式下发布，通过编译宏控制
+                        // 增加批处理大小，减少锁竞争 - 每处理100个粒子才发布一次
                         #ifdef DEBUG_PUBLISH
-                        {
+                        if(j % 100 == 0) {
                             std::lock_guard<std::mutex> lock(publish_mutex);
                             auto this_guess_stamped = geometry_msgs::msg::PointStamped();
                             this_guess_stamped.header.frame_id = "map";
@@ -153,9 +161,9 @@ void CloudInitializer::rescueRobotMultiThread() {
                                 local_numofInsidePoints, local_numofOutsidePoints,
                                 local_turkeyScore);
                                 
-                            // 移除每次ICP后的点云发布
+                            // 增加批处理大小，减少锁竞争 - 每处理100个粒子才发布一次点云
                             #ifdef DEBUG_PUBLISH
-                            {
+                            if(j % 100 == 0) {
                                 std::lock_guard<std::mutex> lock(publish_mutex);
                                 sensor_msgs::msg::PointCloud2 outMsg;
                                 pcl::toROSMsg(*local_transformed_pc, outMsg);
@@ -181,81 +189,82 @@ void CloudInitializer::rescueRobotMultiThread() {
                             Eigen::Vector3d eulerAngle = quaternion.matrix().eulerAngles(1,2,0);
                             result_angle = eulerAngle[1]/M_PI*180;
                         } else {
-                            result_angle = static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
+                            result_angle = current_angle;
                         }
                         
-                        // 写入结果文件
-                        this->writeResultToFile(
-                            result_angle, j, local_robotPose,
-                            local_numofInsidePoints, local_insideScore,
-                            local_numofOutsidePoints, local_outsideScore,
-                            local_insideTotalRange, local_outsideTotalScore,
-                            local_turkeyScore);
-                        
-                        // 使用原子操作更新最佳位姿，减少锁的持有时间
-                        {
-                            double current_score = 1.0/(local_insideScore + local_outsideScore);
-                            bool update_needed = false;
-                            
-                            // 使用短暂的锁检查是否需要更新
-                            {
-                                std::lock_guard<std::mutex> lock(score_mutex);
-                                if(MaxScore < current_score) {
-                                    MaxScore = current_score;
-                                    MaxRobotPose = local_robotPose;
-                                    update_needed = true;
-                                }
-                            }
-                            
-                            // 只有在真正需要更新时才发布消息和记录日志
-                            // 这部分代码在锁外执行，减少锁的持有时间
-                            if(update_needed) {
-                                #ifdef DEBUG_PUBLISH
-                                // 发布当前最佳位姿
-                                auto pose_max_stamped = geometry_msgs::msg::PointStamped();
-                                pose_max_stamped.header.frame_id = "map";
-                                pose_max_stamped.point.x = local_robotPose(0,3);
-                                pose_max_stamped.point.y = local_robotPose(1,3);
-                                pose_max_stamped.point.z = 0;
-                                
-                                // 使用单独的锁发布消息
-                                {
-                                    std::lock_guard<std::mutex> lock(publish_mutex);
-                                    pubCurrentMaxRobotPose->publish(pose_max_stamped);
-                                }
-                                #endif
-                                
-                                // 减少日志输出频率，只记录显著改进
-                                static double last_reported_score = 0.0;
-                                if(current_score > last_reported_score * 1.05) { // 只有提高5%以上才报告
-                                    last_reported_score = current_score;
-                                    RCLCPP_INFO(this->get_logger(), 
-                                        "当前最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.4f",
-                                        local_robotPose(0,3), local_robotPose(1,3), 
-                                        static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
-                                        current_score);
-                                }
-                            }
+                        // 增加批处理大小，减少文件锁争用 - 每处理100个粒子才写入一次
+                        if(j % 100 == 0 || j == corridorGuess.size() - 1) {
+                            this->writeResultToFile(
+                                result_angle, j, local_robotPose,
+                                local_numofInsidePoints, local_insideScore,
+                                local_numofOutsidePoints, local_outsideScore,
+                                local_insideTotalRange, local_outsideTotalScore,
+                                local_turkeyScore);
                         }
                         
-                        // 移除每次迭代的时间记录，减少日志输出
-                        // 可以考虑使用计数器，只记录每N次迭代的时间
+                        // 线程内部先更新本地最佳分数，减少全局锁争用
+                        double current_score = 1.0/(local_insideScore + local_outsideScore);
+                        if(thread_max_score < current_score) {
+                            thread_max_score = current_score;
+                            thread_max_pose = local_robotPose;
+                            thread_has_better_pose = true;
+                            
+                            // 记录线程内部找到更好位姿
+                            RCLCPP_DEBUG(this->get_logger(), 
+                                "线程 (角度=%d) 找到更好位姿: x=%.2f, y=%.2f, 评分=%.4f",
+                                current_angle, local_robotPose(0,3), local_robotPose(1,3), current_score);
+                        }
+                        
                         #ifdef DETAILED_TIMING
-                        auto endTime = this->now();
-                        RCLCPP_DEBUG(this->get_logger(), 
-                                    "单个猜测运行时间: %f ms", 
-                                    (endTime - startTime).seconds() * 1000);
+                        if(j % 100 == 0) { // 每100个粒子记录一次时间
+                            auto endTime = this->now();
+                            RCLCPP_DEBUG(this->get_logger(), 
+                                        "角度 %d, 完成粒子 %zu/%zu, 运行时间: %f ms", 
+                                        current_angle, j, corridorGuess.size(),
+                                        (endTime - startTime).seconds() * 1000);
+                        }
                         #endif
-                    })
-                );
-            }
+                    }
+                    
+                    // 处理完所有粒子后，更新全局最佳位姿
+                    if(thread_has_better_pose) {
+                        std::lock_guard<std::mutex> lock(score_mutex);
+                        if(MaxScore < thread_max_score) {
+                            MaxScore = thread_max_score;
+                            MaxRobotPose = thread_max_pose;
+                            
+                            #ifdef DEBUG_PUBLISH
+                            // 发布当前最佳位姿
+                            auto pose_max_stamped = geometry_msgs::msg::PointStamped();
+                            pose_max_stamped.header.frame_id = "map";
+                            pose_max_stamped.point.x = thread_max_pose(0,3);
+                            pose_max_stamped.point.y = thread_max_pose(1,3);
+                            pose_max_stamped.point.z = 0;
+                            
+                            // 发布消息
+                            {
+                                std::lock_guard<std::mutex> pub_lock(publish_mutex);
+                                pubCurrentMaxRobotPose->publish(pose_max_stamped);
+                            }
+                            #endif
+                            
+                            RCLCPP_INFO(this->get_logger(), 
+                                "当前全局最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.4f",
+                                thread_max_pose(0,3), thread_max_pose(1,3), 
+                                current_angle, thread_max_score);
+                        }
+                    }
+                    
+                    RCLCPP_DEBUG(this->get_logger(), "线程完成角度 %d 的所有粒子评估", current_angle);
+                })
+            );
         }
         
         // 减少进度报告频率，只在关键点报告
         size_t completed = 0;
         size_t last_reported = 0;
-        // 减少报告频率，从10%改为25%
-        size_t report_interval = total_tasks / 4; // 每25%报告一次
+        // 减少报告频率，从25%改为50%
+        size_t report_interval = total_tasks / 2; // 每50%报告一次
         if(report_interval == 0) report_interval = 1;
         
         // 等待所有任务完成
