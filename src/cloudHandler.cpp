@@ -247,7 +247,7 @@ void CloudHandler::cloudHandlerCB(
         }
         
          
-        RCLCPP_INFO(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
+        RCLCPP_INFO_ONCE(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
         
         // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
@@ -977,8 +977,8 @@ void CloudHandler::filterUsefulPoints() {
     }
 
     // 在计算完所有点后添加安全检查和调试信息
-    RCLCPP_INFO(this->get_logger(), "Number of ICP points: %d", numIcpPoints);
-    RCLCPP_INFO(this->get_logger(), "Turkey weight sum: %f", weightSumTurkey);
+    RCLCPP_DEBUG(this->get_logger(), "Number of ICP points: %d", numIcpPoints);
+    RCLCPP_DEBUG(this->get_logger(), "Turkey weight sum: %f", weightSumTurkey);
 
     if (numIcpPoints == 0) {
         RCLCPP_WARN(this->get_logger(), "No valid ICP points found! This may cause tracking failure.");

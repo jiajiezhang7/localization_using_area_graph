@@ -122,6 +122,7 @@ public:
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotGuessMarker;  // 机器人猜测标记发布器
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubRobotPoseAfterICP;  // ICP后机器人位姿发布器
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pubCurrentMaxRobotPose;  // 当前最佳机器人位姿发布器
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubGlobalLocMarker;  // 全局定位结果标记发布器
 
     // 消息存储
     geometry_msgs::msg::PointStamped robotGuess;  // 机器人猜测位置
@@ -213,6 +214,9 @@ private:
             
         pubCurrentMaxRobotPose = this->create_publisher<geometry_msgs::msg::PointStamped>(
             "pubCurrentMaxRobotPose", qos);
+            
+        pubGlobalLocMarker = this->create_publisher<visualization_msgs::msg::Marker>(
+            "global_loc_marker", qos);
     }
 
     // 初始化订阅器

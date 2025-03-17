@@ -65,11 +65,11 @@
         initialExtrinsicTrans: [4.0, -6.0, 0.0] 
 
         # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: true                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
         
         # 25.2.20在测试这个模式-希望跑通 -- 2.28已跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
-        bTestRescue:  false               # 是否测试 [全局定位准不准] 模式
+        bTestRescue:  true               # 是否测试 [全局定位准不准] 模式
         # (全局定位ICP还不work)
         bInitializationWithICP: false
         root_long: 121.59139728509
@@ -81,7 +81,7 @@
 
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 5.0     # 搜索半径(米)
+        particle_generator_radius: 6.0     # 搜索半径(米)
         # without icp initialization 
         rescue_angle_interval: 5.0
         # --------------------------------------------------------

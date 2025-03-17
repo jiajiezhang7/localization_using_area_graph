@@ -118,7 +118,7 @@ bool CloudBase::areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaSta
         line_strip->points.push_back(p);
         line_strip->points.push_back(p_);
         pubinfinity->publish(*line_strip);
-        RCLCPP_INFO(this->get_logger(), "------------------throughTimes: %d ---------------------------", throughTimes);
+        RCLCPP_DEBUG(this->get_logger(), "------------------throughTimes: %d ---------------------------", throughTimes);
         return true;
     } else {
         return false;
