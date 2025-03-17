@@ -118,7 +118,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
     {
         std::lock_guard<std::mutex> lock(wifi_mutex_);
         if (!received_wifi_location_) {
-            RCLCPP_INFO(this->get_logger(), "等待WiFi定位结果...");
+            RCLCPP_INFO_ONCE(this->get_logger(), "等待WiFi定位结果...");
             return;  // 如果还没有收到WiFi定位结果，直接返回
         }
     }
@@ -156,7 +156,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
         // 只在首次收到WiFi定位结果时打印信息
         static bool first_wifi_location = true;
         if (first_wifi_location) {
-            RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+            RCLCPP_INFO_ONCE(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
             first_wifi_location = false;
         }
         

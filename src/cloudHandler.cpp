@@ -204,7 +204,7 @@ void CloudHandler::cloudHandlerCB(
 
     // 检查地图是否初始化，未初始化则返回
     if(!mapInit) {
-        RCLCPP_INFO(get_logger(), "Map not initialized yet, waiting for map!");
+        RCLCPP_INFO_ONCE(get_logger(), "Map not initialized yet, waiting for map!");
         return;
     }
 
@@ -319,7 +319,7 @@ void CloudHandler::cloudHandlerCB(
         }
         
         // 等待rescueRobot完成
-        RCLCPP_INFO(get_logger(), "-------------WAITING FOR RESCUE ROBOT TO COMPLETE---------------");
+        RCLCPP_INFO_ONCE(get_logger(), "-------------WAITING FOR RESCUE ROBOT TO COMPLETE---------------");
         return;
     }
     // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿 （目前能跑通的模式）
@@ -645,7 +645,8 @@ bool CloudHandler::checkWholeMap(int pc_index,
 
     // 初始化搜索参数
     double min_error = 0;        // 最小匹配误差
-    // 移除未使用的变量
+    double min_PCLength = 0;     // 最小激光点距离
+    double min_mapLength = 0;    // 最小地图点距离
     bool bMatchWithPass = false; // 是否与通道匹配的标志
     int start_index = 0;         // 搜索起始索引
 
@@ -699,9 +700,11 @@ bool CloudHandler::checkWholeMap(int pc_index,
                 map2x = map_pc->points[(i + 1) % mapSize].x;
                 map2y = map_pc->points[(i + 1) % mapSize].y;
 
-                // 计算射线和地图的长度 - 这些计算在当前代码中未使用，注释掉以消除警告
-                // double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
-                // double PCLength = calDistance(PCPoint, PosePoint);
+                // 计算射线和地图的长度
+                double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
+                double PCLength = calDistance(PCPoint, PosePoint);
+                min_mapLength = mapLength;
+                min_PCLength = PCLength;
                 
                 // 更新索引记录（用于下次搜索优化）
                 outsideAreaIndexRecord[pc_index] = i % mapSize;
@@ -792,10 +795,10 @@ void CloudHandler::filterUsefulPoints() {
     outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);      
 
     // Debug: 在 filterUsefulPoints() 函数中添加以下调试信息
-    RCLCPP_INFO(this->get_logger(), "transformed_pc size: %zu", transformed_pc->points.size());
-    RCLCPP_INFO(this->get_logger(), "intersectionOnMap size: %zu", intersectionOnMap->points.size());
-    RCLCPP_INFO(this->get_logger(), "Horizon_SCAN value: %d", Horizon_SCAN);
-    RCLCPP_INFO(this->get_logger(), "Valid points before filtering: %zu", transformed_pc->points.size());
+    RCLCPP_DEBUG(this->get_logger(), "transformed_pc size: %zu", transformed_pc->points.size());
+    RCLCPP_DEBUG(this->get_logger(), "intersectionOnMap size: %zu", intersectionOnMap->points.size());
+    RCLCPP_DEBUG(this->get_logger(), "Horizon_SCAN value: %d", Horizon_SCAN);
+    RCLCPP_DEBUG(this->get_logger(), "Valid points before filtering: %zu", transformed_pc->points.size());
 
     // 遍历所有变换后的点云
     for(size_t i = 0; i < transformed_pc->points.size(); i++) {

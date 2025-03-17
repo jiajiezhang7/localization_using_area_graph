@@ -17,6 +17,10 @@
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
 #include <thread>
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <sstream>
+#include <iomanip>
 
 // 函数声明
 bool isValidPoint(const pcl::PointXYZI& point);
@@ -54,6 +58,9 @@ CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
     
     // Initialize variables
     initializeVariables();
+    
+    // 初始化可视化参数
+    visualization_enabled_ = true;
     
     // Allocate memory for point clouds
     allocateMemory();
@@ -194,7 +201,7 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
-        // TODO: 两重循环 -- maybe多线程优化
+        // 两重循环
         // Try different angles， 360 /2 = 180个角度
         for(size_t i = 0; i < try_time; i++) {
             RCLCPP_DEBUG(this->get_logger(), "开始尝试第 %zu 个角度", i);
@@ -231,7 +238,7 @@ void CloudInitializer::rescueRobot() {
                 setInitialPose(static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
                              tempinitialExtTrans);
                              
-                // RCLCPP_INFO(this->get_logger(), "robotPose矩阵:\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f",
+                // RCLCPP_DEBUG(this->get_logger(), "robotPose矩阵:\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f",
                 //     robotPose(0,0), robotPose(0,1), robotPose(0,2), robotPose(0,3),
                 //     robotPose(1,0), robotPose(1,1), robotPose(1,2), robotPose(1,3),
                 //     robotPose(2,0), robotPose(2,1), robotPose(2,2), robotPose(2,3),
@@ -391,8 +398,153 @@ void CloudInitializer::rescueRobot() {
     // 标记rescueRobot已完成
     isRescueFinished = true;
 
+    // 生成并保存可视化图像
+    if (visualization_enabled_ && !corridorGuess.empty()) {
+        // 提取WiFi定位位置（使用第一个粒子作为初始WiFi定位结果）
+        std::vector<float> wifi_position = {corridorGuess[0][0], corridorGuess[0][1]};
+        
+        // 提取全局定位最终结果位置
+        std::vector<float> final_position = {MaxRobotPose(0,3), MaxRobotPose(1,3)};
+        
+        // 构建输出文件路径
+        std::ostringstream tsViz;
+        tsViz.precision(2);
+        tsViz << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
+        std::string vizFilename = "/home/jay/AGLoc_ws/localization_result_" + tsViz.str() + ".png";
+        
+        // 保存可视化图像
+        saveVisualizationImage(wifi_position, final_position, vizFilename);
+        RCLCPP_INFO(this->get_logger(), "已保存定位结果可视化图像到: %s", vizFilename.c_str());
+    }
+
     // 重置MaxScore为一个较低的值，确保下次能够更新
     MaxScore = 0.0;
+}
+
+/**
+ * Draw the point cloud map on the image with enhanced visualization
+ */
+void CloudInitializer::drawMapOnImage(cv::Mat& image, float scale, float offset_x, float offset_y) {
+    // Directly draw all points with increased size for better visibility
+    for (size_t i = 0; i < map_pc->points.size(); i++) {
+        const pcl::PointXYZI& point = map_pc->points[i];
+        
+        // Skip invalid points
+        if (!isValidPoint(point)) {
+            continue;
+        }
+        
+        // Calculate image coordinates
+        int img_x = static_cast<int>((point.x * scale) + offset_x);
+        int img_y = static_cast<int>((point.y * scale) + offset_y);
+        
+        // Check if coordinates are within image boundaries
+        if (img_x >= 0 && img_x < image.cols && img_y >= 0 && img_y < image.rows) {
+            // Draw point with increased size (3 pixels) for better visibility
+            cv::circle(image, cv::Point(img_x, img_y), 3, cv::Scalar(50, 50, 50), -1);
+        }
+    }
+}
+
+/**
+ * Generate and save visualization image with map, WiFi position, and global localization results
+ */
+void CloudInitializer::saveVisualizationImage(const std::vector<float>& wifi_position, 
+                                           const std::vector<float>& final_position,
+                                           const std::string& output_path) {
+    // Check point cloud size
+    if (map_pc->points.empty()) {
+        RCLCPP_WARN(this->get_logger(), "Map point cloud is empty, cannot generate visualization image");
+        return;
+    }
+    
+    // Calculate map's bounding box
+    float min_x = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::lowest();
+    float min_y = std::numeric_limits<float>::max();
+    float max_y = std::numeric_limits<float>::lowest();
+    
+    for (const auto& point : map_pc->points) {
+        if (!isValidPoint(point)) continue;
+        
+        min_x = std::min(min_x, point.x);
+        max_x = std::max(max_x, point.x);
+        min_y = std::min(min_y, point.y);
+        max_y = std::max(max_y, point.y);
+    }
+    
+    // Add margin to boundaries
+    float margin = 5.0f;
+    min_x -= margin;
+    max_x += margin;
+    min_y -= margin;
+    max_y += margin;
+    
+    // Calculate image size and scale
+    float map_width = max_x - min_x;
+    float map_height = max_y - min_y;
+    
+    // Set image width to 1200 pixels, height calculated proportionally
+    const int img_width = 1200;
+    const float scale = img_width / map_width;
+    const int img_height = static_cast<int>(map_height * scale) + 100;  // Extra space for title and legend
+    
+    // Create white background image
+    cv::Mat visualization(img_height, img_width, CV_8UC3, cv::Scalar(255, 255, 255));
+    
+    // Calculate map to image coordinate offset
+    float offset_x = -min_x * scale;
+    float offset_y = -min_y * scale + 50;  // Top padding for title
+    
+    // Draw the map with enhanced visualization
+    drawMapOnImage(visualization, scale, offset_x, offset_y);
+    
+    // Draw WiFi localization result (blue dot)
+    int wifi_x = static_cast<int>((wifi_position[0] * scale) + offset_x);
+    int wifi_y = static_cast<int>((wifi_position[1] * scale) + offset_y);
+    
+    if (wifi_x >= 0 && wifi_x < visualization.cols && wifi_y >= 0 && wifi_y < visualization.rows) {
+        cv::circle(visualization, cv::Point(wifi_x, wifi_y), 10, cv::Scalar(255, 0, 0), -1);
+        cv::putText(visualization, "WiFi Position", cv::Point(wifi_x + 15, wifi_y), 
+                   cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+    }
+    
+    // Draw global localization result (red dot)
+    int final_x = static_cast<int>((final_position[0] * scale) + offset_x);
+    int final_y = static_cast<int>((final_position[1] * scale) + offset_y);
+    
+    if (final_x >= 0 && final_x < visualization.cols && final_y >= 0 && final_y < visualization.rows) {
+        cv::circle(visualization, cv::Point(final_x, final_y), 10, cv::Scalar(0, 0, 255), -1);
+        cv::putText(visualization, "Global Position", cv::Point(final_x + 15, final_y), 
+                   cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
+    }
+    
+    // Draw image title
+    std::ostringstream title;
+    title << "Localization Result Visualization - " << rclcpp::Time(mapHeader.stamp).seconds() << " sec";
+    cv::putText(visualization, title.str(), cv::Point(10, 30), 
+               cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 0), 2);
+    
+    // Draw legend
+    cv::rectangle(visualization, cv::Point(10, img_height - 70), cv::Point(300, img_height - 10), cv::Scalar(255, 255, 255), -1);
+    cv::rectangle(visualization, cv::Point(10, img_height - 70), cv::Point(300, img_height - 10), cv::Scalar(0, 0, 0), 1);
+    
+    cv::circle(visualization, cv::Point(30, img_height - 50), 10, cv::Scalar(255, 0, 0), -1);
+    cv::putText(visualization, "WiFi Localization", cv::Point(50, img_height - 45), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+    
+    cv::circle(visualization, cv::Point(30, img_height - 25), 10, cv::Scalar(0, 0, 255), -1);
+    cv::putText(visualization, "Global Localization", cv::Point(50, img_height - 20), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+    
+    // Draw visualization timestamp and scale info
+    std::ostringstream scaleInfo;
+    scaleInfo << "Scale: 1 pixel = " << std::fixed << std::setprecision(3) << (1.0/scale) << " meters";
+    cv::putText(visualization, scaleInfo.str(), cv::Point(img_width - 400, img_height - 20), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 1);
+    
+    // Save the image
+    cv::imwrite(output_path, visualization);
 }
 
 bool CloudInitializer::insideOldArea(int mapPCindex) {

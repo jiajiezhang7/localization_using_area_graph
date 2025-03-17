@@ -242,9 +242,29 @@ private:
     }
 
 protected:
-    // Image transport (if needed later)
-    // std::shared_ptr<image_transport::ImageTransport> it_;
-    // image_transport::Publisher pubThings2Say;
+    // 可视化相关成员变量和方法
+    bool visualization_enabled_;
+    
+    /**
+     * @brief 生成并保存可视化图像，包含地图、WiFi定位和全局定位结果
+     * 
+     * @param wifi_position WiFi定位的位置 (x,y)
+     * @param final_position 全局定位后的最终位置 (x,y)
+     * @param output_path 输出图像文件的路径
+     */
+    void saveVisualizationImage(const std::vector<float>& wifi_position, 
+                               const std::vector<float>& final_position,
+                               const std::string& output_path);
+    
+    /**
+     * @brief 在指定图像上绘制点云地图
+     * 
+     * @param image 要绘制的图像
+     * @param scale 缩放因子
+     * @param offset_x X轴偏移
+     * @param offset_y Y轴偏移
+     */
+    void drawMapOnImage(cv::Mat& image, float scale, float offset_x, float offset_y);
 };
 
 #endif // _CLOUD_INITIALIZER_HPP_
