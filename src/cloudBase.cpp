@@ -294,63 +294,63 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
     outMsgMap.header = tempHeader;
     pubMapPC->publish(outMsgMap);
 
-    // 创建可视化图像
-    const int img_size = 800;
-    const int margin = 50;
-    cv::Mat visualization = cv::Mat::zeros(img_size + 2*margin, img_size + 2*margin, CV_8UC3);
+    // 创建可视化图像 - map_visualization
+    // const int img_size = 800;
+    // const int margin = 50;
+    // cv::Mat visualization = cv::Mat::zeros(img_size + 2*margin, img_size + 2*margin, CV_8UC3);
     
-    // 计算点云的边界框
-    float min_x = std::numeric_limits<float>::max();
-    float max_x = std::numeric_limits<float>::lowest();
-    float min_y = std::numeric_limits<float>::max();
-    float max_y = std::numeric_limits<float>::lowest();
+    // // 计算点云的边界框
+    // float min_x = std::numeric_limits<float>::max();
+    // float max_x = std::numeric_limits<float>::lowest();
+    // float min_y = std::numeric_limits<float>::max();
+    // float max_y = std::numeric_limits<float>::lowest();
     
-    for (const auto& point : map_pc->points) {
-        min_x = std::min(min_x, point.x);
-        max_x = std::max(max_x, point.x);
-        min_y = std::min(min_y, point.y);
-        max_y = std::max(max_y, point.y);
-    }
+    // for (const auto& point : map_pc->points) {
+    //     min_x = std::min(min_x, point.x);
+    //     max_x = std::max(max_x, point.x);
+    //     min_y = std::min(min_y, point.y);
+    //     max_y = std::max(max_y, point.y);
+    // }
     
-    // 计算缩放因子
-    float scale = img_size / std::max(max_x - min_x, max_y - min_y);
+    // // 计算缩放因子
+    // float scale = img_size / std::max(max_x - min_x, max_y - min_y);
     
-    // 绘制地图点云（白色）
-    for (size_t i = 0; i < map_pc->points.size(); i++) {
-        int x = static_cast<int>((map_pc->points[i].x - min_x) * scale) + margin;
-        int y = static_cast<int>((map_pc->points[i].y - min_y) * scale) + margin;
-        cv::circle(visualization, cv::Point(x, y), 1, cv::Scalar(255, 255, 255), -1);
+    // // 绘制地图点云（白色）
+    // for (size_t i = 0; i < map_pc->points.size(); i++) {
+    //     int x = static_cast<int>((map_pc->points[i].x - min_x) * scale) + margin;
+    //     int y = static_cast<int>((map_pc->points[i].y - min_y) * scale) + margin;
+    //     cv::circle(visualization, cv::Point(x, y), 1, cv::Scalar(255, 255, 255), -1);
         
-    }
+    // }
     
-    // 绘制地图中心点（绿色）
-    int center_x = static_cast<int>((mapCenterInitialization(0) - min_x) * scale) + margin;
-    int center_y = static_cast<int>((mapCenterInitialization(1) - min_y) * scale) + margin;
-    cv::circle(visualization, cv::Point(center_x, center_y), 5, cv::Scalar(0, 255, 0), -1);
+    // // 绘制地图中心点（绿色）
+    // int center_x = static_cast<int>((mapCenterInitialization(0) - min_x) * scale) + margin;
+    // int center_y = static_cast<int>((mapCenterInitialization(1) - min_y) * scale) + margin;
+    // cv::circle(visualization, cv::Point(center_x, center_y), 5, cv::Scalar(0, 255, 0), -1);
     
-    // 绘制初始位置（红色）
-    int init_x = static_cast<int>((initialExtTrans[0] - min_x) * scale) + margin;
-    int init_y = static_cast<int>((initialExtTrans[1] - min_y) * scale) + margin;
-    cv::circle(visualization, cv::Point(init_x, init_y), 5, cv::Scalar(0, 0, 255), -1);
+    // // 绘制初始位置（红色）
+    // int init_x = static_cast<int>((initialExtTrans[0] - min_x) * scale) + margin;
+    // int init_y = static_cast<int>((initialExtTrans[1] - min_y) * scale) + margin;
+    // cv::circle(visualization, cv::Point(init_x, init_y), 5, cv::Scalar(0, 0, 255), -1);
     
-    // 绘制初始方向箭头
-    float arrow_length = 20.0; // 箭头长度（像素）
-    float init_angle = initialYawAngle * M_PI / 180.0; // 转换为弧度
-    int arrow_x = init_x + static_cast<int>(arrow_length * cos(init_angle));
-    int arrow_y = init_y + static_cast<int>(arrow_length * sin(init_angle));
-    cv::arrowedLine(visualization, cv::Point(init_x, init_y), 
-                    cv::Point(arrow_x, arrow_y),
-                    cv::Scalar(0, 0, 255), 2, cv::LINE_AA, 0, 0.3);
+    // // 绘制初始方向箭头
+    // float arrow_length = 20.0; // 箭头长度（像素）
+    // float init_angle = initialYawAngle * M_PI / 180.0; // 转换为弧度
+    // int arrow_x = init_x + static_cast<int>(arrow_length * cos(init_angle));
+    // int arrow_y = init_y + static_cast<int>(arrow_length * sin(init_angle));
+    // cv::arrowedLine(visualization, cv::Point(init_x, init_y), 
+    //                 cv::Point(arrow_x, arrow_y),
+    //                 cv::Scalar(0, 0, 255), 2, cv::LINE_AA, 0, 0.3);
     
-    // 添加图例
-    cv::putText(visualization, "Map Center", cv::Point(margin, img_size + margin * 1.5), 
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
-    cv::putText(visualization, "Initial Pose", cv::Point(margin + 150, img_size + margin * 1.5), 
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
+    // // 添加图例
+    // cv::putText(visualization, "Map Center", cv::Point(margin, img_size + margin * 1.5), 
+    //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+    // cv::putText(visualization, "Initial Pose", cv::Point(margin + 150, img_size + margin * 1.5), 
+    //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
     
-    // 保存图像
-    cv::imwrite("/home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png", visualization);
-    RCLCPP_INFO(this->get_logger(), "Map visualization saved to /home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png");
+    // // 保存图像
+    // cv::imwrite("/home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png", visualization);
+    // RCLCPP_INFO(this->get_logger(), "Map visualization saved to /home/jay/AGLoc_ws/src/localization_using_area_graph/maps/map_visualization.png");
 }
 
 

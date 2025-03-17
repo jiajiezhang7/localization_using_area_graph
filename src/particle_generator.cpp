@@ -15,9 +15,9 @@
 // 初始化部分
 ParticleGenerator::ParticleGenerator()
     : Node("particle_generator"), 
+      received_wifi_location_(false),  // 新增标记变量
       gen_(rd_()), 
-      dist_(0.0, 1.0),
-      received_wifi_location_(false)  // 新增标记变量
+      dist_(0.0, 1.0)
 {
     initializeParameters();
     initializePublishersSubscribers();
@@ -154,7 +154,7 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
             y_rotated + map_extrinsic_trans_[1]
         };
         // 已经通过检验，变换后的WiFi-location这里是正确的，输出顺序是先x，后y
-        RCLCPP_DEBUG(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
+        RCLCPP_INFO(this->get_logger(), "变换后的WiFi center: [%.2f, %.2f]", wifi_center[0], wifi_center[1]);
         
         // 创建并发布WiFi中心点标记
         publishWifiCenterMarker(msg->header.stamp, wifi_center[0], wifi_center[1]);

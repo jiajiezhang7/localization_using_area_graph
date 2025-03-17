@@ -106,8 +106,9 @@ void CloudInitializer::rescueRobotMultiThread() {
                         double local_turkeyScore = 0;
                         int local_numofInsidePoints = 0;
                         int local_numofOutsidePoints = 0;
-                        double local_accumulateAngle = 0;
-                        double local_averDistancePairedPoints = 0;
+                        // 这些变量在当前实现中未使用，但保留以便未来扩展
+                        // double local_accumulateAngle = 0;
+                        // double local_averDistancePairedPoints = 0;
                         
                         // 创建线程本地的点云对象
                         auto local_transformed_pc = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();

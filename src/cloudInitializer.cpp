@@ -975,13 +975,10 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
 bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint, 
                                    const pcl::PointXYZI &PosePoint,
                                    int horizonIndex,
-                                   double & minDist,
-                                   bool& findIntersection) {
+                                   double & /* minDist */,
+                                   bool& /* findIntersection */) {
     double min_error = 0;
-    double min_PCLength = 0;
-    double min_mapLength = 0;
-    bool first_ring_find = false;
-    bool done_checking_ring = false;
+    // 移除未使用的变量
     int start_index = 0;
     bool bMatchWithPass = false;
 
@@ -1028,8 +1025,8 @@ bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,
                 double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
                 double PCLength = calDistance(PCPoint, PosePoint);
 
-                min_mapLength = mapLength;
-                min_PCLength = PCLength;
+                // 移除未使用的变量赋值
+                // mapLength 和 PCLength 已计算但不需要存储
                 outsideAreaIndexRecord[horizonIndex] = i % mapSize;
                 outsideAreaLastRingIndexRecord[horizonIndex % Horizon_SCAN] = i % mapSize;
 
@@ -1062,7 +1059,7 @@ bool CloudInitializer::checkMap(int ring,
                  mapSize, map_pc ? map_pc->size() : 0);
     
     // 验证输入参数
-    if (inside_index < 0 || inside_index >= AG_index.area_index.size()) {
+    if (inside_index < 0 || static_cast<size_t>(inside_index) >= AG_index.area_index.size()) {
         RCLCPP_ERROR(get_logger(), "Invalid inside_index: %d, area_index size: %zu", 
                     inside_index, AG_index.area_index.size());
         return false;
@@ -1076,7 +1073,7 @@ bool CloudInitializer::checkMap(int ring,
         return false;
     }
     
-    RCLCPP_DEBUG(get_logger(), "AG_index range: start=%d, end=%d", 
+    RCLCPP_DEBUG(get_logger(), "AG_index range: start=%ld, end=%ld", 
                  AG_index.area_index[inside_index].start,
                  AG_index.area_index[inside_index].end);
     

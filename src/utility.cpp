@@ -325,7 +325,7 @@ double ParamServer::calWeightTurkey(double r, double k, bool outside, double out
     }
 }
 
-double ParamServer::calWeightHuber(double r, double k) {
+double ParamServer::calWeightHuber(double /* r */, double /* k */) {
     return 0;
 }
 

@@ -163,7 +163,7 @@ CloudHandler::CloudHandler()
 }
 
 void CloudHandler::setInitialGuessFlag(
-    const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
+    const sensor_msgs::msg::PointCloud2::SharedPtr /* laserCloudMsg */) {
     hasGlobalPoseEstimate = true;
 }
 
@@ -645,8 +645,7 @@ bool CloudHandler::checkWholeMap(int pc_index,
 
     // 初始化搜索参数
     double min_error = 0;        // 最小匹配误差
-    double min_PCLength = 0;     // 最小激光点距离
-    double min_mapLength = 0;    // 最小地图点距离
+    // 移除未使用的变量
     bool bMatchWithPass = false; // 是否与通道匹配的标志
     int start_index = 0;         // 搜索起始索引
 
@@ -700,11 +699,9 @@ bool CloudHandler::checkWholeMap(int pc_index,
                 map2x = map_pc->points[(i + 1) % mapSize].x;
                 map2y = map_pc->points[(i + 1) % mapSize].y;
 
-                // 计算射线和地图的长度
-                double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
-                double PCLength = calDistance(PCPoint, PosePoint);
-                min_mapLength = mapLength;
-                min_PCLength = PCLength;
+                // 计算射线和地图的长度 - 这些计算在当前代码中未使用，注释掉以消除警告
+                // double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
+                // double PCLength = calDistance(PCPoint, PosePoint);
                 
                 // 更新索引记录（用于下次搜索优化）
                 outsideAreaIndexRecord[pc_index] = i % mapSize;
