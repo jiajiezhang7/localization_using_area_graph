@@ -70,6 +70,10 @@ void ParticleGenerator::initializePublishersSubscribers()
     particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/particles_for_init", qos);
         
+    // 发布用于可视化的粒子
+    viz_particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "/particles_for_viz", qos);
+        
     // 发布WiFi中心点标记
     wifi_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
         "/wifi_center_marker", qos);
@@ -219,14 +223,23 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     viz_cloud->height = 1;
     viz_cloud->is_dense = true;
     
-    // 转换为ROS消息并发布
+    // 转换为ROS消息并发布原始粒子（保持不变）
     sensor_msgs::msg::PointCloud2 particles_msg;
-    pcl::toROSMsg(*viz_cloud, particles_msg);
+    pcl::toROSMsg(*cloud, particles_msg);
     particles_msg.header.stamp = stamp;
     particles_msg.header.frame_id = "map";
     
-    // Publish particles
+    // Publish original particles
     particle_pub_->publish(particles_msg);
+    
+    // 转换为ROS消息并发布可视化粒子
+    sensor_msgs::msg::PointCloud2 viz_particles_msg;
+    pcl::toROSMsg(*viz_cloud, viz_particles_msg);
+    viz_particles_msg.header.stamp = stamp;
+    viz_particles_msg.header.frame_id = "map";
+    
+    // Publish visualization particles
+    viz_particle_pub_->publish(viz_particles_msg);
 }
 
 // 它所订阅的是已经转换到map坐标系下的Area Graph的 node point

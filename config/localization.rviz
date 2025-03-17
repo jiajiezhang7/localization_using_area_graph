@@ -20,10 +20,11 @@ Panels:
         - /PointCloud23
         - /PointCloud24
         - /PointCloud25
-        - /PointCloud25/Topic1
-        - /PointCloud26
         - /Marker2
         - /Marker3
+        - /Marker3/Status1
+        - /Marker3/Topic1
+        - /PointCloud26
       Splitter Ratio: 0.5
     Tree Height: 1266
   - Class: rviz_common/Selection
@@ -197,9 +198,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 648
+      Max Intensity: 17.377674102783203
       Min Color: 0; 0; 0
-      Min Intensity: 633
+      Min Intensity: 1.4380311965942383
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -265,9 +266,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 17.26609992980957
+      Max Intensity: 17.377674102783203
       Min Color: 0; 0; 0
-      Min Intensity: 1.442003607749939
+      Min Intensity: 1.4380311965942383
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -281,40 +282,6 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /pubOrganizedCloudIn
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 0
-        Min Value: 0
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 237; 51; 59
-      Color Transformer: FlatColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 1
-      Min Color: 0; 0; 0
-      Min Intensity: 1
-      Name: PointCloud2
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.15000000596046448
-      Style: Spheres
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /particles_for_init
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -378,6 +345,53 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /global_loc_marker
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_loc_marker
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 1
+      Min Color: 0; 0; 0
+      Min Intensity: 1
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.20000000298023224
+      Style: Spheres
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /particles_for_viz
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -424,25 +438,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 39.019859313964844
+      Distance: 46.11837387084961
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.056064605712891
-        Y: -6.5276031494140625
-        Z: -8.542043685913086
+        X: 7.7136359214782715
+        Y: -6.600090503692627
+        Z: -5.028306484222412
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.3547966480255127
+      Pitch: 1.4747964143753052
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.1881778240203857
+      Yaw: 3.163177967071533
     Saved: ~
 Window Geometry:
   Displays:

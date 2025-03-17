@@ -45,6 +45,7 @@ private:
     
     // Publishers & Subscribers
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr particle_pub_;        // 发布采样得到的
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr viz_particle_pub_;    // 发布可视化粒子
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr wifi_marker_pub_;   // 发布WiFi中心点标记
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;       // 订阅雷达点云话题

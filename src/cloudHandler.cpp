@@ -247,7 +247,7 @@ void CloudHandler::cloudHandlerCB(
         }
         
          
-        RCLCPP_INFO_ONCE(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
+        RCLCPP_INFO(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
         
         // 设置初始位姿估计的回调函数 --- 包装器
         auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 

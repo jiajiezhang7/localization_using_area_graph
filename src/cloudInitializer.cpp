@@ -48,7 +48,7 @@ CloudInitializer::CloudInitializer() : CloudBase("cloud_initializer_node") {
     
     bGuessReady = false;
     MaxRobotPose.setZero();
-    MaxScore = -std::numeric_limits<double>::infinity(); // 初始化为负无穷大而不是0
+    MaxScore = 0;
     rescueRunTime = 0;
     rescueTimes = 0;
     
@@ -304,14 +304,9 @@ void CloudInitializer::rescueRobot() {
                                    << "outside_total:" << outsideTotalScore << ","
                                    << "turkey_score:" << turkeyScore << std::endl;
                 }
-                // 计算当前评分，防止除以零
-                double currentScore = (insideScore + outsideScore > 0) ? 
-                                     1.0/(insideScore + outsideScore) : 
-                                     std::numeric_limits<double>::infinity();
-                
                 // Update best pose if current score is better
-                if(MaxScore < currentScore) {
-                    MaxScore = currentScore;
+                if(MaxScore < 1.0/(insideScore + outsideScore)) {
+                    MaxScore = 1.0/(insideScore + outsideScore);
                     MaxRobotPose = robotPose;
                     
                     // Publish current max pose
@@ -333,7 +328,7 @@ void CloudInitializer::rescueRobot() {
                         "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
                         robotPose(0,3), robotPose(1,3), 
                         static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
-                        currentScore, MaxScore,
+                        1.0/(insideScore + outsideScore), MaxScore,
                         insideScore, outsideScore);
                 }
 
@@ -402,7 +397,7 @@ void CloudInitializer::rescueRobot() {
     
     // 标记rescueRobot已完成
     isRescueFinished = true;
-    
+
     // 发布全局定位结果的marker
     visualization_msgs::msg::Marker global_loc_marker;
     global_loc_marker.header.frame_id = "map";
@@ -566,24 +561,16 @@ void CloudInitializer::saveVisualizationImage(const std::vector<float>& wifi_pos
     cv::putText(visualization, title.str(), cv::Point(10, 30), 
                cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 0), 2);
     
-    // Draw legend with coordinates
-    cv::rectangle(visualization, cv::Point(10, img_height - 100), cv::Point(400, img_height - 10), cv::Scalar(255, 255, 255), -1);
-    cv::rectangle(visualization, cv::Point(10, img_height - 100), cv::Point(400, img_height - 10), cv::Scalar(0, 0, 0), 1);
+    // Draw legend
+    cv::rectangle(visualization, cv::Point(10, img_height - 70), cv::Point(300, img_height - 10), cv::Scalar(255, 255, 255), -1);
+    cv::rectangle(visualization, cv::Point(10, img_height - 70), cv::Point(300, img_height - 10), cv::Scalar(0, 0, 0), 1);
     
-    // WiFi localization with coordinates
-    cv::circle(visualization, cv::Point(30, img_height - 80), 10, cv::Scalar(255, 0, 0), -1);
-    std::ostringstream wifi_text;
-    wifi_text << "WiFi Localization (x: " << std::fixed << std::setprecision(3) << wifi_position[0] 
-              << ", y: " << std::fixed << std::setprecision(3) << wifi_position[1] << ")"; 
-    cv::putText(visualization, wifi_text.str(), cv::Point(50, img_height - 75), 
+    cv::circle(visualization, cv::Point(30, img_height - 50), 10, cv::Scalar(255, 0, 0), -1);
+    cv::putText(visualization, "WiFi Localization", cv::Point(50, img_height - 45), 
                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
     
-    // Global localization with coordinates
-    cv::circle(visualization, cv::Point(30, img_height - 45), 10, cv::Scalar(0, 0, 255), -1);
-    std::ostringstream global_text;
-    global_text << "Global Localization (x: " << std::fixed << std::setprecision(3) << final_position[0] 
-                << ", y: " << std::fixed << std::setprecision(3) << final_position[1] << ")"; 
-    cv::putText(visualization, global_text.str(), cv::Point(50, img_height - 40), 
+    cv::circle(visualization, cv::Point(30, img_height - 25), 10, cv::Scalar(0, 0, 255), -1);
+    cv::putText(visualization, "Global Localization", cv::Point(50, img_height - 20), 
                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
     
     // Draw visualization timestamp and scale info
@@ -1176,13 +1163,10 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
 bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint, 
                                    const pcl::PointXYZI &PosePoint,
                                    int horizonIndex,
-                                   double & minDist ,
-                                   bool& findIntersection) {
+                                   double & /* minDist */,
+                                   bool& /* findIntersection */) {
     double min_error = 0;
-    double min_PCLength = 0;
-    double min_mapLength = 0;
-    bool first_ring_find = false;
-    bool done_checking_ring = false;
+    // 移除未使用的变量
     int start_index = 0;
     bool bMatchWithPass = false;
 
@@ -1229,8 +1213,8 @@ bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,
                 double mapLength = calDistance(intersectionOnMapThisLine, PosePoint);
                 double PCLength = calDistance(PCPoint, PosePoint);
 
-                min_mapLength = mapLength;
-                min_PCLength = PCLength;
+                // 移除未使用的变量赋值
+                // mapLength 和 PCLength 已计算但不需要存储
                 outsideAreaIndexRecord[horizonIndex] = i % mapSize;
                 outsideAreaLastRingIndexRecord[horizonIndex % Horizon_SCAN] = i % mapSize;
 
