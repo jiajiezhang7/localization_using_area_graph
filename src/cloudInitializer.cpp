@@ -170,17 +170,17 @@ void CloudInitializer::rescueRobot() {
     ts.precision(2);
     ts << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
     // TODO 全局定位结果保存路径
-    std::string filename = "/home/jay/AGLoc_ws/frameResult" + 
-                          ts.str() + "rescueRoom.txt";
+    // std::string filename = "/home/jay/AGLoc_ws/frameResult" + 
+    //                       ts.str() + "rescueRoom.txt";
                           
-    rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
-    rescueRoomStream.setf(std::ios::fixed);
-    rescueRoomStream.precision(2);
+    // rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
+    // rescueRoomStream.setf(std::ios::fixed);
+    // rescueRoomStream.precision(2);
     
-    if (!rescueRoomStream.good()) {
-        RCLCPP_ERROR(this->get_logger(), "ERROR OPENING FILE");
-        return;
-    }
+    // if (!rescueRoomStream.good()) {
+    //     RCLCPP_ERROR(this->get_logger(), "ERROR OPENING FILE");
+    //     return;
+    // }
 
     auto startC = std::chrono::high_resolution_clock::now();
     
@@ -446,7 +446,7 @@ void CloudInitializer::rescueRobot() {
         std::ostringstream tsViz;
         tsViz.precision(2);
         tsViz << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
-        std::string vizFilename = "/home/jay/AGLoc_ws/localization_result_" + tsViz.str() + ".png";
+        std::string vizFilename = "/home/jay/AGLoc_ws/figs_localization/localization_result_" + tsViz.str() + ".png";
         
         // 保存可视化图像
         saveVisualizationImage(wifi_position, final_position, vizFilename);

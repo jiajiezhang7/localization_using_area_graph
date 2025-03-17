@@ -40,23 +40,23 @@ void CloudInitializer::rescueRobotMultiThread() {
     RCLCPP_INFO(this->get_logger(), "----------- 猜测已就绪，开始救援 -----------------");
 
     // 准备输出文件
-    std::ostringstream ts;
-    ts.precision(2);
-    ts << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
-    std::string filename = "/home/jay/AGLoc_ws/frameResult" + 
-                          ts.str() + "rescueRoom.txt";
+    // std::ostringstream ts;
+    // ts.precision(2);
+    // ts << std::fixed << rclcpp::Time(mapHeader.stamp).seconds();
+    // std::string filename = "/home/jay/AGLoc_ws/frameResult" + 
+    //                       ts.str() + "rescueRoom.txt";
                           
-    {
-        std::lock_guard<std::mutex> lock(file_mutex);
-        rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
-        rescueRoomStream.setf(std::ios::fixed);
-        rescueRoomStream.precision(2);
+    // {
+    //     std::lock_guard<std::mutex> lock(file_mutex);
+    //     rescueRoomStream.open(filename, std::ofstream::out | std::ofstream::app);
+    //     rescueRoomStream.setf(std::ios::fixed);
+    //     rescueRoomStream.precision(2);
         
-        if (!rescueRoomStream.good()) {
-            RCLCPP_ERROR(this->get_logger(), "打开文件出错");
-            return;
-        }
-    }
+    //     if (!rescueRoomStream.good()) {
+    //         RCLCPP_ERROR(this->get_logger(), "打开文件出错");
+    //         return;
+    //     }
+    // }
 
     auto startC = std::chrono::high_resolution_clock::now();
     
@@ -78,7 +78,7 @@ void CloudInitializer::rescueRobotMultiThread() {
 
         // 创建线程池
         // 直接将线程数限制为8个，减少线程管理开销
-        unsigned int num_threads = 8u;
+        unsigned int num_threads = 16u;
         // 如果硬件核心数少于8个，则使用硬件支持的线程数
         num_threads = std::min(num_threads, std::thread::hardware_concurrency());
         // 至少使用2个线程
@@ -99,7 +99,7 @@ void CloudInitializer::rescueRobotMultiThread() {
                 pool.enqueue([this, i, &organizedCloudInDS]() {
                     // 获取当前角度
                     int current_angle = static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
-                    RCLCPP_DEBUG(this->get_logger(), "线程开始处理角度 %d", current_angle);
+                    RCLCPP_INFO(this->get_logger(), "线程开始处理角度 %d", current_angle);
                     
                     // 用于跟踪线程内部的最佳位姿和分数
                     double thread_max_score = 0.0;
@@ -210,15 +210,15 @@ void CloudInitializer::rescueRobotMultiThread() {
                             thread_has_better_pose = true;
                             
                             // 记录线程内部找到更好位姿
-                            RCLCPP_DEBUG(this->get_logger(), 
-                                "线程 (角度=%d) 找到更好位姿: x=%.2f, y=%.2f, 评分=%.4f",
+                            RCLCPP_INFO(this->get_logger(), 
+                                "线程 (角度=%d) 找到更好位姿: x=%.2f, y=%.2f, 评分=%.10f",
                                 current_angle, local_robotPose(0,3), local_robotPose(1,3), current_score);
                         }
                         
                         #ifdef DETAILED_TIMING
                         if(j % 100 == 0) { // 每100个粒子记录一次时间
                             auto endTime = this->now();
-                            RCLCPP_DEBUG(this->get_logger(), 
+                            RCLCPP_INFO(this->get_logger(), 
                                         "角度 %d, 完成粒子 %zu/%zu, 运行时间: %f ms", 
                                         current_angle, j, corridorGuess.size(),
                                         (endTime - startTime).seconds() * 1000);
@@ -249,13 +249,13 @@ void CloudInitializer::rescueRobotMultiThread() {
                             #endif
                             
                             RCLCPP_INFO(this->get_logger(), 
-                                "当前全局最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.4f",
+                                "当前全局最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.10f",
                                 thread_max_pose(0,3), thread_max_pose(1,3), 
                                 current_angle, thread_max_score);
                         }
                     }
                     
-                    RCLCPP_DEBUG(this->get_logger(), "线程完成角度 %d 的所有粒子评估", current_angle);
+                    RCLCPP_INFO(this->get_logger(), "线程完成角度 %d 的所有粒子评估", current_angle);
                 })
             );
         }
