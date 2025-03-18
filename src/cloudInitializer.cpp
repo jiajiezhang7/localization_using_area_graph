@@ -21,6 +21,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
+#include <filesystem>
 
 // 函数声明
 bool isValidPoint(const pcl::PointXYZI& point);
@@ -165,6 +167,29 @@ void CloudInitializer::rescueRobot() {
 
     RCLCPP_INFO(this->get_logger(), "----------- Guess is ready, start rescue -----------------");
 
+    // 创建性能日志文件
+    std::string log_dir = "/home/jay/AGLoc_ws/performance_logs";
+    // 创建目录（如果不存在）
+    std::filesystem::create_directories(log_dir);
+    
+    // 生成带时间戳的文件名
+    auto now = std::chrono::system_clock::now();
+    now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << log_dir << "/performance_" << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S") << ".log";
+    std::string log_file = ss.str();
+    
+    // 打开日志文件
+    perf_log.open(log_file);
+    if (!perf_log.is_open()) {
+        RCLCPP_ERROR(this->get_logger(), "无法创建性能日志文件: %s", log_file.c_str());
+    } else {
+        RCLCPP_INFO(this->get_logger(), "性能日志将输出到: %s", log_file.c_str());
+        perf_log << "========== 粒子定位算法性能日志 ==========" << std::endl;
+        perf_log << "开始时间: " << std::put_time(std::localtime(&now_time_t), "%Y-%m-%d %H:%M:%S") << std::endl;
+        perf_log << "----------------------------------------" << std::endl;
+    }
+
     // Prepare output file
     std::ostringstream ts;
     ts.precision(2);
@@ -201,7 +226,7 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
-        // 优化版本：外循环遍历粒子，内循环遍历角度
+        // 优化版本：按Area对粒子进行分组处理
         // 定义角度优化相关变量
         const double relative_score_threshold = 0.8; // 相对最佳分数的阈值比例
         const int min_angle_range = 30;     // 最小角度范围（度）
@@ -209,27 +234,56 @@ void CloudInitializer::rescueRobot() {
         // 为每个粒子定义最佳角度范围
         std::vector<std::pair<int, int>> best_angle_ranges(corridorGuess.size(), {0, static_cast<int>(try_time - 1)});
         
-        // 外循环：遍历粒子
+        // 按Area对粒子进行分组，使用粒子的z坐标作为Area ID
+        std::map<int, std::vector<size_t>> area_particles;
         for(size_t j = 0; j < corridorGuess.size(); j++) {
-            RCLCPP_DEBUG(this->get_logger(), "处理第 %zu 个粒子猜测", j);
+            // 使用粒子的z坐标作为Area ID
+            int area_id = static_cast<int>(corridorGuess[j][2]);
+            area_particles[area_id].push_back(j);
+            
+            // 输出每个粒子的坐标和Area ID，用于调试
+            RCLCPP_INFO(this->get_logger(), "粒子 %zu: x=%.2f, y=%.2f, z=%.2f, area_id=%d", 
+                         j, corridorGuess[j][0], corridorGuess[j][1], corridorGuess[j][2], area_id);
+        }
+        
+        RCLCPP_INFO(this->get_logger(), "共有 %zu 个不同的Area", area_particles.size());
+        
+        // 存储每个Area的最佳角度范围
+        std::map<int, std::pair<int, int>> area_best_angle_ranges;
+        
+        // 记录整个双重循环的开始时间
+        auto total_start_time = this->now();
+        
+        // 外循环：遍历每个Area
+        for(auto& [area_id, particles] : area_particles) {
+            RCLCPP_INFO(this->get_logger(), "处理Area %d, 包含 %zu 个粒子", area_id, particles.size());
+            
+            // 记录当前Area处理的开始时间
+            auto area_start_time = this->now();
+            
+            // 选择该Area的第一个粒子进行全角度扫描
+            size_t representative_particle = particles[0];
+            RCLCPP_INFO(this->get_logger(), "选择粒子 %zu (x=%.2f, y=%.2f) 作为Area %d 的代表进行全角度扫描", 
+                         representative_particle, corridorGuess[representative_particle][0], 
+                         corridorGuess[representative_particle][1], area_id);
             
             // 用于记录该粒子在不同角度下的评分
             std::vector<double> angle_scores(try_time, 0.0);
             int best_angle_idx = -1;
             double best_particle_score = 0.0;
             
-            // 内循环：遍历角度
+            // 内循环：对代表粒子遍历所有角度
             for(size_t i = 0; i < try_time; i++) {
-                RCLCPP_DEBUG(this->get_logger(), "处理第 %zu 个粒子猜测", j);
+                RCLCPP_DEBUG(this->get_logger(), "处理第 %zu 个粒子猜测", representative_particle);
                 auto startTime = this->now();
                 
                 // Publish current guess
                 auto this_guess_stamped = geometry_msgs::msg::PointStamped();
                 this_guess_stamped.header.frame_id = "map";
-                this_guess_stamped.point.x = corridorGuess[j][0];
-                this_guess_stamped.point.y = corridorGuess[j][1];
+                this_guess_stamped.point.x = corridorGuess[representative_particle][0];
+                this_guess_stamped.point.y = corridorGuess[representative_particle][1];
                 this_guess_stamped.point.z = 0;
-                // RCLCPP_INFO(this->get_logger(), "当前猜测位置: x=%.2f, y=%.2f", corridorGuess[j][0], corridorGuess[j][1]);
+                // RCLCPP_INFO(this->get_logger(), "当前猜测位置: x=%.2f, y=%.2f", corridorGuess[representative_particle][0], corridorGuess[representative_particle][1]);
                 pubRobotGuessMarker->publish(this_guess_stamped);
 
                 // Reset parameters for new guess
@@ -247,7 +301,7 @@ void CloudInitializer::rescueRobot() {
                 // Set initial pose for this guess
                 // RCLCPP_INFO(this->get_logger(), "设置初始位姿, 角度=%.2f", std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
                 Eigen::Vector3f tempinitialExtTrans;
-                tempinitialExtTrans << corridorGuess[j][0], corridorGuess[j][1], 0;
+                tempinitialExtTrans << corridorGuess[representative_particle][0], corridorGuess[representative_particle][1], 0;
                 setInitialPose(static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
                              tempinitialExtTrans);
                              
@@ -276,7 +330,7 @@ void CloudInitializer::rescueRobot() {
                     }
                     
                     auto icpStart = this->now();
-                    initializationICP(corridorGuess[j][2]);
+                    initializationICP(corridorGuess[representative_particle][2]);
                     auto icpEnd = this->now();
                     
                     // Publish updated transformed point cloud
@@ -285,8 +339,8 @@ void CloudInitializer::rescueRobot() {
                     pubTransformedPC->publish(outMsg);
                 } else {
                     // If not using ICP initialization
-                    // RCLCPP_INFO(this->get_logger(), "corridorGuess[j][2] = %.2f", corridorGuess[j][2]);
-                    calClosestMapPoint(corridorGuess[j][2]);
+                    // RCLCPP_INFO(this->get_logger(), "corridorGuess[representative_particle][2] = %.2f", corridorGuess[representative_particle][2]);
+                    calClosestMapPoint(corridorGuess[representative_particle][2]);
                 }
 
                 double result_angle = 0;
@@ -305,8 +359,8 @@ void CloudInitializer::rescueRobot() {
                 if(bGenerateResultFile) {
                     rescueRoomStream << "timestamp:" << rclcpp::Time(mapHeader.stamp).seconds() << ","
                                    << "angle:" << result_angle << ","
-                                   << "guess_x:" << corridorGuess[j](0) << ","
-                                   << "guess_y:" << corridorGuess[j](1) << ","
+                                   << "guess_x:" << corridorGuess[representative_particle](0) << ","
+                                   << "guess_y:" << corridorGuess[representative_particle](1) << ","
                                    << "pose_x:" << robotPose(0,3) << ","
                                    << "pose_y:" << robotPose(1,3) << ","
                                    << "inside_points:" << numofInsidePoints << ","
@@ -373,7 +427,7 @@ void CloudInitializer::rescueRobot() {
                 //             (endTime - startTime).seconds() * 1000);
             }
             
-            // 计算该粒子的最佳角度范围
+            // 计算该Area的最佳角度范围
             if(best_angle_idx != -1) {
                 // 向左右扩展寻找角度范围
                 int left_bound = best_angle_idx;
@@ -407,17 +461,261 @@ void CloudInitializer::rescueRobot() {
                     right_bound = std::min(static_cast<int>(try_time) - 1, right_bound + expand);
                 }
                 
-                best_angle_ranges[j] = {left_bound, right_bound};
+                // 额外添加固定扩展量，以防止角度范围错误
+                const int fixed_expand = 3; // 固定扩展量，相当于3个角度间隔
+                left_bound = std::max(0, left_bound - fixed_expand);
+                right_bound = std::min(static_cast<int>(try_time) - 1, right_bound + fixed_expand);
                 
-                RCLCPP_INFO(this->get_logger(), 
-                    "粒子 %zu (x=%.2f, y=%.2f, area=%.0f) 最佳角度范围: %d-%d度 (索引: %d-%d), 最佳评分: %.6f",
-                    j, corridorGuess[j][0], corridorGuess[j][1], corridorGuess[j][2],
+                // 将该角度范围应用于该Area的所有粒子
+                area_best_angle_ranges[area_id] = {left_bound, right_bound};
+                
+                RCLCPP_DEBUG(this->get_logger(), 
+                    "Area %d 的最佳角度范围: %d-%d度 (索引: %d-%d), 最佳评分: %.6f",
+                    area_id,
                     static_cast<int>(std::fmod(initialYawAngle + left_bound * rescue_angle_interval, 360.0)),
                     static_cast<int>(std::fmod(initialYawAngle + right_bound * rescue_angle_interval, 360.0)),
                     left_bound, right_bound, best_particle_score);
+                
+                // 将该角度范围应用于该Area的所有粒子
+                for(size_t particle_idx : particles) {
+                    best_angle_ranges[particle_idx] = {left_bound, right_bound};
+                }
+            }
+            
+            // 记录当前Area的代表粒子处理时间
+            auto area_rep_end_time = this->now();
+            double area_rep_time = (area_rep_end_time - area_start_time).seconds() * 1000.0;
+            RCLCPP_DEBUG(this->get_logger(), "Area %d 的代表粒子处理时间: %.2f ms", area_id, area_rep_time);
+            
+            // 将代表粒子处理时间输出到日志文件
+            if (perf_log.is_open()) {
+                perf_log << "[代表粒子处理] Area " << area_id << std::endl;
+                perf_log << "  处理时间: " << std::fixed << std::setprecision(2) << area_rep_time << " ms" << std::endl;
+                perf_log << "  粒子数量: 1" << std::endl;
+                perf_log << "  时间点: " << std::put_time(std::localtime(&now_time_t), "%H:%M:%S") << std::endl;
+                perf_log << "----------------------------------------" << std::endl;
+            }
+            
+            // 记录其余粒子处理的开始时间
+            auto other_particles_start_time = this->now();
+            
+            // 处理该Area的其余粒子，只遍历最佳角度范围
+            for(size_t p = 1; p < particles.size(); p++) {
+                size_t particle_idx = particles[p];
+                RCLCPP_DEBUG(this->get_logger(), "使用Area %d 的角度范围处理粒子 %zu", area_id, particle_idx);
+                
+                // 记录该粒子的最佳评分和角度
+                double particle_best_score = 0.0;
+                int particle_best_angle_idx = -1;
+                
+                // 只遍历该Area的最佳角度范围
+                auto [start_angle, end_angle] = area_best_angle_ranges[area_id];
+                for(int i = start_angle; i <= end_angle; i++) {
+                    auto startTime = this->now();
+                    
+                    // Publish current guess
+                    auto this_guess_stamped = geometry_msgs::msg::PointStamped();
+                    this_guess_stamped.header.frame_id = "map";
+                    this_guess_stamped.point.x = corridorGuess[particle_idx][0];
+                    this_guess_stamped.point.y = corridorGuess[particle_idx][1];
+                    this_guess_stamped.point.z = 0;
+                    pubRobotGuessMarker->publish(this_guess_stamped);
+                    
+                    // Reset parameters for new guess
+                    accumulateAngle = 0;
+                    averDistancePairedPoints = 0;
+                    numofInsidePoints = 0;
+                    numofOutsidePoints = 0;
+                    insideScore = 0;
+                    outsideScore = 0;
+                    insideTotalRange = 0;
+                    outsideTotalScore = 0;
+                    turkeyScore = 0;
+                    
+                    // Set initial pose for this guess
+                    Eigen::Vector3f tempinitialExtTrans;
+                    tempinitialExtTrans << corridorGuess[particle_idx][0], corridorGuess[particle_idx][1], 0;
+                    setInitialPose(static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
+                                 tempinitialExtTrans);
+                    
+                    // Transform point cloud
+                    transformed_pc->points.clear();
+                    transformed_pc->points.resize(organizedCloudInDS->points.size());
+                    pcl::transformPointCloud(*organizedCloudInDS, *transformed_pc, robotPose);
+                    
+                    // Publish transformed point cloud
+                    sensor_msgs::msg::PointCloud2 outMsg;
+                    pcl::toROSMsg(*transformed_pc, outMsg);
+                    outMsg.header = mapHeader;
+                    pubTransformedPC->publish(outMsg);
+                    
+                    if(bInitializationWithICP) {
+                        if(pause_iter) {
+                            RCLCPP_INFO(this->get_logger(), "Press enter to continue, before icp");
+                            std::getchar();
+                        }
+                        
+                        auto icpStart = this->now();
+                        initializationICP(corridorGuess[particle_idx][2]);
+                        auto icpEnd = this->now();
+                        
+                        // Publish updated transformed point cloud
+                        pcl::toROSMsg(*transformed_pc, outMsg);
+                        outMsg.header = mapHeader;
+                        pubTransformedPC->publish(outMsg);
+                    } else {
+                        // If not using ICP initialization
+                        calClosestMapPoint(corridorGuess[particle_idx][2]);
+                    }
+                    
+                    double result_angle = 0;
+                    if(bInitializationWithICP) {
+                        Eigen::Matrix4d temp = robotPose.cast<double>();
+                        Eigen::Matrix3d temp_ = temp.topLeftCorner(3,3);
+                        Eigen::Quaterniond quaternion(temp_);
+                        Eigen::Vector3d eulerAngle = quaternion.matrix().eulerAngles(1,2,0);
+                        result_angle = eulerAngle[1]/M_PI*180;
+                    } else {
+                        result_angle = static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0));
+                    }
+                    
+                    initialized = false;
+                    
+                    if(bGenerateResultFile) {
+                        rescueRoomStream << "timestamp:" << rclcpp::Time(mapHeader.stamp).seconds() << ","
+                                       << "angle:" << result_angle << ","
+                                       << "guess_x:" << corridorGuess[particle_idx](0) << ","
+                                       << "guess_y:" << corridorGuess[particle_idx](1) << ","
+                                       << "pose_x:" << robotPose(0,3) << ","
+                                       << "pose_y:" << robotPose(1,3) << ","
+                                       << "inside_points:" << numofInsidePoints << ","
+                                       << "inside_score:" << insideScore << ","
+                                       << "outside_points:" << numofOutsidePoints << ","
+                                       << "outside_score:" << outsideScore << ","
+                                       << "inside_range:" << insideTotalRange << ","
+                                       << "outside_total:" << outsideTotalScore << ","
+                                       << "turkey_score:" << turkeyScore << std::endl;
+                    }
+                    
+                    // 计算当前角度的评分
+                    double current_score = 1.0/(insideScore + outsideScore);
+                    
+                    // 更新该粒子的最佳角度
+                    if(particle_best_angle_idx == -1 || current_score > particle_best_score) {
+                        particle_best_angle_idx = i;
+                        particle_best_score = current_score;
+                    }
+                    
+                    // 更新全局最佳位姿
+                    if(MaxScore < current_score) {
+                        MaxScore = current_score;
+                        MaxRobotPose = robotPose;
+                        
+                        // 发布当前最佳位姿
+                        auto pose_max_stamped = geometry_msgs::msg::PointStamped();
+                        pose_max_stamped.header.frame_id = "map";
+                        pose_max_stamped.point.x = robotPose(0,3);
+                        pose_max_stamped.point.y = robotPose(1,3);
+                        pose_max_stamped.point.z = 0;
+                        pubCurrentMaxRobotPose->publish(pose_max_stamped);
+                        
+                        RCLCPP_INFO(this->get_logger(), 
+                            "Current best guess: x=%.2f, y=%.2f, yaw=%d",
+                            robotPose(0,3), robotPose(1,3), 
+                            static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
+                    }
+                    else {
+                        // 添加调试信息
+                        RCLCPP_DEBUG(this->get_logger(),
+                            "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
+                            robotPose(0,3), robotPose(1,3), 
+                            static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
+                            current_score, MaxScore, insideScore, outsideScore);
+                    }
+                    
+                    if(pause_iter) {
+                        RCLCPP_INFO(this->get_logger(), "Press enter to continue, after icp");
+                        std::getchar();
+                    }
+                    
+                    if(turkeyPauseThred > 0 && turkeyScore > turkeyPauseThred) {
+                        RCLCPP_INFO(this->get_logger(), "Press enter to continue");
+                        std::getchar();
+                    }
+                    
+                    resetParameters();
+                    
+                    auto endTime = this->now();
+                    RCLCPP_DEBUG(this->get_logger(), 
+                                "One guess run time: %f ms", 
+                                (endTime - startTime).seconds() * 1000);
+                }
+                
+                RCLCPP_INFO(this->get_logger(), 
+                    "粒子 %zu (x=%.2f, y=%.2f, area=%d) 在角度范围内的最佳角度: %d度, 评分: %.6f",
+                    particle_idx, corridorGuess[particle_idx][0], corridorGuess[particle_idx][1], area_id,
+                    static_cast<int>(std::fmod(initialYawAngle + particle_best_angle_idx * rescue_angle_interval, 360.0)),
+                    particle_best_score);
+            }
+            
+            // 记录当前Area的其余粒子处理时间
+            auto other_particles_end_time = this->now();
+            double other_particles_time = (other_particles_end_time - other_particles_start_time).seconds() * 1000.0;
+            double avg_particle_time = particles.size() > 1 ? other_particles_time / (particles.size() - 1) : 0.0;
+            RCLCPP_INFO(this->get_logger(), "Area %d 的其余 %zu 个粒子处理时间: %.2f ms, 平均每个粒子: %.2f ms", 
+                         area_id, particles.size() - 1, other_particles_time, avg_particle_time);
+                         
+            // 将其余粒子处理时间输出到日志文件
+            if (perf_log.is_open()) {
+                perf_log << "[其余粒子处理] Area " << area_id << std::endl;
+                perf_log << "  总处理时间: " << std::fixed << std::setprecision(2) << other_particles_time << " ms" << std::endl;
+                perf_log << "  粒子数量: " << particles.size() - 1 << std::endl;
+                perf_log << "  平均处理时间: " << std::fixed << std::setprecision(2) << avg_particle_time << " ms" << std::endl;
+                perf_log << "  时间点: " << std::put_time(std::localtime(&now_time_t), "%H:%M:%S") << std::endl;
+                perf_log << "----------------------------------------" << std::endl;
+            }
+            
+            // 记录当前Area的总处理时间
+            auto area_end_time = this->now();
+            double area_total_time = (area_end_time - area_start_time).seconds() * 1000.0;
+            RCLCPP_INFO(this->get_logger(), "Area %d 总处理时间: %.2f ms", area_id, area_total_time);
+            
+            // 将Area总处理时间输出到日志文件
+            if (perf_log.is_open()) {
+                perf_log << "[Area 总结] Area " << area_id << std::endl;
+                perf_log << "  总处理时间: " << std::fixed << std::setprecision(2) << area_total_time << " ms" << std::endl;
+                perf_log << "  总粒子数量: " << particles.size() << std::endl;
+                perf_log << "  平均每粒子时间: " << std::fixed << std::setprecision(2) << area_total_time / particles.size() << " ms" << std::endl;
+                perf_log << "  时间点: " << std::put_time(std::localtime(&now_time_t), "%H:%M:%S") << std::endl;
+                perf_log << "========================================" << std::endl;
             }
         }
 
+        // 记录整个双重循环的结束时间
+        auto total_end_time = this->now();
+        double total_time = (total_end_time - total_start_time).seconds() * 1000.0;
+        double avg_area_time = area_particles.size() > 0 ? total_time / area_particles.size() : 0.0;
+        RCLCPP_INFO(this->get_logger(), "所有Area的总处理时间: %.2f ms, 平均每个Area: %.2f ms", 
+                     total_time, avg_area_time);
+                     
+        // 将总处理时间输出到日志文件
+        if (perf_log.is_open()) {
+            // 添加空行以区分总结部分
+            perf_log << std::endl;
+            perf_log << "----------------------------------------" << std::endl;
+            perf_log << "算法总结" << std::endl;
+            perf_log << "----------------------------------------" << std::endl;
+            perf_log << "总 Area 数量: " << area_particles.size() << std::endl;
+            perf_log << "总处理时间: " << std::fixed << std::setprecision(2) << total_time << " ms" << std::endl;
+            perf_log << "平均每个 Area 处理时间: " << std::fixed << std::setprecision(2) << avg_area_time << " ms" << std::endl;
+            perf_log << "执行时间: " << std::put_time(std::localtime(&now_time_t), "%Y-%m-%d %H:%M:%S") << std::endl;
+            perf_log << "----------------------------------------" << std::endl;
+            
+            // 关闭日志文件
+            perf_log.close();
+            RCLCPP_INFO(this->get_logger(), "性能日志文件已关闭");
+        }
+                     
         RCLCPP_INFO(this->get_logger(), "----------------------resuceRobot finished!!!--------------------------");
         bRescueRobot = false;
         errorUpThred = 3;

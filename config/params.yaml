@@ -163,7 +163,7 @@
         checkingGuessY: 35.25
 
         bCHENGNODE: true
-        bGenerateResultFile: true
+        bGenerateResultFile: false
         bFurthestRingTracking: true
         # set to 0 means don't pause
         turkeyPauseThred: 0.0

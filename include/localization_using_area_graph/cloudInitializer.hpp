@@ -116,6 +116,8 @@ public:
 
     // 文件输出流
     std::ofstream rescueRoomStream;  // 用于记录救援房间信息的输出流
+    std::ofstream perf_log;          // 用于记录性能数据的输出流
+    std::time_t now_time_t;          // 用于时间戳记录
 
     // ROS2 订阅和发布器
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;  // 初始猜测订阅器
