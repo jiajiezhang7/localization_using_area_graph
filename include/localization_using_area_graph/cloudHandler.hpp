@@ -57,6 +57,9 @@ public:
     void filterUsefulPoints();  // 过滤有用点
     void optimizationICP();     // ICP优化
     void showImg1line(const std::string& words);  // 显示一行图像
+    
+    // 获取机器人位姿 - 为Nav2接口添加
+    Eigen::Matrix4f getRobotPose() const { return robotPose; }  // 返回当前机器人位姿
 
     // 地图和直方图处理
     void mergeMapHistogram();  // 合并地图直方图

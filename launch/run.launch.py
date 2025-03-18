@@ -114,21 +114,21 @@ def generate_launch_description():
 
         # Fujing's Version
         # PandarQT坐标系在全系统中没用到，真的只是为了在Rviz里定个标，你无论把它设在哪里，都是Ok的，和位姿追踪没任何关系
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='transform_agmap_to_hesailidar',
-            arguments=[
-                '--frame-id', 'map',
-                '--child-frame-id', 'PandarQT',
-                '--x', '4.0',
-                '--y', '-6.0',
-                '--z', '0.0',
-                '--roll', '0',
-                '--pitch', '0',
-                '--yaw', '1.5708'
-            ]
-        ),
+        # Node(
+        #     package='tf2_ros',
+        #     executable='static_transform_publisher',
+        #     name='transform_agmap_to_hesailidar',
+        #     arguments=[
+        #         '--frame-id', 'map',
+        #         '--child-frame-id', 'PandarQT',
+        #         '--x', '4.0',
+        #         '--y', '-6.0',
+        #         '--z', '0.0',
+        #         '--roll', '0',
+        #         '--pitch', '0',
+        #         '--yaw', '1.5708'
+        #     ]
+        # ),
         # Area Graph Data Parser
         Node(
             package='area_graph_data_parser',

@@ -28,6 +28,11 @@ endif()
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(nav2_util REQUIRED)
+find_package(nav2_msgs REQUIRED)
+find_package(nav2_core REQUIRED)
+find_package(pluginlib REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -164,12 +169,46 @@ foreach(target
   )
 endforeach()
 
+# 添加AGLoc定位插件库
+add_library(agloc_localizer_node SHARED
+  src/agloc_localizer_node.cpp
+)
+
+ament_target_dependencies(agloc_localizer_node
+  rclcpp
+  rclcpp_lifecycle
+  nav2_util
+  nav2_msgs
+  nav2_core
+  pluginlib
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  pcl_conversions
+)
+
+target_link_libraries(agloc_localizer_node
+  utility
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# 安装插件描述文件
+install(FILES plugins.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # Install targets
 install(
   TARGETS
     cloud_handler
     utility
     particle_generator
+    agloc_localizer_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
