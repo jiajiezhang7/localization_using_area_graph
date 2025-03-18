@@ -201,12 +201,25 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "Downsample size = %lu", 
                     organizedCloudInDS->points.size());
 
-        // 两重循环
-        // Try different angles， 360 /2 = 180个角度
-        for(size_t i = 0; i < try_time; i++) {
-            RCLCPP_DEBUG(this->get_logger(), "开始尝试第 %zu 个角度", i);
-            // 遍历采样生成的粒子 (在本次循环中，即针对某个角度下的某个粒子)
-            for(size_t j = 0; j < corridorGuess.size(); j++) {
+        // 优化版本：外循环遍历粒子，内循环遍历角度
+        // 定义角度优化相关变量
+        const double relative_score_threshold = 0.8; // 相对最佳分数的阈值比例
+        const int min_angle_range = 30;     // 最小角度范围（度）
+        
+        // 为每个粒子定义最佳角度范围
+        std::vector<std::pair<int, int>> best_angle_ranges(corridorGuess.size(), {0, static_cast<int>(try_time - 1)});
+        
+        // 外循环：遍历粒子
+        for(size_t j = 0; j < corridorGuess.size(); j++) {
+            RCLCPP_DEBUG(this->get_logger(), "处理第 %zu 个粒子猜测", j);
+            
+            // 用于记录该粒子在不同角度下的评分
+            std::vector<double> angle_scores(try_time, 0.0);
+            int best_angle_idx = -1;
+            double best_particle_score = 0.0;
+            
+            // 内循环：遍历角度
+            for(size_t i = 0; i < try_time; i++) {
                 RCLCPP_DEBUG(this->get_logger(), "处理第 %zu 个粒子猜测", j);
                 auto startTime = this->now();
                 
@@ -305,11 +318,22 @@ void CloudInitializer::rescueRobot() {
                                    << "turkey_score:" << turkeyScore << std::endl;
                 }
                 // Update best pose if current score is better
-                if(MaxScore < 1.0/(insideScore + outsideScore)) {
-                    MaxScore = 1.0/(insideScore + outsideScore);
+                // 计算当前角度的评分
+                double current_score = 1.0/(insideScore + outsideScore);
+                angle_scores[i] = current_score;
+                
+                // 更新该粒子的最佳角度
+                if(best_angle_idx == -1 || current_score > best_particle_score) {
+                    best_angle_idx = i;
+                    best_particle_score = current_score;
+                }
+                
+                // 更新全局最佳位姿
+                if(MaxScore < current_score) {
+                    MaxScore = current_score;
                     MaxRobotPose = robotPose;
                     
-                    // Publish current max pose
+                    // 发布当前最佳位姿
                     auto pose_max_stamped = geometry_msgs::msg::PointStamped();
                     pose_max_stamped.header.frame_id = "map";
                     pose_max_stamped.point.x = robotPose(0,3);
@@ -323,13 +347,12 @@ void CloudInitializer::rescueRobot() {
                         static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)));
                 }
                 else {
-                    // 添加调试信息：为什么当前粒子没有成为最佳位姿
-                    RCLCPP_INFO(this->get_logger(),
+                    // 添加调试信息
+                    RCLCPP_DEBUG(this->get_logger(),
                         "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
                         robotPose(0,3), robotPose(1,3), 
                         static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
-                        1.0/(insideScore + outsideScore), MaxScore,
-                        insideScore, outsideScore);
+                        current_score, MaxScore, insideScore, outsideScore);
                 }
 
                 if(pause_iter) {
@@ -348,6 +371,50 @@ void CloudInitializer::rescueRobot() {
                 // RCLCPP_DEBUG(this->get_logger(), 
                 //             "One guess run time: %f ms", 
                 //             (endTime - startTime).seconds() * 1000);
+            }
+            
+            // 计算该粒子的最佳角度范围
+            if(best_angle_idx != -1) {
+                // 向左右扩展寻找角度范围
+                int left_bound = best_angle_idx;
+                int right_bound = best_angle_idx;
+                
+                // 计算当前粒子的分数阈值
+                double current_threshold = best_particle_score * relative_score_threshold;
+                
+                // 向左扩展
+                for(int i = best_angle_idx - 1; i >= 0; i--) {
+                    if(angle_scores[i] >= current_threshold) {
+                        left_bound = i;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // 向右扩展
+                for(int i = best_angle_idx + 1; i < static_cast<int>(try_time); i++) {
+                    if(angle_scores[i] >= current_threshold) {
+                        right_bound = i;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // 确保最小角度范围
+                if(right_bound - left_bound + 1 < min_angle_range / rescue_angle_interval) {
+                    int expand = (min_angle_range / rescue_angle_interval - (right_bound - left_bound + 1)) / 2;
+                    left_bound = std::max(0, left_bound - expand);
+                    right_bound = std::min(static_cast<int>(try_time) - 1, right_bound + expand);
+                }
+                
+                best_angle_ranges[j] = {left_bound, right_bound};
+                
+                RCLCPP_INFO(this->get_logger(), 
+                    "粒子 %zu (x=%.2f, y=%.2f, area=%.0f) 最佳角度范围: %d-%d度 (索引: %d-%d), 最佳评分: %.6f",
+                    j, corridorGuess[j][0], corridorGuess[j][1], corridorGuess[j][2],
+                    static_cast<int>(std::fmod(initialYawAngle + left_bound * rescue_angle_interval, 360.0)),
+                    static_cast<int>(std::fmod(initialYawAngle + right_bound * rescue_angle_interval, 360.0)),
+                    left_bound, right_bound, best_particle_score);
             }
         }
 
