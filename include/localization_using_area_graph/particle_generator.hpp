@@ -27,6 +27,9 @@ struct GeoCoordinate {
     double longitude;
     double latitude;
     double altitude;
+    double room_longitude;
+    double room_latitude;
+    int floor;
 };
 
 Eigen::Vector3d CoordinateTransform(const GeoCoordinate& init, const GeoCoordinate& cur);

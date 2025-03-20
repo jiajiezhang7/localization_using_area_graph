@@ -81,7 +81,7 @@
 
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 4.0     # 搜索半径(米)
+        particle_generator_radius: 7.0     # 搜索半径(米)
         # without icp initialization 
         rescue_angle_interval: 5.0
         # --------------------------------------------------------

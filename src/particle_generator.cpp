@@ -140,7 +140,11 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
         GeoCoordinate wifi_coord;
         wifi_coord.longitude = latest_wifi_location_->longitude;
         wifi_coord.latitude = latest_wifi_location_->latitude;
-        wifi_coord.altitude = 0.0;  // 高度设为0
+        wifi_coord.altitude = latest_wifi_location_->altitude;
+        // TODO, 以下三个信息都还没有被用过
+        wifi_coord.room_longitude = latest_wifi_location_->room_long;
+        wifi_coord.room_latitude = latest_wifi_location_->room_lat;
+        wifi_coord.floor = latest_wifi_location_->floor;
         
         // 转换为AGmap局部坐标
         Eigen::Vector3d local_pos = CoordinateTransform(root_coord, wifi_coord);
