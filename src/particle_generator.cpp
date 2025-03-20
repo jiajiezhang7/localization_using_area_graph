@@ -32,6 +32,7 @@ void ParticleGenerator::initializeParameters()
     this->declare_parameter("particle_generator_step", 2.0);  // 粒子采样步长
     this->declare_parameter("particle_generator_radius", 6.0);  //搜索半径
     this->declare_parameter("bRescueRobot", false);
+    this->declare_parameter("use_room_info", true);  // 是否使用room信息来过滤粒子
     this->declare_parameter("root_long", 0.0);
     this->declare_parameter("root_lat", 0.0);
     
@@ -43,6 +44,7 @@ void ParticleGenerator::initializeParameters()
     step_ = this->get_parameter("particle_generator_step").as_double();
     radius_ = this->get_parameter("particle_generator_radius").as_double();
     bRescueRobot_ = this->get_parameter("bRescueRobot").as_bool();
+    use_room_info_ = this->get_parameter("use_room_info").as_bool();
     root_longitude_ = this->get_parameter("root_long").as_double();
     root_latitude_ = this->get_parameter("root_lat").as_double();
     
@@ -77,6 +79,10 @@ void ParticleGenerator::initializePublishersSubscribers()
     // 发布WiFi中心点标记
     wifi_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
         "/wifi_center_marker", qos);
+
+    // 发布房间位置标记
+    room_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+        "/room_marker", qos);
         
     // 订阅1: LiDAR 点云话题
     lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -146,6 +152,62 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
         wifi_coord.room_latitude = latest_wifi_location_->room_lat;
         wifi_coord.floor = latest_wifi_location_->floor;
         
+        // 如果启用了room信息，计算room坐标所在的Area ID
+        RCLCPP_DEBUG(this->get_logger(), "当前use_room_info_参数值: %s", use_room_info_ ? "true" : "false");
+        
+        if (use_room_info_) {
+            GeoCoordinate room_coord;
+            room_coord.longitude = latest_wifi_location_->room_long;
+            room_coord.latitude = latest_wifi_location_->room_lat;
+            room_coord.altitude = latest_wifi_location_->altitude;
+            
+            RCLCPP_DEBUG(this->get_logger(), "Room经纬度信息 - 经度: %.6f, 纬度: %.6f", 
+                         room_coord.longitude, room_coord.latitude);
+            
+            // 将room的经纬度转换为局部坐标
+            Eigen::Vector3d room_local = CoordinateTransform(root_coord, room_coord);
+            
+            // 应用AGmap到map的变换
+            // 1. 旋转变换
+            double cos_yaw = std::cos(map_yaw_angle_);
+            double sin_yaw = std::sin(map_yaw_angle_);
+            double x_rotated = room_local.x() * cos_yaw - room_local.y() * sin_yaw;
+            double y_rotated = room_local.x() * sin_yaw + room_local.y() * cos_yaw;
+            
+            // 2. 平移变换
+            Eigen::Vector2d room_point(
+                x_rotated + map_extrinsic_trans_[0],
+                y_rotated + map_extrinsic_trans_[1]
+            );
+            
+            RCLCPP_DEBUG(this->get_logger(), "Room局部坐标(变换前) - x: %.2f, y: %.2f", 
+                         room_local.x(), room_local.y());
+            RCLCPP_DEBUG(this->get_logger(), "Room局部坐标(变换后) - x: %.2f, y: %.2f", 
+                         room_point.x(), room_point.y());
+            
+            // 判断点在哪个Area内
+            room_area_id_ = -1;
+            RCLCPP_DEBUG(this->get_logger(), "AGmaps_大小: %zu", AGmaps_.size());
+            
+            for (size_t i = 0; i < AGmaps_.size(); i++) {
+                bool intersects = checkIntersection(room_point, AGmaps_[i]);
+                RCLCPP_DEBUG(this->get_logger(), "检查Area %zu: %s", i, intersects ? "在区域内" : "不在区域内");
+                
+                if (intersects) {
+                    room_area_id_ = i;
+                    RCLCPP_DEBUG(this->get_logger(), "Room坐标对应的Area ID: %zu", room_area_id_);
+                    break;
+                }
+            }
+            
+            if (room_area_id_ == INVALID_AREA_ID) {
+                RCLCPP_WARN(this->get_logger(), "未找到Room坐标所在的Area");
+            } else {
+                // 发布房间位置标记
+                publishRoomMarker(msg->header.stamp, room_point.x(), room_point.y());
+            }
+        }
+        
         // 转换为AGmap局部坐标
         Eigen::Vector3d local_pos = CoordinateTransform(root_coord, wifi_coord);
         
@@ -198,10 +260,17 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
             // 检查每个粒子是否在Area Graph的有效区域内
             for (size_t i = 0; i < AGmaps_.size(); i++) {
                 if (checkIntersection(point, AGmaps_[i])) {
+                    // 如果启用了room信息且找到了room所在的Area，只生成该Area内的粒子
+                    if (use_room_info_ && room_area_id_ != INVALID_AREA_ID && i != room_area_id_) {
+                        RCLCPP_DEBUG(this->get_logger(), "跳过Area %zu的粒子，因为不是Room所在的Area(%zu)", i, room_area_id_);
+                        continue;
+                    }
+                    RCLCPP_DEBUG(this->get_logger(), "在Area %zu生成粒子(x=%.2f, y=%.2f)", i, x, y);
+                    
                     pcl::PointXYZI p;
                     p.x = x;
                     p.y = y;
-                    p.z = i;  // 是 Area index 区域索引，这里的合理性在哪里？- (这里的i是区域索引，不是点云索引)
+                    p.z = i;  // Area索引
                     p.intensity = 1.0;
                     cloud->points.push_back(p);
                 }
@@ -332,4 +401,37 @@ bool ParticleGenerator::checkIntersection(const Eigen::Vector2d& point,
     
     // 奇数个交点表示点在多边形内部
     return (intersections % 2) == 1;
+}
+
+// 发布房间位置标记
+void ParticleGenerator::publishRoomMarker(const rclcpp::Time& stamp, double x, double y)
+{
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = stamp;
+    marker.ns = "room_position";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    
+    marker.pose.position.x = x;
+    marker.pose.position.y = y;
+    marker.pose.position.z = 0.0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+    
+    marker.scale.x = 0.5;
+    marker.scale.y = 0.5;
+    marker.scale.z = 0.5;
+    
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;  // 黄色
+    marker.color.a = 1.0;
+    
+    marker.lifetime = rclcpp::Duration(0, 0);  // 0表示永久存在
+    
+    room_marker_pub_->publish(marker);
 }

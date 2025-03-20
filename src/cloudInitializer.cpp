@@ -242,7 +242,7 @@ void CloudInitializer::rescueRobot() {
             area_particles[area_id].push_back(j);
             
             // 输出每个粒子的坐标和Area ID，用于调试
-            RCLCPP_INFO(this->get_logger(), "粒子 %zu: x=%.2f, y=%.2f, z=%.2f, area_id=%d", 
+            RCLCPP_DEBUG(this->get_logger(), "粒子 %zu: x=%.2f, y=%.2f, z=%.2f, area_id=%d", 
                          j, corridorGuess[j][0], corridorGuess[j][1], corridorGuess[j][2], area_id);
         }
         
@@ -402,7 +402,7 @@ void CloudInitializer::rescueRobot() {
                 }
                 else {
                     // 添加调试信息
-                    RCLCPP_DEBUG(this->get_logger(),
+                    RCLCPP_INFO(this->get_logger(),
                         "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
                         robotPose(0,3), robotPose(1,3), 
                         static_cast<int>(std::fmod(initialYawAngle + i * rescue_angle_interval, 360.0)),
@@ -651,7 +651,7 @@ void CloudInitializer::rescueRobot() {
                                 (endTime - startTime).seconds() * 1000);
                 }
                 
-                RCLCPP_INFO(this->get_logger(), 
+                RCLCPP_DEBUG(this->get_logger(), 
                     "粒子 %zu (x=%.2f, y=%.2f, area=%d) 在角度范围内的最佳角度: %d度, 评分: %.6f",
                     particle_idx, corridorGuess[particle_idx][0], corridorGuess[particle_idx][1], area_id,
                     static_cast<int>(std::fmod(initialYawAngle + particle_best_angle_idx * rescue_angle_interval, 360.0)),

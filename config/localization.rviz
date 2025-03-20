@@ -22,9 +22,9 @@ Panels:
         - /PointCloud25
         - /Marker2
         - /Marker3
-        - /Marker3/Status1
         - /Marker3/Topic1
         - /PointCloud26
+        - /Marker5
       Splitter Ratio: 0.5
     Tree Height: 1266
   - Class: rviz_common/Selection
@@ -101,8 +101,6 @@ Visualization Manager:
         AGmap:
           Value: true
         All Enabled: false
-        PandarQT:
-          Value: true
         map:
           Value: true
         world:
@@ -116,8 +114,6 @@ Visualization Manager:
         world:
           map:
             AGmap:
-              {}
-            PandarQT:
               {}
       Update Interval: 0
       Value: true
@@ -198,9 +194,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 17.377674102783203
+      Max Intensity: 789
       Min Color: 0; 0; 0
-      Min Intensity: 1.4380311965942383
+      Min Intensity: 691
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -336,7 +332,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        global_localization: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -349,7 +345,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        global_localization: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -391,6 +387,19 @@ Visualization Manager:
         Value: /particles_for_viz
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        room_position: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /room_marker
       Value: true
   Enabled: true
   Global Options:
@@ -438,25 +447,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 46.11837387084961
+      Distance: 8.397855758666992
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 7.7136359214782715
-        Y: -6.600090503692627
-        Z: -5.028306484222412
+        X: 8.56105899810791
+        Y: 4.517655372619629
+        Z: 0.4044211804866791
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.4747964143753052
+      Pitch: 1.309796690940857
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.163177967071533
+      Yaw: 3.0831708908081055
     Saved: ~
 Window Geometry:
   Displays:
