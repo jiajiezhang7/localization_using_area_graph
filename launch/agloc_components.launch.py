@@ -22,13 +22,13 @@ def generate_launch_description():
 
     use_bag_arg = DeclareLaunchArgument(
         'use_bag',
-        default_value='false',
+        default_value='true',
         description='是否使用ROS2 bag进行测试'
     )
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/95',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/combined_data_20250318_211851',
         description='ROS2 bag文件路径'
     )
 
@@ -92,21 +92,21 @@ def generate_launch_description():
 
     # TF变换：map -> PandarQT（激光雷达）
     # 事实上这只是用于肉眼标出真值，而对机器人定位无丝毫影响
-    ld.add_action(Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='transform_map_to_lidar',
-        arguments=[
-            '--frame-id', 'map',
-            '--child-frame-id', 'PandarQT',
-            '--x', '4.0',
-            '--y', '-6.0',
-            '--z', '0.0',
-            '--roll', '0',
-            '--pitch', '0',
-            '--yaw', '1.5708'
-        ]
-    ))
+    # ld.add_action(Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='transform_map_to_lidar',
+    #     arguments=[
+    #         '--frame-id', 'map',
+    #         '--child-frame-id', 'PandarQT',
+    #         '--x', '4.0',
+    #         '--y', '-6.0',
+    #         '--z', '0.0',
+    #         '--roll', '0',
+    #         '--pitch', '0',
+    #         '--yaw', '1.5708'
+    #     ]
+    # ))
 
     # TF变换：base_link -> PandarQT（这是实际的机器人需要发布的tf关系 baselink->pandarQT，但由于目前是rosbag测试，则这个tf关系会在rosbag中被记录）
     # ld.add_action(Node(
@@ -155,10 +155,35 @@ def generate_launch_description():
     ld.add_action(ExecuteProcess(
         cmd=['ros2', 'bag', 'play',
              LaunchConfiguration('bag_file'),
+             '-s', 'mcap',
              '--clock',
-             '--rate', '0.5'],
+             '--rate', '1.0'],
         output='screen',
         condition=IfCondition(LaunchConfiguration('use_bag'))
+    ))
+
+    # 添加CloudHandler节点（AGLoc系统核心组件）
+    ld.add_action(Node(
+        package='localization_using_area_graph',
+        executable='cloud_handler',
+        name='cloud_handler', 
+        output='screen',
+        parameters=[
+            os.path.join(pkg_dir, 'config', 'params.yaml'),
+            {'use_sim_time': LaunchConfiguration('use_sim_time')}
+        ]
+    ))
+
+    # 添加AGLoc适配器节点（连接AGLoc与Nav2）
+    ld.add_action(Node(
+        package='localization_using_area_graph',
+        executable='agloc_localizer_node',
+        name='agloc_localizer', 
+        output='screen',
+        parameters=[
+            os.path.join(pkg_dir, 'config', 'agloc_nav2_params.yaml'),
+            {'use_sim_time': LaunchConfiguration('use_sim_time')}
+        ]
     ))
 
     return ld

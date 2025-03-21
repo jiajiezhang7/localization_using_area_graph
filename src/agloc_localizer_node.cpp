@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <chrono>
+#include "nav2_util/node_utils.hpp"
 
 namespace localization_using_area_graph
 {
@@ -31,6 +32,9 @@ nav2_util::CallbackReturn AGLocLocalizerNode::on_configure(const rclcpp_lifecycl
   base_frame_id_ = declare_parameter<std::string>("base_frame_id", "base_link");
   tf_broadcast_ = declare_parameter<bool>("tf_broadcast", true);
   
+  // 为nav2_util::LifecycleNode基类的bond连接设置超时参数
+  this->declare_parameter("bond_timeout", 4.0);
+  
   // 创建 TF 组件
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -41,22 +45,36 @@ nav2_util::CallbackReturn AGLocLocalizerNode::on_configure(const rclcpp_lifecycl
     "agloc_pose", rclcpp::QoS(1).reliable());
   particle_cloud_pub_ = create_publisher<nav2_msgs::msg::ParticleCloud>(
     "particle_cloud", rclcpp::QoS(1).reliable());
+    
+  // 创建初始位姿转发发布器
+  initial_pose_forward_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+    "/initialpose_agloc", rclcpp::QoS(1).reliable());
 
   // 创建初始位姿订阅者
   initial_pose_sub_ = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "initialpose", rclcpp::QoS(1).reliable(),
     std::bind(&AGLocLocalizerNode::initialPoseCallback, this, std::placeholders::_1));
 
-  // 创建 CloudHandler
-  try {
-    cloud_handler_ = std::make_shared<CloudHandler>();
-    // 这里可以进行其他必要的初始化
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(get_logger(), "创建CloudHandler失败: %s", e.what());
-    return nav2_util::CallbackReturn::FAILURE;
-  }
+  // 适配器模式：监听现有cloud_handler节点的位姿输出
+  // 根据AGLoc系统的实际输出话题订阅位姿信息
+  agloc_pose_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
+    "/cloud_handler/pose", rclcpp::QoS(1).reliable(),
+    std::bind(&AGLocLocalizerNode::agloc_pose_callback, this, std::placeholders::_1));
 
-  RCLCPP_INFO(get_logger(), "AGLoc定位器已初始化，使用CloudHandler处理点云数据");
+  // 创建定时器，定期发布位姿和TF (10Hz)
+  publish_timer_ = create_wall_timer(
+    std::chrono::milliseconds(100), 
+    std::bind(&AGLocLocalizerNode::publish_timer_callback, this));
+
+  // 使用nav2_util::LifecycleNode的bond连接管理机制
+  // 这会自动创建bond连接，并与lifecycle_manager正确通信
+  double bond_timeout = this->get_parameter("bond_timeout").as_double();
+  RCLCPP_INFO(get_logger(), "设置bond超时时间: %.2f秒", bond_timeout);
+  
+  // 注意：不需要手动创建bond连接，在on_activate中会自动调用createBond()
+
+  RCLCPP_INFO(get_logger(), "AGLoc定位器适配器已初始化，监听cloud_handler节点的位姿输出");
+  RCLCPP_INFO(get_logger(), "订阅话题: /cloud_handler/pose");
   initialized_ = true;
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -73,6 +91,10 @@ nav2_util::CallbackReturn AGLocLocalizerNode::on_activate(const rclcpp_lifecycle
   // 激活发布器
   pose_pub_->on_activate();
   particle_cloud_pub_->on_activate();
+  initial_pose_forward_pub_->on_activate();
+  
+  // 使用基类的createBond()方法创建bond连接
+  createBond();
   
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -88,6 +110,10 @@ nav2_util::CallbackReturn AGLocLocalizerNode::on_deactivate(const rclcpp_lifecyc
   // 停用发布器
   pose_pub_->on_deactivate();
   particle_cloud_pub_->on_deactivate();
+  initial_pose_forward_pub_->on_deactivate();
+  
+  // 使用基类的destroyBond()方法断开bond连接
+  destroyBond();
   
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -104,9 +130,19 @@ nav2_util::CallbackReturn AGLocLocalizerNode::on_cleanup(const rclcpp_lifecycle:
   pose_pub_.reset();
   particle_cloud_pub_.reset();
   initial_pose_sub_.reset();
-  cloud_handler_.reset();
+  agloc_pose_sub_.reset();
+  initial_pose_forward_pub_.reset();
+  
+  // 清理TF相关资源
+  tf_buffer_.reset();
+  tf_listener_.reset();
+  tf_broadcaster_.reset();
+  
+  // 使用基类的destroyBond()方法清理bond连接
+  destroyBond();
   
   initialized_ = false;
+  has_pose_ = false;
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -122,15 +158,55 @@ geometry_msgs::msg::PoseWithCovarianceStamped AGLocLocalizerNode::getPoseEstimat
   return current_pose_;
 }
 
-void AGLocLocalizerNode::updateState()
+// AGLoc点云处理节点位姿输出的回调函数
+void AGLocLocalizerNode::agloc_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   if (!initialized_) {
     return;
   }
+  
+  // 转换为PoseWithCovariance格式
+  geometry_msgs::msg::PoseWithCovarianceStamped pose_with_cov;
+  pose_with_cov.header = msg->header;
+  pose_with_cov.pose.pose = msg->pose;
+  
+  // 设置协方差（使用固定值）
+  for (int i = 0; i < 36; i++) {
+    pose_with_cov.pose.covariance[i] = 0.0;
+  }
+  // 位置协方差
+  pose_with_cov.pose.covariance[0] = 0.05;  // x
+  pose_with_cov.pose.covariance[7] = 0.05;   // y
+  pose_with_cov.pose.covariance[14] = 0.05;  // z
+  // 旋转协方差
+  pose_with_cov.pose.covariance[21] = 0.1;  // roll
+  pose_with_cov.pose.covariance[28] = 0.1;  // pitch
+  pose_with_cov.pose.covariance[35] = 0.1;  // yaw
+  
+  // 保存当前位姿
+  current_pose_ = pose_with_cov;
+  has_pose_ = true;
+  
+  RCLCPP_DEBUG(get_logger(), "收到AGLoc的位姿更新: x=%.2f, y=%.2f", 
+               msg->pose.position.x, msg->pose.position.y);
+}
 
-  // 更新位姿信息并发布
+// 定时器回调函数，发布位姿和TF
+void AGLocLocalizerNode::publish_timer_callback()
+{
+  if (!initialized_) {
+    return;
+  }
+  
+  // 即使还没有收到位姿更新，也尝试发布初始化的map->odom变换
+  // 这样可以确保在启动时TF树不会断开
   publishPoseEstimate();
-  publishParticleCloud();
+  
+  // 只有收到位姿更新后才发布粒子云
+  // TODO 这段代码不应该存在
+  if (has_pose_) {
+    publishParticleCloud();
+  }
 }
 
 // AGLoc使用自己的初始位姿设置逻辑，不需要外部initialpose
@@ -141,48 +217,14 @@ void AGLocLocalizerNode::publishPoseEstimate()
     return;
   }
   
-  // 获取当前时间
+  // 更新时间戳
   auto current_time = this->now();
   
-  // 获取当前位姿
-  Eigen::Matrix4f current_pose = cloud_handler_->getRobotPose();
-  
-  // 转换为ROS消息格式 - 发布agloc_pose (Navigation2需要)
-  geometry_msgs::msg::PoseWithCovarianceStamped pose_msg;
-  pose_msg.header.stamp = current_time;
-  pose_msg.header.frame_id = global_frame_id_;
-  
-  // 设置位置
-  pose_msg.pose.pose.position.x = current_pose(0,3);
-  pose_msg.pose.pose.position.y = current_pose(1,3);
-  pose_msg.pose.pose.position.z = current_pose(2,3);
-  
-  // 从旋转矩阵转换为四元数
-  Eigen::Matrix3f rot = current_pose.block<3,3>(0,0);
-  Eigen::Quaternionf q(rot);
-  pose_msg.pose.pose.orientation.w = q.w();
-  pose_msg.pose.pose.orientation.x = q.x();
-  pose_msg.pose.pose.orientation.y = q.y();
-  pose_msg.pose.pose.orientation.z = q.z();
-  
-  // 设置协方差（使用固定值）
-  for (int i = 0; i < 36; i++) {
-    pose_msg.pose.covariance[i] = 0.0;
+  // 只有当有位姿数据时才发布位姿
+  if (has_pose_) {
+    current_pose_.header.stamp = current_time;
+    pose_pub_->publish(current_pose_);
   }
-  // 位置协方差
-  pose_msg.pose.covariance[0] = 0.05;  // x
-  pose_msg.pose.covariance[7] = 0.05;   // y
-  pose_msg.pose.covariance[14] = 0.05;  // z
-  // 旋转协方差
-  pose_msg.pose.covariance[21] = 0.1;  // roll
-  pose_msg.pose.covariance[28] = 0.1;  // pitch
-  pose_msg.pose.covariance[35] = 0.1;  // yaw
-  
-  // 保存当前位姿用于getPoseEstimate
-  current_pose_ = pose_msg;
-  
-  // 发布位姿
-  pose_pub_->publish(pose_msg);
   
   // 如果不需要发布TF，直接返回
   if (!tf_broadcast_) {
@@ -192,13 +234,40 @@ void AGLocLocalizerNode::publishPoseEstimate()
   // 获取odom到base_link的变换
   geometry_msgs::msg::TransformStamped odom_to_base;
   try {
+    // 使用超时等待变换可用
+    // 这里设置100ms的超时，并使用当前时间而非零时间
+    auto timeout = tf2::durationFromSec(0.1);
+    auto current_time = this->now();
+    
     // 尝试获取最新的变换
     odom_to_base = tf_buffer_->lookupTransform(
-      odom_frame_id_, base_frame_id_, tf2::TimePointZero);
+      odom_frame_id_, base_frame_id_, current_time, timeout);
+      
+    RCLCPP_DEBUG(get_logger(), "成功获取odom->base_link变换");
   } catch (tf2::TransformException & e) {
-    RCLCPP_ERROR(get_logger(), "获取odom到base变换失败: %s", e.what());
-    RCLCPP_WARN(get_logger(), "无法计算map到odom的变换，跳过TF发布");
-    return;
+    // 如果失败，尝试获取最新可用的变换
+    try {
+      RCLCPP_DEBUG(get_logger(), "尝试获取最新的odom->base_link变换");
+      odom_to_base = tf_buffer_->lookupTransform(
+        odom_frame_id_, base_frame_id_, tf2::TimePointZero, tf2::durationFromSec(0.1));
+      RCLCPP_DEBUG(get_logger(), "成功获取odom->base_link变换");
+    } catch (tf2::TransformException & e2) {
+      RCLCPP_ERROR(get_logger(), "获取odom到base变换失败: %s", e2.what());
+      
+      // 如果仍然失败，使用单位变换作为默认值
+      odom_to_base.header.stamp = this->now();
+      odom_to_base.header.frame_id = odom_frame_id_;
+      odom_to_base.child_frame_id = base_frame_id_;
+      odom_to_base.transform.translation.x = 0.0;
+      odom_to_base.transform.translation.y = 0.0;
+      odom_to_base.transform.translation.z = 0.0;
+      odom_to_base.transform.rotation.x = 0.0;
+      odom_to_base.transform.rotation.y = 0.0;
+      odom_to_base.transform.rotation.z = 0.0;
+      odom_to_base.transform.rotation.w = 1.0;
+      
+      RCLCPP_WARN(get_logger(), "使用默认的odom->base_link变换");
+    }
   }
   
   // 计算map到odom的变换
@@ -211,15 +280,22 @@ void AGLocLocalizerNode::publishPoseEstimate()
   tf2::Transform T_m_b;
   tf2::Transform T_b_o;
   
-  // 设置map到base的变换
-  tf2::Vector3 t_m_b(current_pose(0,3), current_pose(1,3), current_pose(2,3));
-  tf2::Matrix3x3 R_m_b;
-  R_m_b.setValue(
-    current_pose(0,0), current_pose(0,1), current_pose(0,2),
-    current_pose(1,0), current_pose(1,1), current_pose(1,2),
-    current_pose(2,0), current_pose(2,1), current_pose(2,2));
-  T_m_b.setBasis(R_m_b);
-  T_m_b.setOrigin(t_m_b);
+  if (has_pose_) {
+    // 如果已有位姿数据，从current_pose_设置map到base的变换
+    tf2::Vector3 t_m_b(current_pose_.pose.pose.position.x, 
+                     current_pose_.pose.pose.position.y,
+                     current_pose_.pose.pose.position.z);
+                     
+    tf2::Quaternion q_m_b;
+    tf2::fromMsg(current_pose_.pose.pose.orientation, q_m_b);
+    
+    T_m_b.setOrigin(t_m_b);
+    T_m_b.setRotation(q_m_b);
+  } else {
+    // 如果还没有位姿数据，使用单位矩阵作为初始值
+    // 即map和base_link初始重合
+    T_m_b.setIdentity();
+  }
   
   // 设置base到odom的变换
   tf2::fromMsg(odom_to_base.transform, T_b_o);
@@ -233,7 +309,8 @@ void AGLocLocalizerNode::publishPoseEstimate()
   // 发布TF
   tf_broadcaster_->sendTransform(tf_msg);
   
-  RCLCPP_DEBUG(get_logger(), "已发布位姿和TF变换: map->odom");
+  RCLCPP_INFO(get_logger(), "已发布TF变换: map->odom (使用%s位姿)", 
+               has_pose_ ? "实际" : "初始化");
 }
 
 void AGLocLocalizerNode::publishParticleCloud()
@@ -255,32 +332,49 @@ void AGLocLocalizerNode::publishParticleCloud()
 void AGLocLocalizerNode::initialPoseCallback(
   const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
 {
-  RCLCPP_INFO(get_logger(), "收到初始位姿");
+  RCLCPP_INFO(get_logger(), "收到初始位姿设置请求");
   
-  if (!initialized_ || !cloud_handler_) {
+  if (!initialized_) {
     RCLCPP_WARN(get_logger(), "AGLoc定位器未初始化，无法设置初始位姿");
     return;
   }
   
-  // 从消息中提取位姿
-  double yaw = tf2::getYaw(msg->pose.pose.orientation);
-  Eigen::Vector3f position(msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
+  // 设置手动初始化标志
+  manual_init_ = true;
   
-  // 调用CloudHandler的setInitialPose方法
-  cloud_handler_->setInitialPose(yaw, position);
-  RCLCPP_INFO(get_logger(), "已设置初始位姿: x=%.2f, y=%.2f, yaw=%.2f", 
-              position.x(), position.y(), yaw);
+  // 修改消息的帧和时间戳
+  geometry_msgs::msg::PoseWithCovarianceStamped forward_msg = *msg;
+  forward_msg.header.stamp = this->now();
+  forward_msg.header.frame_id = global_frame_id_;
+  
+  // 转发初始位姿到cloud_handler节点
+  initial_pose_forward_pub_->publish(forward_msg);
+  
+  double yaw = tf2::getYaw(msg->pose.pose.orientation);
+  RCLCPP_INFO(get_logger(), "已转发初始位姿到cloud_handler节点: x=%.2f, y=%.2f, yaw=%.2f", 
+              msg->pose.pose.position.x, msg->pose.pose.position.y, yaw);
 }
 
 }  // namespace localization_using_area_graph
 
-// 主函数
+// AGLoc定位器作为独立节点启动，复用Nav2的生命周期管理机制
 int main(int argc, char ** argv)
 {
+  // 初始化ROS
   rclcpp::init(argc, argv);
-  auto options = rclcpp::NodeOptions();
+  
+  // 创建节点选项，启用节点成组功能以与Nav2集成
+  rclcpp::NodeOptions options;
+  options.use_intra_process_comms(true);
+  
+  // 输出启动信息
+  std::cout << "启动AGLoc定位器节点 - 等待lifecycle_manager管理..." << std::endl;
+  
+  // 创建并运行节点
   auto node = std::make_shared<localization_using_area_graph::AGLocLocalizerNode>(options);
   rclcpp::spin(node->get_node_base_interface());
+  
+  // 清理并退出
   rclcpp::shutdown();
   return 0;
 }

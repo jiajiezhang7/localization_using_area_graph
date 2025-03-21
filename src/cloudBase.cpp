@@ -137,7 +137,6 @@ CloudBase::CloudBase(const std::string& node_name)
     initializeSubscribers();
     allocateMemory();
 
-    setInitialPose(initialYawAngle, initialExtTrans);
 
     RCLCPP_INFO(this->get_logger(), "CloudBase initialized successfully");
 }

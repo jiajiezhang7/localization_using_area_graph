@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<library path="localization_using_area_graph">
-  <class type="localization_using_area_graph::AGLocLocalizerNode" base_class_type="nav2_core::Localizer">
-    <description>AGLoc定位插件，实现基于区域图的定位功能</description>
-  </class>
-</library>

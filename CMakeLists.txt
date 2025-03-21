@@ -169,8 +169,8 @@ foreach(target
   )
 endforeach()
 
-# 添加AGLoc定位插件库
-add_library(agloc_localizer_node SHARED
+# 添加AGLoc定位器节点（作为独立可执行文件，不是插件）
+add_executable(agloc_localizer_node
   src/agloc_localizer_node.cpp
 )
 
@@ -179,8 +179,6 @@ ament_target_dependencies(agloc_localizer_node
   rclcpp_lifecycle
   nav2_util
   nav2_msgs
-  nav2_core
-  pluginlib
   std_msgs
   sensor_msgs
   geometry_msgs
@@ -197,10 +195,7 @@ target_link_libraries(agloc_localizer_node
   ${OpenCV_LIBRARIES}
 )
 
-# 安装插件描述文件
-install(FILES plugins.xml
-  DESTINATION share/${PROJECT_NAME}
-)
+# AGLoc已不再是插件，不需要安装plugins.xml
 
 # Install targets
 install(

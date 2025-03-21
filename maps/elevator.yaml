@@ -1,4 +1,4 @@
-image: elevator.pgm
+image: /home/jay/AGLoc_ws/src/localization_using_area_graph/maps/elevator.pgm
 mode: trinary
 resolution: 0.05
 origin: [-33.6, -20.9, 0]

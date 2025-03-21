@@ -20,6 +20,7 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/msg/point_cloud.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 
 // Message filters for ROS2
 #include "message_filters/subscriber.h"
@@ -32,9 +33,11 @@ public:
     // ROS2 订阅器
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subLaserCloud;    // 订阅激光点云数据
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subInitialGuess;  // 订阅初始位姿猜测
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subManualInitialPose;  // 订阅手动设置的初始位姿
 
     // ROS2 发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pubRobotPose;      // 发布机器人位姿
 
     // cloudInitializer时在CloudHandler类构造时就已经被实例化了的
     std::shared_ptr<CloudInitializer> cloudInitializer;  // 使用智能指针管理云初始化器对象
@@ -48,6 +51,7 @@ public:
     std::chrono::steady_clock::time_point sumFrameRunTime; // 使用ROS2时间，累计帧运行时间
     int numofFrame;       // 帧数
     bool hasGlobalPoseEstimate;    // 是否已从全局定位获得位姿估计
+    bool hasManualInitialPose;     // 是否有手动设置的初始位姿
     int globalImgTimes;   // 全局图像次数
 
     explicit CloudHandler();  // 显式构造函数
@@ -60,6 +64,9 @@ public:
     
     // 获取机器人位姿 - 为Nav2接口添加
     Eigen::Matrix4f getRobotPose() const { return robotPose; }  // 返回当前机器人位姿
+    
+    // 设置手动初始位姿 - 为Nav2接口添加
+    void setManualInitialPose(double yaw, const Eigen::Vector3f& position);  // 设置手动初始位姿
 
     // 地图和直方图处理
     void mergeMapHistogram();  // 合并地图直方图
@@ -92,6 +99,7 @@ private:
     // 回调方法
     void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 处理接收到的点云数据
     void setInitialGuessFlag(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 设置初始猜测标志
+    void manualInitialPoseCB(const std::shared_ptr<geometry_msgs::msg::PoseWithCovarianceStamped> poseMsg);  // 处理手动设置的初始位姿
 
     // 初始化发布器和订阅器
     void initializePublishers() {
@@ -100,6 +108,10 @@ private:
         // 发布内部区域点云
         pubinsideAreaPC = this->create_publisher<sensor_msgs::msg::PointCloud2>(
             "insideAreaPC", qos);
+            
+        // 创建机器人位姿发布者
+        pubRobotPose = create_publisher<geometry_msgs::msg::PoseStamped>(
+            "/cloud_handler/pose", rclcpp::QoS(1).reliable());
     }
 
     void initializeSubscribers() {
@@ -114,7 +126,11 @@ private:
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::setInitialGuessFlag, this, std::placeholders::_1));
-        
+            
+        // 订阅手动设置的初始位姿话题
+        subManualInitialPose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+            "/initialpose_agloc", qos,
+            std::bind(&CloudHandler::manualInitialPoseCB, this, std::placeholders::_1));
     }
 
     // 初始化变量
@@ -125,9 +141,8 @@ private:
         insideAreaID = 0;          // 内部区域ID
         numofFrame = 0;            // 帧数
         hasGlobalPoseEstimate = false;      // 是否已从全局定位获得位姿估计
+        hasManualInitialPose = false;       // 是否有手动设置的初始位姿
         globalImgTimes = 0;        // 全局图像次数
-        
-
     }
 
 protected:

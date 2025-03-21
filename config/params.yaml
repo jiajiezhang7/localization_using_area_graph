@@ -5,7 +5,8 @@
         # 点云数据的预处理和组织
         # 过滤无效点
         # 实现论文中的"clutter removal"步骤
-        pointCloudTopic: "/hesai/pandar"            # Point cloud topic  --- Jiajie's Version bag We got /lidar_points
+        pointCloudTopic: "/lidar_points"            # Point cloud topic  --- Agile03: /lidar_points ; Agile01,02: /hesai/pandar
+        # pointCloudTopic: "/hesai/pandar"           
         N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
         Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
         downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1

@@ -14,6 +14,8 @@
  */
 #include "localization_using_area_graph/cloudHandler.hpp"
 #include "localization_using_area_graph/utility.hpp"
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 /**
  * @brief 计算走廊场景的点云降采样率
@@ -142,8 +144,8 @@ CloudHandler::CloudHandler()
     numofFrame = 0;  // 帧数计数器
 
     // 初始化CloudHandler中的发布者和订阅者
-    CloudHandler::initializePublishers();
-    CloudHandler::initializeSubscribers(); 
+    initializePublishers();
+    initializeSubscribers(); 
 
     // 打开文件以保存机器人位姿结果（TUM格式）
     robotPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/robotPoseTum.txt", 
@@ -207,6 +209,13 @@ void CloudHandler::cloudHandlerCB(
         RCLCPP_INFO_ONCE(get_logger(), "Map not initialized yet, waiting for map!");
         return;
     }
+
+    // 打印当前状态
+    RCLCPP_INFO(get_logger(), "当前状态: bRescueRobot=%s, isRescueFinished=%s, initialized=%s, hasGlobalPoseEstimate=%s",
+                bRescueRobot ? "true" : "false",
+                cloudInitializer->isRescueFinished ? "true" : "false",
+                initialized ? "true" : "false",
+                hasGlobalPoseEstimate ? "true" : "false");
 
     // 准备新帧的处理
     setEveryFrame();
@@ -305,6 +314,23 @@ void CloudHandler::cloudHandlerCB(
             RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]", 
                         robotPose(0,3), robotPose(1,3));
             
+            // 发布机器人位姿
+            geometry_msgs::msg::PoseStamped pose_msg;
+            pose_msg.header = mapHeader;
+            pose_msg.pose.position.x = robotPose(0,3);
+            pose_msg.pose.position.y = robotPose(1,3);
+            pose_msg.pose.position.z = robotPose(2,3);
+            
+            // 从旋转矩阵转换为四元数
+            Eigen::Matrix3f rot = robotPose.block<3,3>(0,0);
+            Eigen::Quaternionf q(rot);
+            pose_msg.pose.orientation.x = q.x();
+            pose_msg.pose.orientation.y = q.y();
+            pose_msg.pose.orientation.z = q.z();
+            pose_msg.pose.orientation.w = q.w();
+            
+            pubRobotPose->publish(pose_msg);
+            
             // 关闭救援模式
             bRescueRobot = false;
             cloudInitializer->isRescueFinished = false;
@@ -325,21 +351,35 @@ void CloudHandler::cloudHandlerCB(
     // 模式3: 纯位姿跟踪模式 - 使用固定初始位姿 （目前能跑通的模式）
     else {
         // 如果从模式2的全局定位环节计算得到了初始位姿，则使用它，并且覆盖从params中读取的默认值
-        if(hasGlobalPoseEstimate) {
+        // 优先级：手动设置位姿 > 全局定位结果 > params默认值
+        if(hasManualInitialPose) {
+            // 使用手动设置的位姿，已在manualInitialPoseCB中设置robotPose
+            errorUpThred = 3;
+            
+            RCLCPP_INFO(get_logger(), "使用手动设置的初始位姿: [%f, %f]", 
+                         robotPose(0,3), robotPose(1,3));
+                         
+            // 清除标志，避免重复使用
+            hasManualInitialPose = false;
+        }
+        else if(hasGlobalPoseEstimate) {
             // 使用全局定位的结果
             robotPose = cloudInitializer->MaxRobotPose;
             errorUpThred = 3;
             
             cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess, 
-                                       cloudInitializer.get(), 
-                                       std::placeholders::_1));
-                                       
+                                     cloudInitializer.get(), 
+                                     std::placeholders::_1));
+                                     
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
+            RCLCPP_INFO(get_logger(), "使用全局定位结果作为初始位姿: [%f, %f]", 
+                         robotPose(0,3), robotPose(1,3));
+                         
             hasGlobalPoseEstimate = false;
         } else {
-            // 如果没有从模式2中得到初始位姿，则使用params中读取的默认值
-            RCLCPP_INFO_ONCE(get_logger(), "------NO FRAME GOES TO RESCUE, USE EXT MAT IN PARAM.YAML--------");
+            // 如果既没有手动设置也没有全局定位结果，则使用params中读取的默认值
+            RCLCPP_INFO_ONCE(get_logger(), "------未提供初始位姿，使用params中的默认值--------");
         }
 
         // 使用当前机器人位姿变换点云
@@ -1323,7 +1363,7 @@ void CloudHandler::optimizationICP() {
         }
     }
 
-    // 发布最终的机器人位姿
+    // 准备并发布机器人位姿
     geometry_msgs::msg::PoseStamped pose_stamped;
     pose_stamped.header = mapHeader;
     pose_stamped.pose.position.x = robotPose(0,3);
@@ -1341,10 +1381,68 @@ void CloudHandler::optimizationICP() {
     pose_stamped.pose.orientation.z = quaternion.z();
     pose_stamped.pose.orientation.w = quaternion.w();
 
+    // 发布当前位姿给AGLoc定位器
+    pubRobotPose->publish(pose_stamped);
+
     // 将位姿添加到全局路径并发布
     globalPath.poses.push_back(pose_stamped);
     pubRobotPath->publish(globalPath);
     saveTUMTraj(pose_stamped);  // 保存轨迹到TUM格式文件
+}
+
+/**
+ * @brief 设置手动初始位姿
+ * @details 此函数用于手动设置机器人的初始位姿
+ * 
+ * @param yaw 机器人朝向（偏航角），单位弧度
+ * @param position 机器人位置，3D向量(x,y,z)
+ */
+void CloudHandler::setManualInitialPose(double yaw, const Eigen::Vector3f& position) {
+    // 创建旋转矩阵（绕Z轴旋转yaw弧度）
+    Eigen::Matrix3f rot;
+    rot << cos(yaw), -sin(yaw), 0,
+           sin(yaw), cos(yaw), 0,
+           0, 0, 1;
+           
+    // 设置robotPose矩阵的旋转部分
+    robotPose.block<3,3>(0,0) = rot;
+    
+    // 设置robotPose矩阵的平移部分
+    robotPose.block<3,1>(0,3) = position;
+    
+    // 标记已有手动设置的初始位姿
+    hasManualInitialPose = true;
+    
+    RCLCPP_INFO(get_logger(), "手动设置初始位姿: 位置[%f, %f, %f], 偏航角[%f]", 
+                position[0], position[1], position[2], yaw);
+}
+
+/**
+ * @brief 处理手动设置的初始位姿回调
+ * @details 从/initialpose_agloc话题接收初始位姿消息，并设置robotPose
+ * 
+ * @param poseMsg 包含位姿和协方差的消息
+ */
+void CloudHandler::manualInitialPoseCB(const std::shared_ptr<geometry_msgs::msg::PoseWithCovarianceStamped> poseMsg) {
+    // 从消息中提取位置
+    Eigen::Vector3f position;
+    position[0] = poseMsg->pose.pose.position.x;
+    position[1] = poseMsg->pose.pose.position.y;
+    position[2] = poseMsg->pose.pose.position.z;
+    
+    // 从四元数中提取偏航角
+    tf2::Quaternion q;
+    tf2::fromMsg(poseMsg->pose.pose.orientation, q);
+    
+    // 获取欧拉角
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+    
+    // 调用setManualInitialPose设置初始位姿
+    setManualInitialPose(yaw, position);
+    
+    RCLCPP_INFO(get_logger(), "收到初始位姿消息，设置初始位姿: 位置[%f, %f], 偏航角[%f]", 
+                position[0], position[1], yaw);
 }
 
 int main(int argc, char** argv) {
