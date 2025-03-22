@@ -64,6 +64,7 @@ private:
     rss::msg::WifiLocation::SharedPtr latest_wifi_location_;
     bool received_wifi_location_{false};  // 标记是否收到过WiFi定位结果
     bool latest_lidar_received_{false};  // 标记是否收到过激光雷达数据
+    bool particles_published_{false};  // 标记是否已经发布过粒子
     
     // root node的经纬度
     double root_longitude_;

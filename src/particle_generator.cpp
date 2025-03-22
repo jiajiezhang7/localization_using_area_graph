@@ -153,6 +153,10 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
     // 检查是否已收到WiFi定位结果
     {
         std::lock_guard<std::mutex> lock(wifi_mutex_);
+        // 如果已经发布过粒子，直接返回
+        if (particles_published_) {
+            return;
+        }
         if (!received_wifi_location_) {
             static int wait_count = 0;
             if (wait_count % 10 == 0) { // 每10次打印一次日志，减少日志冗余
@@ -346,6 +350,10 @@ void ParticleGenerator::generateParticles(const rclcpp::Time& stamp,
     
     // Publish visualization particles
     viz_particle_pub_->publish(viz_particles_msg);
+    
+    // 标记粒子已发布
+    particles_published_ = true;
+    RCLCPP_INFO(this->get_logger(), "粒子已生成并发布，后续不再更新粒子");
 }
 
 // 它所订阅的是已经转换到map坐标系下的Area Graph的 node point
