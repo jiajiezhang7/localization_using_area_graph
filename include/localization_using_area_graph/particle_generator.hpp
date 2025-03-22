@@ -63,11 +63,12 @@ private:
     std::mutex wifi_mutex_;
     rss::msg::WifiLocation::SharedPtr latest_wifi_location_;
     bool received_wifi_location_{false};  // 标记是否收到过WiFi定位结果
+    bool latest_lidar_received_{false};  // 标记是否收到过激光雷达数据
     
     // root node的经纬度
     double root_longitude_;
     double root_latitude_;
-    
+    std::string pointCloudTopic_;
     // 地图变换参数
     std::array<double, 3> map_extrinsic_trans_;  // AGmap到map的平移变换
     double map_yaw_angle_;  // AGmap到map的旋转角度（弧度）

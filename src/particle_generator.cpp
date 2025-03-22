@@ -35,6 +35,7 @@ void ParticleGenerator::initializeParameters()
     this->declare_parameter("use_room_info", true);  // 是否使用room信息来过滤粒子
     this->declare_parameter("root_long", 0.0);
     this->declare_parameter("root_lat", 0.0);
+    this->declare_parameter("pointCloudTopic", "/hesai/pandar");
     
     // 声明地图变换参数
     this->declare_parameter("mapExtrinsicTrans", std::vector<double>{0.0, 0.0, 0.0});
@@ -47,6 +48,7 @@ void ParticleGenerator::initializeParameters()
     use_room_info_ = this->get_parameter("use_room_info").as_bool();
     root_longitude_ = this->get_parameter("root_long").as_double();
     root_latitude_ = this->get_parameter("root_lat").as_double();
+    pointCloudTopic_ = this->get_parameter("pointCloudTopic").as_string();
     
     // 读取地图变换参数
     auto trans_vec = this->get_parameter("mapExtrinsicTrans").as_double_array();
@@ -65,39 +67,51 @@ void ParticleGenerator::initializeParameters()
 // 发布者订阅者初始化
 void ParticleGenerator::initializePublishersSubscribers() 
 {
-    // Create QoS profile
-    auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
+    // 创建QoS配置，使用可靠传输以确保消息不会丢失
+    auto reliable_qos = rclcpp::QoS(rclcpp::KeepLast(10))
+        .reliable()
+        .transient_local();  // 持久订阅，可以接收到连接前的消息
+        
+    // 普通消息的QoS
+    auto best_effort_qos = rclcpp::QoS(rclcpp::KeepLast(10));
     
     // 发布用于初始化的采样粒子
     particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        "/particles_for_init", qos);
+        "/particles_for_init", reliable_qos);
         
     // 发布用于可视化的粒子
     viz_particle_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        "/particles_for_viz", qos);
+        "/particles_for_viz", reliable_qos);
         
     // 发布WiFi中心点标记
     wifi_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
-        "/wifi_center_marker", qos);
+        "/wifi_center_marker", reliable_qos);
 
     // 发布房间位置标记
     room_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
-        "/room_marker", qos);
+        "/room_marker", reliable_qos);
         
     // 订阅1: LiDAR 点云话题
     lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "/hesai/pandar", qos,
+        pointCloudTopic_, best_effort_qos,
         std::bind(&ParticleGenerator::lidarCallback, this, std::placeholders::_1));
     
     // 订阅2: osmAG地图中的node点云（经由mapAGCB处理，其坐标数值已被变换到map坐标系下）
     agmap_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "/pubAGMapTransformedPC", qos,
+        "/pubAGMapTransformedPC", best_effort_qos,
         std::bind(&ParticleGenerator::agmapCallback, this, std::placeholders::_1));
     
-    // 订阅3: WiFi定位结果
+    // 订阅3: WiFi定位结果 - 使用与robot_loc兼容的QoS设置
+    // 注意：不使用transient_local，因为它可能与发布者不兼容
+    auto wifi_qos = rclcpp::QoS(rclcpp::KeepLast(10))
+        .reliable()
+        .durability_volatile();  // 使用volatile而非transient_local
+    
     wifi_sub_ = this->create_subscription<rss::msg::WifiLocation>(
-        "/WifiLocation", qos,
+        "/WifiLocation", wifi_qos,
         std::bind(&ParticleGenerator::wifiCallback, this, std::placeholders::_1));
+        
+    RCLCPP_INFO(this->get_logger(), "创建了 /WifiLocation 话题的订阅，使用可靠消息策略");
 }
 
 Eigen::Vector3d CoordinateTransform(const GeoCoordinate& init, const GeoCoordinate& cur) {
@@ -117,9 +131,21 @@ Eigen::Vector3d CoordinateTransform(const GeoCoordinate& init, const GeoCoordina
 
 
 void ParticleGenerator::wifiCallback(const rss::msg::WifiLocation::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "接收到WiFi定位消息: [%f, %f]", 
+                msg->longitude, msg->latitude);
+                
     std::lock_guard<std::mutex> lock(wifi_mutex_);
     latest_wifi_location_ = msg;
     received_wifi_location_ = true;  // 标记已收到WiFi定位结果
+    
+    // 立即尝试生成粒子，如果已接收激光雷达数据
+    static bool printed_waiting = false;
+    if (!latest_lidar_received_) {
+        if (!printed_waiting) {
+            RCLCPP_INFO(this->get_logger(), "收到WiFi定位消息，但激光雷达数据尚未就绪，等待中...");
+            printed_waiting = true;
+        }
+    }
 }
 
 void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) 
@@ -128,9 +154,16 @@ void ParticleGenerator::lidarCallback(const sensor_msgs::msg::PointCloud2::Share
     {
         std::lock_guard<std::mutex> lock(wifi_mutex_);
         if (!received_wifi_location_) {
-            RCLCPP_INFO_ONCE(this->get_logger(), "等待WiFi定位结果...");
+            static int wait_count = 0;
+            if (wait_count % 10 == 0) { // 每10次打印一次日志，减少日志冗余
+                RCLCPP_INFO(this->get_logger(), "等待WiFi定位结果...已等待%d次", wait_count);
+            }
+            wait_count++;
             return;  // 如果还没有收到WiFi定位结果，直接返回
         }
+        // 收到了WiFi定位结果，标记激光雷达数据已接收
+        latest_lidar_received_ = true;
+        RCLCPP_INFO(this->get_logger(), "收到WiFi定位和激光雷达数据，开始生成粒子");
     }
 
     std::array<double, 2> wifi_center;
@@ -422,9 +455,9 @@ void ParticleGenerator::publishRoomMarker(const rclcpp::Time& stamp, double x, d
     marker.pose.orientation.z = 0.0;
     marker.pose.orientation.w = 1.0;
     
-    marker.scale.x = 0.5;
-    marker.scale.y = 0.5;
-    marker.scale.z = 0.5;
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
     
     marker.color.r = 1.0;
     marker.color.g = 1.0;

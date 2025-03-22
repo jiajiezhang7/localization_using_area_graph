@@ -173,14 +173,14 @@ void CloudBase::AGindexCB(const area_graph_data_parser::msg::AGindex::SharedPtr 
  */
 void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     // 添加调试信息
-    RCLCPP_DEBUG(this->get_logger(), "Receiving map from AG");
+    // RCLCPP_DEBUG(this->get_logger(), "Receiving map from AG");
 
     // 获取当前地图点云的大小
     mapSize = map_pc->points.size();
     
     // 检查条件
     if(!isAGIndexReceived() || mapInit) {
-        RCLCPP_DEBUG(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
+        RCLCPP_DEBUG_ONCE(this->get_logger(), "AGindexReceived: %d, mapInit: %d", 
                     isAGIndexReceived(), mapInit);
         return; 
     }
@@ -523,7 +523,7 @@ void CloudBase::organizePointcloud() {
             }
             *organizedCloudIn = *furthestRing; 
             N_SCAN = 1;
-            RCLCPP_DEBUG(get_logger(), "FurthestRingTracking: Reset N_SCAN to 1");
+            RCLCPP_DEBUG_ONCE(get_logger(), "FurthestRingTracking: Reset N_SCAN to 1");
         }
 
 
@@ -614,7 +614,7 @@ void CloudBase::setEveryFrame() {
     }
     numTotalHistogram = 0;
     
-    RCLCPP_DEBUG(this->get_logger(), "Frame parameters reset");
+    // RCLCPP_DEBUG(this->get_logger(), "Frame parameters reset");
 }
 
 

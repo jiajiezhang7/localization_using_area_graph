@@ -91,7 +91,7 @@ void CloudInitializer::getInitialExtGuess(
     // 这里的laserCloudMsg 即为 particle_for_init
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
     
-    RCLCPP_WARN(this->get_logger(), "CloudInitializer GETTING INITIAL GUESS");
+    RCLCPP_INFO(this->get_logger(), "CloudInitializer GETTING INITIAL GUESS");
 
     // 处理 particle_generator 提供的初始粒子
         // 创建一个PCL点云指针
@@ -119,6 +119,7 @@ void CloudInitializer::getInitialExtGuess(
     // 计算救援时间
     auto startTime = this->now();
     // 重点处理步骤在此
+    RCLCPP_INFO(this->get_logger(), "-------------------rescueRobot started-------------------");
     rescueRobot();
     RCLCPP_INFO(this->get_logger(), "-------------------rescueRobot finished-------------------");
     robotPose = MaxRobotPose;

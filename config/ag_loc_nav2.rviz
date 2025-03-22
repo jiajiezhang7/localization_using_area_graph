@@ -176,7 +176,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -234,9 +234,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 789
+      Max Intensity: 648
       Min Color: 0; 0; 0
-      Min Intensity: 691
+      Min Intensity: 633
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -299,12 +299,12 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 49.26121139526367
+      Max Intensity: 23.635326385498047
       Min Color: 0; 0; 0
-      Min Intensity: 0.8661402463912964
+      Min Intensity: 1.835228443145752
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -320,7 +320,7 @@ Visualization Manager:
         Value: /pubOrganizedCloudIn
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -333,7 +333,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 255
@@ -354,12 +354,12 @@ Visualization Manager:
         Value: /lidar_points
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        wifi_center: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -372,7 +372,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        global_localization: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -385,7 +385,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        global_localization: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -432,7 +432,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        room_position: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -487,7 +487,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 54.42583465576172
+      Distance: 64.4234390258789
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -502,10 +502,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.33479642868042
+      Pitch: 1.179796576499939
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.153167486190796
+      Yaw: 3.16816782951355
     Saved: ~
 Window Geometry:
   Displays:

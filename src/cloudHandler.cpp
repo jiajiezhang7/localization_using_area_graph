@@ -186,8 +186,8 @@ void CloudHandler::cloudHandlerCB(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg) {
 
     // 输出当前地图初始化状态和大小
-    RCLCPP_DEBUG(get_logger(), "Received point cloud message, mapInit=%d", mapInit);
-    RCLCPP_DEBUG(get_logger(), "Map size: %zu", map_pc->points.size());
+    // RCLCPP_DEBUG(get_logger(), "Received map message, mapInit=%d", mapInit);
+    // RCLCPP_DEBUG(get_logger(), "Map size: %zu", map_pc->points.size());
     
     // 显示全局定位开始的分隔线
     if(globalImgTimes == 0) {
@@ -211,7 +211,7 @@ void CloudHandler::cloudHandlerCB(
     }
 
     // 打印当前状态
-    RCLCPP_INFO(get_logger(), "当前状态: bRescueRobot=%s, isRescueFinished=%s, initialized=%s, hasGlobalPoseEstimate=%s",
+    RCLCPP_DEBUG(get_logger(), "当前状态: bRescueRobot=%s, isRescueFinished=%s, initialized=%s, hasGlobalPoseEstimate=%s",
                 bRescueRobot ? "true" : "false",
                 cloudInitializer->isRescueFinished ? "true" : "false",
                 initialized ? "true" : "false",
@@ -301,6 +301,17 @@ void CloudHandler::cloudHandlerCB(
             
             // 标记已开始全局定位流程
             hasGlobalPoseEstimate = true;
+            
+            // 注意：主动触发rescueRobot流程
+            static int trigger_count = 0;
+            trigger_count++;
+            
+            if(trigger_count >= 5 && !cloudInitializer->isRescueFinished) {
+                RCLCPP_WARN(get_logger(), "强制触发rescueRobot流程...");
+                cloudInitializer->rescueRobot();
+                trigger_count = 0;
+            }
+            
             return;
         }
         
@@ -1456,7 +1467,7 @@ int main(int argc, char** argv) {
         cloudHandler->get_logger().get_name(),
         RCUTILS_LOG_SEVERITY_INFO)) {
         auto logger = rclcpp::get_logger("CloudHandler");
-        RCLCPP_INFO(logger, "Logger level set to INFO");
+        RCLCPP_INFO(logger, "Logger level set to DEBUG");
     }
 
     RCLCPP_INFO(cloudHandler->get_logger(), "CloudHandler node started");

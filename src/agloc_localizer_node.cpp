@@ -309,7 +309,7 @@ void AGLocLocalizerNode::publishPoseEstimate()
   // 发布TF
   tf_broadcaster_->sendTransform(tf_msg);
   
-  RCLCPP_INFO(get_logger(), "已发布TF变换: map->odom (使用%s位姿)", 
+  RCLCPP_INFO_ONCE(get_logger(), "已发布TF变换: map->odom (使用%s位姿)", 
                has_pose_ ? "实际" : "初始化");
 }
 
