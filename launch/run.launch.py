@@ -14,7 +14,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/97',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/96',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
 
@@ -114,22 +114,22 @@ def generate_launch_description():
 
         # Fujing's Version
         # PandarQT坐标系在全系统中没用到，真的只是为了在Rviz里定个标，你无论把它设在哪里，都是Ok的，和位姿追踪没任何关系
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='transform_agmap_to_hesailidar',
-            arguments=[
-                '--frame-id', 'map',
-                '--child-frame-id', 'PandarQT',
-                '--x', '4.0',
-                '--y', '-6.0',
-                '--z', '0.0',
-                '--roll', '0',
-                '--pitch', '0',
-                '--yaw', '1.5708'
-            ]
-        ),
-        # Area Graph Data Parser
+        # Node(
+        #     package='tf2_ros',
+        #     executable='static_transform_publisher',
+        #     name='transform_agmap_to_hesailidar',
+        #     arguments=[
+        #         '--frame-id', 'map',
+        #         '--child-frame-id', 'PandarQT',
+        #         '--x', '4.0',
+        #         '--y', '-6.0',
+        #         '--z', '0.0',
+        #         '--roll', '0',
+        #         '--pitch', '0',
+        #         '--yaw', '1.5708'
+        #     ]
+        # ),
+        # # Area Graph Data Parser
         Node(
             package='area_graph_data_parser',
             executable='main',
@@ -158,7 +158,6 @@ def generate_launch_description():
             ]
         ),
 
-        # # Fujing's Version
         TimerAction(
             period=3.0,
             actions=[
@@ -167,6 +166,7 @@ def generate_launch_description():
                     cmd=['ros2', 'bag', 'play',
                          LaunchConfiguration('bag_file'),
                          '--clock',
+                         '--remap', '/lidar_points:=/hesai/pandar',
                          '--rate', '0.5'],
                     output='screen'
                 ),
@@ -211,6 +211,7 @@ def generate_launch_description():
                 params_file,
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'bag_path': LaunchConfiguration('bag_file'),
                     'use_true_ap_positions': False
                 }
             ],

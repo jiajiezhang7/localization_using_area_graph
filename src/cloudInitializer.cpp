@@ -169,7 +169,7 @@ void CloudInitializer::rescueRobot() {
     RCLCPP_INFO(this->get_logger(), "----------- Guess is ready, start rescue -----------------");
 
     // 创建性能日志文件
-    std::string log_dir = "/home/jay/AGLoc_ws/performance_logs";
+    std::string log_dir = "/home/jay/AGLoc_ws/performance_logs_global_loc";
     // 创建目录（如果不存在）
     std::filesystem::create_directories(log_dir);
     
