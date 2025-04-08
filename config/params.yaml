@@ -156,7 +156,8 @@
 
 
         bOnlyScoreParticles: false
-        scoreDownsampleRate: 0.4
+        # 控制体素滤波器的降采样程度，若要减小降采样程度 - 保留更多点，则需要减小scoreDownsampleRate的值
+        scoreDownsampleRate: 0.2
 
         # only for testing
         bResultChecking: false

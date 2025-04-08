@@ -140,6 +140,7 @@ CloudHandler::CloudHandler()
     // 初始化变量
     globalImgTimes = 0;  // 全局图像计数器
     hasGlobalPoseEstimate = false;  // 是否已获取全局位姿估计标志
+    hasManualInitialPose = false;   // 初始化手动位姿标志为false
     sumFrameRunTime = std::chrono::steady_clock::now();  // 累计帧运行时间
     numofFrame = 0;  // 帧数计数器
 
