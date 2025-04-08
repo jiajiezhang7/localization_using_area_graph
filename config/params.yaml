@@ -6,7 +6,7 @@
         # 过滤无效点
         # 实现论文中的"clutter removal"步骤
         # pointCloudTopic: "/lidar_points"            # Point cloud topic  --- Agile03: /lidar_points ; Agile01,02: /hesai/pandar
-        pointCloudTopic: "/hesai/pandar"           
+        pointCloudTopic: "/hesai/pandar"            # 用agile-01录的包中的雷达话题名即为/hesai/pandar，以后用agile-03录的包，这里也不用改了，因为在launch播包时已经重映射了
         N_SCAN: 64                                  # 雷达垂直线数 number of lidar channel (i.e., 16, 32, 64, 128)
         Horizon_SCAN: 600 #1800                     # 水平分辨率 lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
         downsampleRate: 1                           # 垂直方向降采样率 default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
@@ -82,7 +82,7 @@
 
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 4.0     # 搜索半径(米)
+        particle_generator_radius: 6.0     # 搜索半径(米)
         use_room_info: true               # 是否使用WiFiLocation中的room信息来过滤粒子
         # without icp initialization 
         rescue_angle_interval: 5.0

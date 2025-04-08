@@ -222,7 +222,8 @@ def generate_launch_description():
              '-s', 'mcap',
              '--clock',
              '--rate', '0.5',
-             '--start-offset', LaunchConfiguration('start_offset')],
+             '--start-offset', LaunchConfiguration('start_offset'),
+             '--remap', '/lidar_points:=/hesai/pandar'],
         output='screen',
         condition=IfCondition(LaunchConfiguration('use_bag'))
     )
