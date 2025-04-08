@@ -14,7 +14,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/combined_data_20250318_211851',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_corridor_02',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
 
@@ -212,7 +212,7 @@ def generate_launch_description():
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'bag_path': LaunchConfiguration('bag_file'),
-                    'use_true_ap_positions': False
+                    'use_true_ap_positions': True
                 }
             ],
             condition=IfCondition(LaunchConfiguration('use_global_localization')),

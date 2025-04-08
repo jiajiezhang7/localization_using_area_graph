@@ -184,7 +184,8 @@ def generate_launch_description():
             os.path.join(pkg_dir, 'config', 'params.yaml'),
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'use_true_ap_positions': True
+                'use_true_ap_positions': False,
+                'bag_path': LaunchConfiguration('bag_file'),
             }
         ],
         condition=IfCondition(LaunchConfiguration('use_global_localization')),

@@ -165,10 +165,28 @@ void AGLocLocalizerNode::agloc_pose_callback(const geometry_msgs::msg::PoseStamp
     return;
   }
   
+  // 将map->雷达的位姿转换为map->base_link的位姿
+  // 首先，从PoseStamped创建tf2变换
+  tf2::Transform T_map_lidar;
+  tf2::fromMsg(msg->pose, T_map_lidar);
+  
+  // 定义雷达到base_link的静态变换
+  // 根据提供的参数：x=0.34058, y=0, z=0.3465, qz=0.70710678, qw=0.70710678
+  tf2::Transform T_lidar_base;
+  tf2::Vector3 translation(-0.34058, 0.0, -0.3465); // 注意这里取反，因为我们需要从雷达到base_link
+  tf2::Quaternion rotation(0.0, 0.0, -0.70710678, 0.70710678); // 同样取反
+  rotation.normalize();
+  T_lidar_base.setOrigin(translation);
+  T_lidar_base.setRotation(rotation);
+  
+  // 计算map->base_link的变换
+  // 从AGLoc系统中得到的robotPose事实上是map->hesai_lidar的关系
+  tf2::Transform T_map_base = T_map_lidar * T_lidar_base;
+  
   // 转换为PoseWithCovariance格式
   geometry_msgs::msg::PoseWithCovarianceStamped pose_with_cov;
   pose_with_cov.header = msg->header;
-  pose_with_cov.pose.pose = msg->pose;
+  tf2::toMsg(T_map_base, pose_with_cov.pose.pose);
   
   // 设置协方差（使用固定值）
   for (int i = 0; i < 36; i++) {
@@ -187,8 +205,8 @@ void AGLocLocalizerNode::agloc_pose_callback(const geometry_msgs::msg::PoseStamp
   current_pose_ = pose_with_cov;
   has_pose_ = true;
   
-  RCLCPP_DEBUG(get_logger(), "收到AGLoc的位姿更新: x=%.2f, y=%.2f", 
-               msg->pose.position.x, msg->pose.position.y);
+  RCLCPP_DEBUG(get_logger(), "收到AGLoc的位姿更新(转换到base_link): x=%.2f, y=%.2f", 
+               pose_with_cov.pose.pose.position.x, pose_with_cov.pose.pose.position.y);
 }
 
 // 定时器回调函数，发布位姿和TF
