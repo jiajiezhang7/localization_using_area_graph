@@ -212,7 +212,8 @@ def generate_launch_description():
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'bag_path': LaunchConfiguration('bag_file'),
-                    'use_true_ap_positions': True
+                    # 当前实验表明，False比True的定位效果要更准
+                    'use_true_ap_positions': False
                 }
             ],
             condition=IfCondition(LaunchConfiguration('use_global_localization')),
