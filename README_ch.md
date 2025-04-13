@@ -63,6 +63,7 @@ ros2 launch localization_using_area_graph run.launch.py
 ### WiFi全局定位 + 位姿跟踪
  -  将参数中的 `bRescueRobot` 设置为 `true`
  -  将 `run.launch.py`,`agloc_nav2_integration.launch.py` 中的 `use_global_localization` 设置为 `true`
+ -  WiFi定位机理可选择使用真值AP位置/估计AP位置，通过launch文件参数 `use_true_ap_positions` 来控制
 
 ### 仅位姿跟踪
  -  将参数中的 `bRescueRobot` 设置为 `false`

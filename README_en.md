@@ -62,6 +62,7 @@ ros2 launch localization_using_area_graph run.launch.py
 ### WiFi Global Localization + Pose Tracking
  - Set `bRescueRobot` to `true` in the parameters file.
  - Set `use_global_localization` to `true` in `run.launch.py` and `agloc_nav2_integration.launch.py`.
+ - The WiFi localization mechanism can choose to use true AP positions or estimated AP positions, controlled by the `use_true_ap_positions` parameter in the launch file
 
 ### Pose Tracking Only
  - Set `bRescueRobot` to `false` in the parameters file.
