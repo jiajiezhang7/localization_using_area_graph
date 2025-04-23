@@ -267,6 +267,13 @@ void CloudInitializer::rescueRobot() {
         best_sparse_angle = 0;
         best_sparse_area_id = -1;
         
+        // 新增：记录第二优粗搜索候选
+        double second_best_sparse_score = 0.0;
+        Eigen::Matrix4f second_best_sparse_pose = Eigen::Matrix4f::Identity();
+        Eigen::Vector3f second_best_sparse_position; second_best_sparse_position << 0.0, 0.0, 0.0;
+        double second_best_sparse_angle = 0.0;
+        int second_best_sparse_area_id = -1;
+        
         // 对稀疏采样的粒子执行粗粒度角度搜索
         RCLCPP_INFO(this->get_logger(), "开始粗粒度角度搜索，角度步长: 12度");
         
@@ -402,27 +409,41 @@ void CloudInitializer::rescueRobot() {
                     best_particle_score = current_score;
                 }
                 
-                // 更新粗搜索阶段的最佳位姿
-                if(best_sparse_score < current_score) {
+                // 更新粗搜索阶段的最佳位姿和第二最佳位姿
+                if(current_score > best_sparse_score) {
+                    // 将旧的最佳更新为第二最佳
+                    second_best_sparse_score = best_sparse_score;
+                    second_best_sparse_pose = best_sparse_pose;
+                    second_best_sparse_position = best_sparse_position;
+                    second_best_sparse_angle = best_sparse_angle;
+                    second_best_sparse_area_id = best_sparse_area_id;
+                    // 更新新的最佳
                     best_sparse_score = current_score;
                     best_sparse_pose = robotPose;
                     best_sparse_position = sparse_particles[particle_idx];
                     best_sparse_angle = current_angle;
                     best_sparse_area_id = area_id;
-                    
-                    // 发布当前最佳位姿
-                    auto pose_max_stamped = geometry_msgs::msg::PointStamped();
-                    pose_max_stamped.header.frame_id = "map";
-                    pose_max_stamped.point.x = robotPose(0,3);
-                    pose_max_stamped.point.y = robotPose(1,3);
-                    pose_max_stamped.point.z = 0;
-                    pubCurrentMaxRobotPose->publish(pose_max_stamped);
-                    
-                    RCLCPP_INFO(this->get_logger(), 
-                        "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.6f",
-                        robotPose(0,3), robotPose(1,3), current_angle, current_score);
+                } else if (current_score > second_best_sparse_score) {
+                    // 更新第二最佳候选
+                    second_best_sparse_score = current_score;
+                    second_best_sparse_pose = robotPose;
+                    second_best_sparse_position = sparse_particles[particle_idx];
+                    second_best_sparse_angle = current_angle;
+                    second_best_sparse_area_id = area_id;
                 }
-                else {
+                
+                // 发布当前最佳位姿
+                auto pose_max_stamped = geometry_msgs::msg::PointStamped();
+                pose_max_stamped.header.frame_id = "map";
+                pose_max_stamped.point.x = robotPose(0,3);
+                pose_max_stamped.point.y = robotPose(1,3);
+                pose_max_stamped.point.z = 0;
+                pubCurrentMaxRobotPose->publish(pose_max_stamped);
+                
+                RCLCPP_INFO(this->get_logger(), 
+                    "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.6f",
+                    robotPose(0,3), robotPose(1,3), current_angle, current_score);
+                if (current_score <= best_sparse_score) {
                     // 添加调试信息
                     RCLCPP_DEBUG(this->get_logger(),
                         "粒子位姿 x=%.2f, y=%.2f, yaw=%d 评分=%.6f < 当前最佳评分=%.6f (insideScore=%.2f, outsideScore=%.2f)",
@@ -502,26 +523,25 @@ void CloudInitializer::rescueRobot() {
         // 计算局部搜索半径 - 为原采样半径的1/2
         const float local_search_radius = original_radius / 3.0f;
         
-        // 创建局部搜索粒子列表
+        // 创建局部搜索粒子列表，加入双峰候选
         local_particles.clear();
-        
-        // 将最佳粒子添加到局部搜索列表
         local_particles.push_back(best_sparse_position);
-        
-        // 从原始粒子中筛选在局部搜索范围内的粒子
+        local_particles.push_back(second_best_sparse_position);
         for (size_t i = 0; i < corridorGuess.size(); i++) {
-            // 计算当前粒子到最佳粒子的距离
-            float dx = corridorGuess[i][0] - best_sparse_position[0];
-            float dy = corridorGuess[i][1] - best_sparse_position[1];
-            float distance = std::sqrt(dx*dx + dy*dy);
-            
-            // 如果在局部搜索半径内且不是最佳粒子本身，则添加到局部搜索列表
-            if (distance <= local_search_radius && distance > 0.001f) {  // 使用小阈值避免添加重复的最佳粒子
+            float dx1 = corridorGuess[i][0] - best_sparse_position[0];
+            float dy1 = corridorGuess[i][1] - best_sparse_position[1];
+            float distance1 = std::sqrt(dx1*dx1 + dy1*dy1);
+
+            float dx2 = corridorGuess[i][0] - second_best_sparse_position[0];
+            float dy2 = corridorGuess[i][1] - second_best_sparse_position[1];
+            float distance2 = std::sqrt(dx2*dx2 + dy2*dy2);
+
+            if (((distance1 <= local_search_radius && distance1 > 0.001f) ||
+                 (distance2 <= local_search_radius && distance2 > 0.001f))) {
                 local_particles.push_back(corridorGuess[i]);
             }
         }
-        
-        RCLCPP_INFO(this->get_logger(), "局部精细搜索留下了 %zu 个粒子", local_particles.size());
+        RCLCPP_INFO(this->get_logger(), "局部精细搜索留下了 %zu 个粒子 (含双峰候选)", local_particles.size());
         
         // 使用更小的角度步长进行精细搜索
         const size_t fine_try_time = static_cast<size_t>(360/5); // 使用5度的角度步长
@@ -543,9 +563,19 @@ void CloudInitializer::rescueRobot() {
             
             if (particle_idx == 0) {
                 // 对于最佳粒子，在其最佳角度附近搜索
-                int best_angle_idx_fine = static_cast<int>(best_sparse_angle / 5.0); // 转换为5度步长的索引
-                start_angle_idx = std::max(0, best_angle_idx_fine - 6); // 左右30度
-                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, best_angle_idx_fine + 6); // 右30度
+                int best_angle_idx_fine = static_cast<int>(best_sparse_angle / 5.0f);
+                start_angle_idx = std::max(0, best_angle_idx_fine - 6);
+                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, best_angle_idx_fine + 6);
+            } else if (particle_idx == 1) {
+                // 对于第二最佳候选，在其最佳角度附近搜索
+                int second_angle_idx_fine = static_cast<int>(second_best_sparse_angle / 5.0f);
+                start_angle_idx = std::max(0, second_angle_idx_fine - 6);
+                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, second_angle_idx_fine + 6);
+                RCLCPP_INFO(this->get_logger(),
+                    "双峰验证: 精细搜索第二候选，区域=%d, 角度范围=[%d, %d]",
+                    second_best_sparse_area_id,
+                    start_angle_idx * 5,
+                    end_angle_idx * 5);
             } else {
                 // 对于其他局部粒子，进行全角度搜索
                 start_angle_idx = 0;
@@ -858,10 +888,73 @@ void CloudInitializer::rescueRobot() {
         // 设置持续时间（秒）
         global_loc_marker.lifetime = rclcpp::Duration(0, 0);  // 0表示永久存在
         
-        // 发布标记
+        // 发布位置标记（蓝色球体）
         pubGlobalLocMarker->publish(global_loc_marker);
         RCLCPP_INFO(this->get_logger(), "已发布全局定位结果marker: x=%.2f, y=%.2f", MaxRobotPose(0,3), MaxRobotPose(1,3));
 
+        // 创建箭头标记显示机器人朝向
+        visualization_msgs::msg::Marker direction_arrow_marker;
+        direction_arrow_marker.header.frame_id = "map";
+        direction_arrow_marker.header.stamp = this->now();
+        direction_arrow_marker.ns = "global_localization_direction";
+        direction_arrow_marker.id = 1;
+        direction_arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
+        direction_arrow_marker.action = visualization_msgs::msg::Marker::ADD;
+
+        // 转换雷达到底盘的位姿
+        // 首先从 MaxRobotPose 创建 map->lidar 的变换
+        Eigen::Matrix4f T_map_lidar = MaxRobotPose;
+        
+        // 定义雷达到base_link的静态变换
+        // 根据提供的参数：x=0.34058, y=0, z=0.3465, qz=0.70710678, qw=0.70710678
+        Eigen::Matrix4f T_lidar_base = Eigen::Matrix4f::Identity();
+        
+        // 设置平移部分（注意这里取反，因为我们需要从雷达到base_link）
+        T_lidar_base(0, 3) = -0.34058;
+        T_lidar_base(1, 3) = 0.0;
+        T_lidar_base(2, 3) = -0.3465;
+        
+        // 设置旋转部分（四元数 qz=0.70710678, qw=0.70710678 转换为旋转矩阵）
+        Eigen::Quaternionf q_lidar_base(0.70710678, 0.0, 0.0, -0.70710678); // 注意这里的顺序是 w,x,y,z
+        q_lidar_base.normalize();
+        T_lidar_base.block<3, 3>(0, 0) = q_lidar_base.toRotationMatrix();
+        
+        // 计算 map->base_link 的变换
+        Eigen::Matrix4f T_map_base = T_map_lidar * T_lidar_base;
+        
+        // 设置箭头位置（使用计算出的底盘位置）
+        direction_arrow_marker.pose.position.x = T_map_base(0, 3);
+        direction_arrow_marker.pose.position.y = T_map_base(1, 3);
+        direction_arrow_marker.pose.position.z = 0.1;  // 略微抬高以便于观察
+
+        // 从变换矩阵中提取旋转信息并转换为四元数
+        Eigen::Matrix3f rotation_matrix = T_map_base.block<3, 3>(0, 0);
+        Eigen::Quaternionf q(rotation_matrix);
+
+        // 设置箭头朝向
+        direction_arrow_marker.pose.orientation.x = q.x();
+        direction_arrow_marker.pose.orientation.y = q.y();
+        direction_arrow_marker.pose.orientation.z = q.z();
+        direction_arrow_marker.pose.orientation.w = q.w();
+
+        // 设置箭头尺寸
+        direction_arrow_marker.scale.x = 2.0;  // 箭头长度
+        direction_arrow_marker.scale.y = 0.1;  // 箭头宽度
+        direction_arrow_marker.scale.z = 0.1;  // 箭头高度
+
+        // 设置箭头颜色（红色）
+        direction_arrow_marker.color.r = 0.0;
+        direction_arrow_marker.color.g = 0.0;
+        direction_arrow_marker.color.b = 1.0;
+        direction_arrow_marker.color.a = 1.0;  // 不透明
+
+        // 设置持续时间
+        direction_arrow_marker.lifetime = rclcpp::Duration(0, 0);  // 永久存在
+
+        // 发布朝向箭头标记
+        pubGlobalLocMarker->publish(direction_arrow_marker);
+        RCLCPP_INFO(this->get_logger(), "已发布全局定位方向箭头: 角度=%d度", 
+            static_cast<int>(std::fmod(atan2(MaxRobotPose(1,0), MaxRobotPose(0,0)) * 180.0 / M_PI, 360.0)));
 
         
         // 生成并保存可视化图像

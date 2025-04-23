@@ -32,7 +32,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_corridor_01',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_door_01',
         description='ROS2 bag文件路径'
     )
 
@@ -100,6 +100,24 @@ def generate_launch_description():
     use_sim_time_param = SetParameter(
         name='use_sim_time',
         value=LaunchConfiguration('use_sim_time')
+    )
+
+    # Robot Localization节点（WiFi定位）
+    robot_loc = Node(
+        package='wifi_loc',
+        executable='robot_loc',
+        name='robot_loc',
+        parameters=[
+            os.path.join(pkg_dir, 'config', 'params.yaml'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'use_true_ap_positions': False,
+                'bag_path': LaunchConfiguration('bag_file'),
+                'wait_for_robotpose': True,  # 等待AGLoc位姿结果并在可视化中显示
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration('use_global_localization')),
+        output='screen',
     )
 
     # 从run.launch.py参考AGLoc需要的TF变换
@@ -175,22 +193,7 @@ def generate_launch_description():
         output='screen',
     )
     
-    # Robot Localization节点（WiFi定位）
-    robot_loc = Node(
-        package='wifi_loc',
-        executable='robot_loc',
-        name='robot_loc',
-        parameters=[
-            os.path.join(pkg_dir, 'config', 'params.yaml'),
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'use_true_ap_positions': False,
-                'bag_path': LaunchConfiguration('bag_file'),
-            }
-        ],
-        condition=IfCondition(LaunchConfiguration('use_global_localization')),
-        output='screen',
-    )
+
 
     # 添加CloudHandler节点（AGLoc系统核心组件）- 从run.launch.py参考
     cloud_handler = Node(

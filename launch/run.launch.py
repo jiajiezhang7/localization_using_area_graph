@@ -14,7 +14,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/96',  # 注意不需要.db3后缀
+        default_value='/home/jay/AGLoc_ws/rosbag/95',  # 注意不需要.db3后缀
         description='Path to ROS2 bag file'
     )
 
@@ -213,7 +213,8 @@ def generate_launch_description():
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'bag_path': LaunchConfiguration('bag_file'),
                     # 当前实验表明，False比True的定位效果要更准
-                    'use_true_ap_positions': False
+                    'use_true_ap_positions': False,
+                    'wait_for_robotpose': False,  # 等待AGLoc位姿结果并在可视化中显示
                 }
             ],
             condition=IfCondition(LaunchConfiguration('use_global_localization')),
