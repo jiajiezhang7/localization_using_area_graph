@@ -6,10 +6,10 @@
  * @brief Global localization initialization for Area Graph based indoor localization
  * @version 0.1
  * @date 2024-11-09
- * 
+ *
  * @details Global localization class that provides initial pose estimation in Area Graph maps.
  *          This class inherits from CloudBase and implements:
- *          
+ *
  *          1. Pose Initialization:
  *             - WiFi/barometer based coarse initialization
  *             - Uniform pose sampling around initial guess
@@ -18,7 +18,7 @@
  *
  *          2. Score Functions:
  *             - Distance based scoring
- *             - Outside/inside point ratio evaluation 
+ *             - Outside/inside point ratio evaluation
  *
  * 多线程优化控制宏
  * 取消注释以下宏定义可启用调试功能
@@ -45,12 +45,12 @@
  * @var inRayDis         Ray intersection distances
  * @var inRayRange       Range measurements for rays
  * @var match_with_outside Outside area matching flags
- * 
+ *
  * Public Methods:
  * @fn setLaserCloudin() Sets input point cloud data
  * @fn setMapPC()        Sets reference map point cloud
  * @fn rescueRobot()     Performs recovery localization
- 
+
  *
  * Key Features:
  * - Robust to partial map observations
@@ -68,7 +68,7 @@
  * - Dense point cloud input (e.g., 64 beam LiDAR)
  * - WiFi/barometer rough position estimate
  * - Well-defined Area Graph map
- * 
+ *
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
  */
@@ -91,7 +91,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 #include <image_transport/image_transport.hpp>
 
-class CloudInitializer : public CloudBase, 
+class CloudInitializer : public CloudBase,
                         public std::enable_shared_from_this<CloudInitializer> {
 public:
     // 变换和评分变量
@@ -118,7 +118,7 @@ public:
     std::ofstream rescueRoomStream;  // 用于记录救援房间信息的输出流
     std::ofstream perf_log;          // 用于记录性能数据的输出流
     std::time_t now_time_t;          // 用于时间戳记录
-    
+
     // 时间计算变量
     rclcpp::Time fine_search_start; // 精细搜索开始时间
     double fine_search_time;        // 精细搜索总耗时
@@ -153,7 +153,7 @@ public:
                       int horizonIndex,
                       double& minDist,
                       bool& findIntersection);  // 检查整个地图
-    
+
     // 点云验证方法
     bool isValidPoint(const pcl::PointXYZI& point);  // 验证点是否有效
 
@@ -169,13 +169,27 @@ public:
     void initializationICP(int insideAGIndex);  // 使用ICP进行初始化
     bool checkICPmovingDist(Eigen::Matrix4f robotPoseGuess);  // 检查ICP移动距离
     bool insideOldArea(int mapPCindex);  // 检查是否在旧区域内
-    
+
+    // 双峰候选位姿评估方法
+    /**
+     * @brief 使用ICP评估位姿，不修改全局状态
+     *
+     * @param initialPose 初始位姿估计
+     * @param areaId 区域ID
+     * @param inputCloud 输入点云
+     * @return std::pair<Eigen::Matrix4f, double> 优化后的位姿和评分
+     */
+    std::pair<Eigen::Matrix4f, double> evaluatePoseWithICP(
+        const Eigen::Matrix4f& initialPose,
+        int areaId,
+        pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud);
+
     // 多线程优化相关方法
     void rescueRobotMultiThread(); // 使用多线程的救援机器人方法
-    
+
     // 线程安全的方法
     void setInitialPoseThreadSafe(int yaw, const Eigen::Vector3f& trans, Eigen::Matrix4f& localRobotPose);
-    void initializationICPThreadSafe(int insideAGIndex, Eigen::Matrix4f& localRobotPose, 
+    void initializationICPThreadSafe(int insideAGIndex, Eigen::Matrix4f& localRobotPose,
                                   pcl::PointCloud<pcl::PointXYZI>::Ptr& localTransformedPC,
                                   double& localInsideScore, double& localOutsideScore,
                                   int& localNumofInsidePoints, int& localNumofOutsidePoints,
@@ -201,7 +215,7 @@ private:
     // 成员变量
     double intersectionx;  // 交叉点x坐标
     double intersectiony;  // 交叉点y坐标
-    
+
     // 多线程同步相关
     std::mutex score_mutex;     // 用于保护MaxScore和MaxRobotPose
     std::mutex publish_mutex;   // 用于保护发布操作
@@ -211,16 +225,16 @@ private:
     // 初始化发布器
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
+
         pubRobotGuessMarker = this->create_publisher<geometry_msgs::msg::PointStamped>(
             "pubRobotGuessMarker", qos);
-            
+
         pubRobotPoseAfterICP = this->create_publisher<geometry_msgs::msg::PointStamped>(
             "pubRobotPoseAfterICP", qos);
-            
+
         pubCurrentMaxRobotPose = this->create_publisher<geometry_msgs::msg::PointStamped>(
             "pubCurrentMaxRobotPose", qos);
-            
+
         pubGlobalLocMarker = this->create_publisher<visualization_msgs::msg::Marker>(
             "global_loc_marker", qos);
     }
@@ -228,7 +242,7 @@ private:
     // 初始化订阅器
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
+
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudInitializer::getInitialExtGuess, this, std::placeholders::_1));
@@ -243,7 +257,7 @@ private:
         bGuessReady = false;
         rescueTimes = 0;
         rescueRunTime = 0.0;
-        
+
         // 为向量预留空间
         numofIntersection.reserve(1000);
         inRayDis.reserve(1000);
@@ -254,21 +268,21 @@ private:
 protected:
     // 可视化相关成员变量和方法
     bool visualization_enabled_;
-    
+
     /**
      * @brief 生成并保存可视化图像，包含地图、WiFi定位和全局定位结果
-     * 
+     *
      * @param wifi_position WiFi定位的位置 (x,y)
      * @param final_position 全局定位后的最终位置 (x,y)
      * @param output_path 输出图像文件的路径
      */
-    void saveVisualizationImage(const std::vector<float>& wifi_position, 
+    void saveVisualizationImage(const std::vector<float>& wifi_position,
                                const std::vector<float>& final_position,
                                const std::string& output_path);
-    
+
     /**
      * @brief 在指定图像上绘制点云地图
-     * 
+     *
      * @param image 要绘制的图像
      * @param scale 缩放因子
      * @param offset_x X轴偏移

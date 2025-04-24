@@ -40,8 +40,8 @@ find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
-find_package(tf2_eigen REQUIRED)           
-find_package(tf2_msgs REQUIRED)            
+find_package(tf2_eigen REQUIRED)
+find_package(tf2_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
@@ -113,6 +113,7 @@ add_executable(cloud_handler
   src/cloudInitializer.cpp
   src/cloudInitializer_multithread.cpp
   src/cloudInitializer_thread_safe.cpp
+  src/cloudInitializer_pose_evaluation.cpp
 )
 
 target_link_libraries(cloud_handler
@@ -122,7 +123,7 @@ target_link_libraries(cloud_handler
   ${CERES_LIBRARIES}
   ${message_filters_LIBRARIES}
   OpenMP::OpenMP_CXX
-  tf2_geometry_msgs::tf2_geometry_msgs  
+  tf2_geometry_msgs::tf2_geometry_msgs
 )
 
 
@@ -151,7 +152,7 @@ ament_target_dependencies(particle_generator
 foreach(target
     cloud_handler
     particle_generator)
-    
+
   ament_target_dependencies(${target}
     rclcpp
     std_msgs
@@ -161,7 +162,7 @@ foreach(target
     visualization_msgs
     tf2
     tf2_ros
-    tf2_geometry_msgs  
+    tf2_geometry_msgs
     cv_bridge
     image_transport
     area_graph_data_parser
@@ -217,7 +218,7 @@ install(
 
 # Install launch and config files
 install(DIRECTORY
-  launch 
+  launch
   config
   maps
   DESTINATION share/${PROJECT_NAME}
