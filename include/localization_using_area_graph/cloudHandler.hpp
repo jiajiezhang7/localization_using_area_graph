@@ -36,7 +36,6 @@ public:
     rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subManualInitialPose;  // 订阅手动设置的初始位姿
 
     // ROS2 发布器
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubinsideAreaPC;     // 发布区域内点云
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pubRobotPose;      // 发布机器人位姿
 
     // cloudInitializer时在CloudHandler类构造时就已经被实例化了的
@@ -61,10 +60,10 @@ public:
     void filterUsefulPoints();  // 过滤有用点
     void optimizationICP();     // ICP优化
     void showImg1line(const std::string& words);  // 显示一行图像
-    
+
     // 获取机器人位姿 - 为Nav2接口添加
     Eigen::Matrix4f getRobotPose() const { return robotPose; }  // 返回当前机器人位姿
-    
+
     // 设置手动初始位姿 - 为Nav2接口添加
     void setManualInitialPose(double yaw, const Eigen::Vector3f& position);  // 设置手动初始位姿
 
@@ -85,7 +84,7 @@ public:
 
     // 重写CloudBase方法
     void calClosestMapPoint(int inside_index) override;  // 计算最近地图点
-    bool checkMap(int ring, 
+    bool checkMap(int ring,
                  int horizonIndex,
                  int &last_index,
                  double &minDist,
@@ -103,12 +102,6 @@ private:
 
     // 初始化发布器和订阅器
     void initializePublishers() {
-        auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
-        // 发布内部区域点云
-        pubinsideAreaPC = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-            "insideAreaPC", qos);
-            
         // 创建机器人位姿发布者
         pubRobotPose = create_publisher<geometry_msgs::msg::PoseStamped>(
             "/cloud_handler/pose", rclcpp::QoS(1).reliable());
@@ -116,17 +109,17 @@ private:
 
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
+
         // 订阅点云话题
         subLaserCloud = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointCloudTopic, qos,
             std::bind(&CloudHandler::cloudHandlerCB, this, std::placeholders::_1));
-            
+
         // 订阅初始猜测粒子，一旦检测到生成的粒子，则使得标识符 hasGlobalPoseEstimate == True
         subInitialGuess = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", qos,
             std::bind(&CloudHandler::setInitialGuessFlag, this, std::placeholders::_1));
-            
+
         // 订阅手动设置的初始位姿话题
         subManualInitialPose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
             "/initialpose_agloc", qos,

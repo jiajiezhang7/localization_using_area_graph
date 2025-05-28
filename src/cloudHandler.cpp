@@ -22,12 +22,12 @@
  * @details 基于场景的走廊特征程度(corridorness)自适应计算降采样率：
  *          1. 当场景不具有明显走廊特征时(maxPercentage < 0.5)不进行降采样
  *          2. 当场景越像走廊时，采用更高的降采样率以提高效率
- * 
+ *
  * @param maxPercentage 走廊特征程度，范围[0,1]
  *                      - 0表示完全不具有走廊特征
  *                      - 1表示完全符合走廊特征
  *                      该值通过直方图分析得到，表示主导方向上的点的占比
- * 
+ *
  * @return double 降采样率
  *         - 返回0表示不进行降采样
  *         - 返回值越大表示降采样程度越高
@@ -39,7 +39,7 @@ double CloudHandler::corridornessDSRate(double maxPercentage) {
     if(maxPercentage < 0.5) {
         return 0;
     }
-    
+
     // 线性计算降采样率
     // 走廊特征越明显(maxPercentage越大)，降采样率越高
     // 降采样率范围：1(当maxPercentage=0.5) 到 6(当maxPercentage=1.0)
@@ -56,7 +56,7 @@ double CloudHandler::corridornessDSRate(double maxPercentage) {
  */
 void CloudHandler::gettingInsideWhichArea() {
     auto insideAreaPC = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
-    
+
     // 检查是否仍在上一个区域内
     if(lastInsideIndex != -1) {
         bool binside = areaInsideChecking(robotPose, lastInsideIndex);
@@ -69,13 +69,13 @@ void CloudHandler::gettingInsideWhichArea() {
                 }
                 insideAreaPC->points.push_back(map_pc->points[j]);
             }
-            
-            // 发布可视化信息并返回
-            sensor_msgs::msg::PointCloud2 outMsg;
-            pcl::toROSMsg(*insideAreaPC, outMsg);
-            outMsg.header = mapHeader;
-            pubinsideAreaPC->publish(outMsg);
-            
+
+            // 发布可视化信息并返回 (已删除pubinsideAreaPC发布器)
+            // sensor_msgs::msg::PointCloud2 outMsg;
+            // pcl::toROSMsg(*insideAreaPC, outMsg);
+            // outMsg.header = mapHeader;
+            // pubinsideAreaPC->publish(outMsg);
+
             RCLCPP_INFO(get_logger(), "---------------------Inside old area---------------------");
             return;
         }
@@ -84,22 +84,22 @@ void CloudHandler::gettingInsideWhichArea() {
     // 搜索所有区域
     int insideTime = 0;
     int temp = -1;
-    
+
     for(size_t i = 0; i < map_pc->points.size(); i++) {
         bool binside = false;
-        
+
         // 检查新区域的开始
         if((int)map_pc->points[i].intensity % 3 == 0) {
             // intensity % 3 == 0 --> Area的起始点
             binside = areaInsideChecking(robotPose, i);
             temp++;
         }
-        
+
         if(binside) {
             insideTime++;
             insideAreaStartIndex = i;
             insideAreaID = temp;
-            
+
             // 收集区域点云用于可视化
             for(size_t j = i; j < static_cast<size_t>(i + 100000) && j < map_pc->points.size(); j++) {
                 // 区域结束
@@ -121,11 +121,11 @@ void CloudHandler::gettingInsideWhichArea() {
         RCLCPP_INFO(get_logger(), "机器人位置在区域 %d 内", insideAreaStartIndex);
     }
 
-    // 发布可视化信息
-    sensor_msgs::msg::PointCloud2 outMsg;
-    pcl::toROSMsg(*insideAreaPC, outMsg);
-    outMsg.header = mapHeader;
-    pubinsideAreaPC->publish(outMsg);
+    // 发布可视化信息 (已删除pubinsideAreaPC发布器)
+    // sensor_msgs::msg::PointCloud2 outMsg;
+    // pcl::toROSMsg(*insideAreaPC, outMsg);
+    // outMsg.header = mapHeader;
+    // pubinsideAreaPC->publish(outMsg);
 
     // 处理多区域错误
     if(insideTime > 1) {
@@ -135,7 +135,7 @@ void CloudHandler::gettingInsideWhichArea() {
     }
 }
 
-CloudHandler::CloudHandler() 
+CloudHandler::CloudHandler()
     : CloudBase("cloud_handler_node") {  // 只初始化基类
     // 初始化变量
     globalImgTimes = 0;  // 全局图像计数器
@@ -146,17 +146,17 @@ CloudHandler::CloudHandler()
 
     // 初始化CloudHandler中的发布者和订阅者
     initializePublishers();
-    initializeSubscribers(); 
+    initializeSubscribers();
 
     // 打开文件以保存机器人位姿结果（TUM格式）
-    robotPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/robotPoseTum.txt", 
+    robotPoseTum.open("/home/jay/AGLoc_ws/robotPoseResult/robotPoseTum.txt",
                       std::ios::ate);
     robotPoseTum << std::fixed;
     robotPoseTum.precision(6);
 
     // 分配内存
     allocateMemory();
-    
+
     // 从params.yaml文件中读取并设置初始位姿
     // 在模式1和模式2 -- 开启全局定位下， 造时设置初始位姿（会被覆盖），会通过getInitialExtGuess和rescueRobot重新估计位姿
     setInitialPose(initialYawAngle, initialExtTrans);
@@ -177,9 +177,9 @@ void CloudHandler::setInitialGuessFlag(
  *          2. 对点云数据进行预处理和组织化
  *          3. 执行全局定位
  *          4. 发布处理后的点云和定位结果
- * 
+ *
  * @param laserCloudMsg 输入的激光雷达点云消息(ROS PointCloud2格式)
- * 
+ *
  * @note 该函数是点云处理的核心,会在每帧点云数据到来时被调用
  *       需要地图已经初始化才能正常工作
  */
@@ -189,7 +189,7 @@ void CloudHandler::cloudHandlerCB(
     // 输出当前地图初始化状态和大小
     // RCLCPP_DEBUG(get_logger(), "Received map message, mapInit=%d", mapInit);
     // RCLCPP_DEBUG(get_logger(), "Map size: %zu", map_pc->points.size());
-    
+
     // 显示全局定位开始的分隔线
     if(globalImgTimes == 0) {
         RCLCPP_INFO(get_logger(), "---------------------------Global localizing---------------------------");
@@ -202,8 +202,8 @@ void CloudHandler::cloudHandlerCB(
     auto startTimecb = this->now();
 
     // 清除上一帧的记录
-    outsideAreaIndexRecord.clear(); 
-    outsideAreaLastRingIndexRecord.clear(); 
+    outsideAreaIndexRecord.clear();
+    outsideAreaLastRingIndexRecord.clear();
 
     // 检查地图是否初始化，未初始化则返回
     if(!mapInit) {
@@ -229,10 +229,10 @@ void CloudHandler::cloudHandlerCB(
     // lidar_points -> laserCloudMsg -> laserCloudIn
     sensor_msgs::msg::PointCloud2 temp_msg = *laserCloudMsg;
     pcl::fromROSMsg(temp_msg, *laserCloudIn);
-    
+
     // laserCloudIn -> organizedCloudIn
     organizePointcloud();
-    
+
     // 发布组织化后的点云
     sensor_msgs::msg::PointCloud2 outMsg;
     pcl::toROSMsg(*organizedCloudIn, outMsg);
@@ -249,22 +249,22 @@ void CloudHandler::cloudHandlerCB(
     }
 
     // 模式1: 测试全局定位 - 每帧都执行全局定位
-    if(bTestRescue) {  
+    if(bTestRescue) {
         if (!isAGIndexReceived()) {
             RCLCPP_ERROR(get_logger(), "AG_index not initialized yet!");
             RCLCPP_WARN(get_logger(), "CloudBase::AGindexReceived: %d", isAGIndexReceived());
             throw std::bad_weak_ptr();
         }
-        
-         
+
+
         RCLCPP_INFO(get_logger(), "----------TEST RESCUE ROBOT, EVERY FRAME GOES TO RESCUE----------");
-        
+
         // 设置初始位姿估计的回调函数 --- 包装器
-        auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
+        auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess,
                                             cloudInitializer.get(),
                                             std::placeholders::_1);
 
-        // 实际上调用的就是CloudInitializer::getInitialExtGuess                                    
+        // 实际上调用的就是CloudInitializer::getInitialExtGuess
         cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
             "/particles_for_init", 10, initialGuessCallback);
 
@@ -273,7 +273,7 @@ void CloudHandler::cloudHandlerCB(
         pcl::toROSMsg(*furthestRing, furthestMsg);
         furthestMsg.header = mapHeader;
         pubtest->publish(furthestMsg);
-        
+
         cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
         resetParameters();
         return;
@@ -283,12 +283,12 @@ void CloudHandler::cloudHandlerCB(
         // 首次执行：创建订阅并处理点云
         if(!hasGlobalPoseEstimate) {
             RCLCPP_INFO(get_logger(), "-------------STARTING RESCUE ROBOT (ONCE)---------------");
-            
+
             // 设置初始位姿估计的回调函数
-            auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess, 
+            auto initialGuessCallback = std::bind(&CloudInitializer::getInitialExtGuess,
                                               cloudInitializer.get(),
                                               std::placeholders::_1);
-                                              
+
             cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/particles_for_init", 10, initialGuessCallback);
 
@@ -297,42 +297,42 @@ void CloudHandler::cloudHandlerCB(
             pcl::toROSMsg(*furthestRing, furthestMsg);
             furthestMsg.header = mapHeader;
             pubtest->publish(furthestMsg);
-            
+
             cloudInitializer->setLaserCloudin(furthestRing, mapHeader);
-            
+
             // 标记已开始全局定位流程
             hasGlobalPoseEstimate = true;
-            
+
             // 注意：主动触发rescueRobot流程
             static int trigger_count = 0;
             trigger_count++;
-            
+
             if(trigger_count >= 5 && !cloudInitializer->isRescueFinished) {
                 RCLCPP_WARN(get_logger(), "强制触发rescueRobot流程...");
                 cloudInitializer->rescueRobot();
                 trigger_count = 0;
             }
-            
+
             return;
         }
-        
+
         // 检查rescueRobot是否已完成
         if(cloudInitializer->isRescueFinished) {
             RCLCPP_INFO(get_logger(), "-------------RESCUE ROBOT COMPLETED---------------");
-            
+
             // 应用最佳估计位姿
             robotPose = cloudInitializer->MaxRobotPose;
-            
-            RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]", 
+
+            RCLCPP_INFO(get_logger(), "Setting robot pose in rescue robot: [%f, %f]",
                         robotPose(0,3), robotPose(1,3));
-            
+
             // 发布机器人位姿
             geometry_msgs::msg::PoseStamped pose_msg;
             pose_msg.header = mapHeader;
             pose_msg.pose.position.x = robotPose(0,3);
             pose_msg.pose.position.y = robotPose(1,3);
             pose_msg.pose.position.z = robotPose(2,3);
-            
+
             // 从旋转矩阵转换为四元数
             Eigen::Matrix3f rot = robotPose.block<3,3>(0,0);
             Eigen::Quaternionf q(rot);
@@ -340,22 +340,22 @@ void CloudHandler::cloudHandlerCB(
             pose_msg.pose.orientation.y = q.y();
             pose_msg.pose.orientation.z = q.z();
             pose_msg.pose.orientation.w = q.w();
-            
+
             pubRobotPose->publish(pose_msg);
-            
+
             // 关闭救援模式
             bRescueRobot = false;
             cloudInitializer->isRescueFinished = false;
-            
+
             // 取消对粒子消息的订阅，防止再次触发rescueRobot
             cloudInitializer->subInitialGuess.reset();
-            
+
             subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
-                "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag, 
+                "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag,
                                      this, std::placeholders::_1));
             return;
         }
-        
+
         // 等待rescueRobot完成
         RCLCPP_INFO_ONCE(get_logger(), "-------------WAITING FOR RESCUE ROBOT TO COMPLETE---------------");
         return;
@@ -367,10 +367,10 @@ void CloudHandler::cloudHandlerCB(
         if(hasManualInitialPose) {
             // 使用手动设置的位姿，已在manualInitialPoseCB中设置robotPose
             errorUpThred = 3;
-            
-            RCLCPP_INFO(get_logger(), "使用手动设置的初始位姿: [%f, %f]", 
+
+            RCLCPP_INFO(get_logger(), "使用手动设置的初始位姿: [%f, %f]",
                          robotPose(0,3), robotPose(1,3));
-                         
+
             // 清除标志，避免重复使用
             hasManualInitialPose = false;
         }
@@ -378,16 +378,16 @@ void CloudHandler::cloudHandlerCB(
             // 使用全局定位的结果
             robotPose = cloudInitializer->MaxRobotPose;
             errorUpThred = 3;
-            
+
             cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
-                "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess, 
-                                     cloudInitializer.get(), 
+                "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess,
+                                     cloudInitializer.get(),
                                      std::placeholders::_1));
-                                     
+
             RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
-            RCLCPP_INFO(get_logger(), "使用全局定位结果作为初始位姿: [%f, %f]", 
+            RCLCPP_INFO(get_logger(), "使用全局定位结果作为初始位姿: [%f, %f]",
                          robotPose(0,3), robotPose(1,3));
-                         
+
             hasGlobalPoseEstimate = false;
         } else {
             // 如果既没有手动设置也没有全局定位结果，则使用params中读取的默认值
@@ -396,7 +396,7 @@ void CloudHandler::cloudHandlerCB(
 
         // 使用当前机器人位姿变换点云
         pcl::transformPointCloud(*organizedCloudIn, *transformed_pc, robotPose);
-        RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]", 
+        RCLCPP_INFO(get_logger(), "Robot pose in tracking: [%f, %f]",
                     robotPose(0,3), robotPose(1,3));
 
         // 发布变换后的点云(1*600)
@@ -407,30 +407,30 @@ void CloudHandler::cloudHandlerCB(
 
         // 记录准备阶段的运行时间
         auto endTime = this->now();
-        RCLCPP_DEBUG(get_logger(), "Prepare run time: %f ms", 
+        RCLCPP_DEBUG(get_logger(), "Prepare run time: %f ms",
                      (endTime - startTime).seconds() * 1000);
 
         // 初始化点云处理标记
         vbHistogramRemain.resize(transformed_pc->points.size(), true);
-        
+
         // 确定机器人所在区域
         startTime = this->now();
         gettingInsideWhichArea();
         endTime = this->now();
-        RCLCPP_DEBUG(get_logger(), "GettingInsideWhichArea run time: %f ms", 
+        RCLCPP_DEBUG(get_logger(), "GettingInsideWhichArea run time: %f ms",
                      (endTime - startTime).seconds() * 1000);
 
         // 计算与地图点云的最近点
         startTime = this->now();
         calClosestMapPoint(insideAreaStartIndex);
         endTime = this->now();
-        RCLCPP_DEBUG(get_logger(), "CalClosestMapPoint run time: %f ms", 
+        RCLCPP_DEBUG(get_logger(), "CalClosestMapPoint run time: %f ms",
                      (endTime - startTime).seconds() * 1000);
 
         // 执行ICP优化
         startTime = this->now();
         optimizationICP();
-        
+
         // 发布优化后的变换点云(1*600)
         pcl::toROSMsg(*transformed_pc, transformedMsg);
         transformedMsg.header = mapHeader;
@@ -440,7 +440,7 @@ void CloudHandler::cloudHandlerCB(
         auto transformed_pc_ = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         transformed_pc_->resize(64 * Horizon_SCAN);
         pcl::transformPointCloud(*organizedCloudIn64, *transformed_pc_, robotPose);
-        
+
         sensor_msgs::msg::PointCloud2 wholeMsg;
         pcl::toROSMsg(*transformed_pc_, wholeMsg);
         wholeMsg.header = mapHeader;
@@ -450,24 +450,24 @@ void CloudHandler::cloudHandlerCB(
         transformed_pc_->clear();
         transformed_pc_->resize(Horizon_SCAN);
         pcl::transformPointCloud(*furthestRing, *transformed_pc_, robotPose);
-        
+
         sensor_msgs::msg::PointCloud2 ringMsg;
         pcl::toROSMsg(*transformed_pc_, ringMsg);
         ringMsg.header = cloudHeader;
         pubFurthestRing->publish(ringMsg);
 
         endTime = this->now();
-        RCLCPP_DEBUG(get_logger(), "OptimizationICP run time: %f ms", 
+        RCLCPP_DEBUG(get_logger(), "OptimizationICP run time: %f ms",
                      (endTime - startTime).seconds() * 1000);
     }
 
     // 重置参数
     resetParameters();
-    
+
     // 计算并记录总运行时间
     auto endTimecb = this->now();
     auto finishC = std::chrono::high_resolution_clock::now();
-    
+
     double cb_duration = (endTimecb - startTimecb).seconds() * 1000;
     RCLCPP_DEBUG(get_logger(), "Pointcloud_CB run time: %f ms", cb_duration);
 
@@ -480,8 +480,8 @@ void CloudHandler::cloudHandlerCB(
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finishC - startC);
     sumFrameRunTime += std::chrono::duration_cast<std::chrono::steady_clock::duration>(duration);
     numofFrame++;
-    
-    RCLCPP_DEBUG(get_logger(), "Average cloudhandler run time: %f ns", 
+
+    RCLCPP_DEBUG(get_logger(), "Average cloudhandler run time: %f ns",
                  std::chrono::duration_cast<std::chrono::duration<double>>(sumFrameRunTime - std::chrono::steady_clock::now()).count() / numofFrame);
 }
 
@@ -492,17 +492,17 @@ void CloudHandler::cloudHandlerCB(
  *          2. 根据模式选择使用单环或多环进行匹配
  *          3. 计算激光束与地图的交点
  *          4. 发布交点结果用于可视化
- * 
+ *
  * @param inside_index 机器人当前所在区域的起始索引
  */
 void CloudHandler::calClosestMapPoint(int inside_index) {
     // 记录上一次找到交点的地图索引，用于加速后续搜索
     int last_index = 0;
-    
+
     // 遍历激光雷达的每一个水平角度
     for(int i = 0; i < Horizon_SCAN; i++) {
         bool findIntersection = false;
-        
+
         // 最远环模式：只使用最远的那一环进行匹配
         if(bFurthestRingTracking) {
             double minDist;  // 存储最小距离
@@ -517,7 +517,7 @@ void CloudHandler::calClosestMapPoint(int inside_index) {
                 // 确保选择的环不超过激光雷达的最大线数
                 if((10 + 5 * chose_ring) < N_SCAN) {
                     // 检查当前选择的环与地图的交点
-                    findIntersection = checkMap(10 + 5 * chose_ring, i, last_index, 
+                    findIntersection = checkMap(10 + 5 * chose_ring, i, last_index,
                                               minDist, inside_index);
                 }
                 // 如果找到交点就不再检查其他环
@@ -526,7 +526,7 @@ void CloudHandler::calClosestMapPoint(int inside_index) {
                 }
             }
         }
-        
+
         // 如果没有找到交点，将对应位置的点坐标设为零
         if(!findIntersection) {
             intersectionOnMap->points[i].x = 0;
@@ -548,20 +548,20 @@ void CloudHandler::showImg1line(const std::string& words) {
     image_transport::ImageTransport it(shared_from_this());
     // 创建发布器，发布到"Things2say"话题
     auto pub = it.advertise("Things2say", 1);
-    
+
     // 创建一个黑色背景的图像
     cv::Mat image(200, 600, CV_8UC3, cv::Scalar(0,0,0));
     // 在图像上绘制白色文字
-    cv::putText(image, words, cv::Point(20,100), cv::FONT_HERSHEY_DUPLEX, 
+    cv::putText(image, words, cv::Point(20,100), cv::FONT_HERSHEY_DUPLEX,
                 2, cv::Scalar(255,255,255), 2, 8);
-    
+
     // 将OpenCV图像转换为ROS消息
     auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", image).toImageMsg();
     // 等待500毫秒，确保消息能被接收
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // 发布图像消息
     pub.publish(*msg);
-    
+
     // 使用ROS日志输出显示的消息内容
     RCLCPP_INFO(get_logger(), "Display message: %s", words.c_str());
 }
@@ -573,14 +573,14 @@ void CloudHandler::showImg1line(const std::string& words) {
  *          2. 获取机器人的当前位置
  *          3. 遍历地图点，检查是否有交点
  *          4. 返回是否找到交点
- * 
+ *
  * @param ring 激光线所在的环
  * @param horizonIndex 激光线在环中的索引
  * @param last_index 上一次找到交点的地图索引
  * @param minDist 最小距离
  * @param inside_index 机器人当前所在区域的起始索引
  */
-bool CloudHandler::checkMap(int ring, 
+bool CloudHandler::checkMap(int ring,
                           int horizonIndex,
                           int& last_index,
                           double& minDist,
@@ -624,17 +624,17 @@ bool CloudHandler::checkMap(int ring,
             // 计算交点到机器人位置的距离平方
             double distSq = std::pow(intersectionOnMapThisLine.x - PosePoint.x, 2) +
                           std::pow(intersectionOnMapThisLine.y - PosePoint.y, 2);
-             
+
             // 由于地图多边形的形状不保证是凸的，激光线可能与地图多次相交，选择最近的交点
             if(minDist == 0 || minDist > distSq) {
                 findIntersection = true;
                 minDist = distSq;
-                
+
                 // 存储交点信息
                 intersectionOnMap->points[horizonIndex] = intersectionOnMapThisLine;
-                
+
                 // 标记通道交点
-                if((int)map_pc->points[j % mapSize].intensity > 2 && 
+                if((int)map_pc->points[j % mapSize].intensity > 2 &&
                    (int)map_pc->points[(j + 1) % mapSize].intensity > 2) {
                     // 当测试所有通道打开时，标记此点为通道交点，使其有所不同
                     intersectionOnMap->points[horizonIndex].intensity = -1;
@@ -649,7 +649,7 @@ bool CloudHandler::checkMap(int ring,
                 if(initialized || (!bTestRescue && !bRescueRobot)) {
                     // 对于已初始化或非救援情，更新整列的intensity
                     for(int i = 0; i < N_SCAN; i++) {
-                        transformed_pc->points[i * Horizon_SCAN + horizonIndex].intensity = 
+                        transformed_pc->points[i * Horizon_SCAN + horizonIndex].intensity =
                             j % mapSize;
                     }
                 }
@@ -660,7 +660,7 @@ bool CloudHandler::checkMap(int ring,
             }
         }
     }
-    
+
     return findIntersection;  // 返回是否找到交点
 }
 
@@ -670,7 +670,7 @@ bool CloudHandler::checkMap(int ring,
  *          1. 获取机器人的当前位置
  *          2. 遍历地图点，检查是否有交点
  *          3. 返回是否找到交点
- * 
+ *
  * @param pc_index 激光线在transformed_pc中的索引
  * @param PCPoint 激光线上的当前点
  * @param map1x 地图线段的第一个点的x坐标
@@ -713,12 +713,12 @@ bool CloudHandler::checkWholeMap(int pc_index,
         // 如果相邻两圈的激光点距离小于0.8米，使用上一圈的匹配记录
         start_index = outsideAreaLastRingIndexRecord[pc_index % Horizon_SCAN];
     }
-    
+
     // 遍历地图点寻找最优交点
     for(size_t i = start_index; i < map_pc->size() + start_index; i++) {
         // 通道处理模式：如果设置为开放所有通道，则跳过通道线段
         if(bAllPassageOpen) {
-            if((int)map_pc->points[i % mapSize].intensity > 2 && 
+            if((int)map_pc->points[i % mapSize].intensity > 2 &&
                (int)map_pc->points[(i + 1) % mapSize].intensity > 2) {
                 continue;
             }
@@ -741,11 +741,11 @@ bool CloudHandler::checkWholeMap(int pc_index,
         if(inbetween) {
             // 计算交点到激光点的距离
             double dist = calDistance(intersectionOnMapThisLine, PCPoint);
-            
+
             // 更新最优匹配（距离更小的交点）
             if(min_error == 0 || min_error > dist) {
                 min_error = dist;
-                
+
                 // 记录最优匹配的地图线段端点
                 map1x = map_pc->points[i % mapSize].x;
                 map1y = map_pc->points[i % mapSize].y;
@@ -757,15 +757,15 @@ bool CloudHandler::checkWholeMap(int pc_index,
                 double PCLength = calDistance(PCPoint, PosePoint);
                 min_mapLength = mapLength;
                 min_PCLength = PCLength;
-                
+
                 // 更新索引记录（用于下次搜索优化）
                 outsideAreaIndexRecord[pc_index] = i % mapSize;
                 outsideAreaLastRingIndexRecord[pc_index % Horizon_SCAN] = i % mapSize;
-                
+
                 // 记录交点坐标
                 intersectionx = intersectionOnMapThisLine.x;
                 intersectiony = intersectionOnMapThisLine.y;
-                
+
                 // 检查是否与通道匹配（intensity > 2 表示通道）
                 if(map_pc->points[i % mapSize].intensity > 2) {
                     bMatchWithPass = true;
@@ -792,28 +792,28 @@ void CloudHandler::resetParameters() {
     laserCloudIn->clear();        // 清空输入激光点云
     UsefulPoints1->clear();       // 清空有用点集1
     UsefulPoints2->clear();       // 清空有用点集2
-    
+
     // 2. 重置环形扫描相关的点云大小
     ringMapP1->points.resize(Horizon_SCAN, 0);  // 重置环形地图点云1的大小
     ringMapP2->points.resize(Horizon_SCAN, 0);  // 重置环形地图点云2的大小
-    
+
     intersectionOnMap->clear();                       // 清空地图上的交点
     intersectionOnMap->points.resize(Horizon_SCAN, 0);  // 重置交点大小
     numIcpPoints = 0;                                 // 重置ICP点数
     furthestRing->clear();                            // 清空最远环
     furthestRing->points.resize(Horizon_SCAN);        // 重置最远环大小
     intersectionOnMap->points.resize(Horizon_SCAN, 0);  // 再次重置交点大小（可能是冗余的，但按照Fujing的代码，这里需要重置）
-    
+
     // 3. 重置组织化点云
     organizedCloudIn->clear();                                // 清空组织化输入点云
     organizedCloudIn->points.resize(N_SCAN * Horizon_SCAN, 0);  // 重置组织化输入点云大小
-    
+
     organizedCloudIn64->clear();                              // 清空64线组织化输入点云
     organizedCloudIn64->points.resize(N_SCAN * Horizon_SCAN, 0);  // 重置64线组织化输入点云大小
-    
+
     transformed_pc->clear();                                  // 清空变换后的点云
     transformed_pc->points.resize(N_SCAN * Horizon_SCAN, 0);    // 重置变换后点云大小
-    
+
     UsefulPoints1->points.resize(N_SCAN * Horizon_SCAN, 0);     // 重置有用点集1大小
     UsefulPoints2->points.resize(N_SCAN * Horizon_SCAN, 0);     // 重置有用点集2大小
 }
@@ -841,10 +841,10 @@ void CloudHandler::filterUsefulPoints() {
     weightSumTurkey = 0;         // Turkey权重和
     weightSumCauchy = 0;         // Cauchy权重和
     weightsTurkey.clear();       // Turkey权重列表
-    
+
     // 调整记录数组大小
     outsideAreaIndexRecord.resize(transformed_pc->points.size(), 0);        // 区域外点索引记录
-    outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);      
+    outsideAreaLastRingIndexRecord.resize(Horizon_SCAN, 0);
 
     // Debug: 在 filterUsefulPoints() 函数中添加以下调试信息
     RCLCPP_DEBUG(this->get_logger(), "transformed_pc size: %zu", transformed_pc->points.size());
@@ -856,15 +856,15 @@ void CloudHandler::filterUsefulPoints() {
     for(size_t i = 0; i < transformed_pc->points.size(); i++) {
         // 添加索引安全检查
         if (i >= intersectionOnMap->points.size()) {
-            RCLCPP_ERROR(this->get_logger(), "Index out of bounds: i=%zu, intersectionOnMap size=%zu", 
+            RCLCPP_ERROR(this->get_logger(), "Index out of bounds: i=%zu, intersectionOnMap size=%zu",
                         i, intersectionOnMap->points.size());
             continue;
         }
 
         // 检查点是否为NaN
-        if(std::isnan(transformed_pc->points[i].x) || 
+        if(std::isnan(transformed_pc->points[i].x) ||
            std::isnan(transformed_pc->points[i].y) ||
-           std::isnan(intersectionOnMap->points[i % Horizon_SCAN].x) || 
+           std::isnan(intersectionOnMap->points[i % Horizon_SCAN].x) ||
            std::isnan(intersectionOnMap->points[i % Horizon_SCAN].y)) {
             RCLCPP_INFO(this->get_logger(), "NaN point detected at index %zu", i);
             continue;
@@ -874,12 +874,12 @@ void CloudHandler::filterUsefulPoints() {
         double distance = organizedCloudIn->points[i].intensity;
 
         // 处理有效的交点
-        if(abs(intersectionOnMap->points[i % Horizon_SCAN].x) > 1e-6 && 
+        if(abs(intersectionOnMap->points[i % Horizon_SCAN].x) > 1e-6 &&
            abs(intersectionOnMap->points[i % Horizon_SCAN].y) > 1e-6) {
-           
+
             double pedalx, pedaly;                // 垂足坐标
             double intersectionx, intersectiony;   // 交点坐标
-            
+
             // 计算地图上的距离
             double temp_map_length = std::sqrt(
                 std::pow(intersectionOnMap->points[i % Horizon_SCAN].x - robotPose(0,3), 2) +
@@ -889,17 +889,17 @@ void CloudHandler::filterUsefulPoints() {
             // 根据通道处理模式进行处理
             if(!bAllPassageClose && !bAllPassageOpen) {  // 正常模式
                 // 处理通道点
-                if(match_difference > 0.1 && 
+                if(match_difference > 0.1 &&
                    ringMapP1->points[i % Horizon_SCAN].intensity > 2 &&
                    ringMapP2->points[i % Horizon_SCAN].intensity > 2) {
-                    
+
                     // 检查整个地图上的穿透情况
                     double map1x = 0, map1y = 0, map2x = 0, map2y = 0;
                     bool countGoingthrough = checkWholeMap(i, transformed_pc->points[i],
                                                          map1x, map1y, map2x, map2y,
                                                          intersectionx, intersectiony);
                     if(countGoingthrough) continue;
-                    
+
                     // 计算垂足
                     calPedal(map1x, map1y, map2x, map2y,
                             transformed_pc->points[i].x, transformed_pc->points[i].y,
@@ -914,7 +914,7 @@ void CloudHandler::filterUsefulPoints() {
                             transformed_pc->points[i].x,
                             transformed_pc->points[i].y,
                             pedalx, pedaly);
-                    
+
                     intersectionx = intersectionOnMap->points[i % Horizon_SCAN].x;
                     intersectiony = intersectionOnMap->points[i % Horizon_SCAN].y;
                 }
@@ -928,7 +928,7 @@ void CloudHandler::filterUsefulPoints() {
                         transformed_pc->points[i].x,
                         transformed_pc->points[i].y,
                         pedalx, pedaly);
-                        
+
                 intersectionx = intersectionOnMap->points[i % Horizon_SCAN].x;
                 intersectiony = intersectionOnMap->points[i % Horizon_SCAN].y;
             }
@@ -942,7 +942,7 @@ void CloudHandler::filterUsefulPoints() {
                                                              map1x, map1y, map2x, map2y,
                                                              intersectionx, intersectiony);
                         if(countGoingthrough) continue;
-                        
+
                         // 计算垂足
                         calPedal(map1x, map1y, map2x, map2y,
                                 transformed_pc->points[i].x, transformed_pc->points[i].y,
@@ -959,7 +959,7 @@ void CloudHandler::filterUsefulPoints() {
                             transformed_pc->points[i].x,
                             transformed_pc->points[i].y,
                             pedalx, pedaly);
-                            
+
                     intersectionx = intersectionOnMap->points[i % Horizon_SCAN].x;
                     intersectiony = intersectionOnMap->points[i % Horizon_SCAN].y;
                 }
@@ -981,19 +981,19 @@ void CloudHandler::filterUsefulPoints() {
                (error > 0.0 && error_vertical < errorUpThredCurr)) {
                 numIcpPoints++;
                 usefulIndex.push_back(i);
-                
+
                 // 保存有用点和其垂足
                 UsefulPoints1->points[i] = transformed_pc->points[i];
                 UsefulPoints2->points[i].x = pedalx;
                 UsefulPoints2->points[i].y = pedaly;
                 UsefulPoints2->points[i].z = transformed_pc->points[i].z;
-                
+
                 // 计算Turkey权重
                 double weight = calWeightTurkey(error_vertical, errorLowThredCurr,
                                               (error > 0), errorUpThredCurr);
                 weightSumTurkey += weight;
                 weightsTurkey.push_back(weight);
-                
+
                 // 更新中心点
                 if(use_weight && initialized) {
                     // 使用权重更新
@@ -1009,16 +1009,16 @@ void CloudHandler::filterUsefulPoints() {
                     mapCenter(0) += pedalx;
                     mapCenter(1) += pedaly;
                 }
-                
+
                 // 保存带权重的坐标
                 Vec_pcx.push_back(weight * pcx);
                 Vec_pcy.push_back(weight * pcy);
                 Vec_pedalx.push_back(weight * pedalx);
                 Vec_pedaly.push_back(weight * pedaly);
-                
+
                 // 更新配对点的平均距离
                 averDistancePairedPoints += error_vertical;
-                
+
                 // 第一次迭代时更新地图直方图
                 if(currentIteration == 0) {
                     mapHistogram[transformed_pc->points[i].intensity]++;
@@ -1052,7 +1052,7 @@ void CloudHandler::mergeMapHistogram() {
     double intervalDeg = 5;  // 每个区间5度
     int interval = ceil(180/intervalDeg);  // 总共36个区间(0-180度)
     std::vector<double> histogram(interval, 0);  // 初始化直方图数组
-    
+
     // 初始化统计指标
     int total_hit_points = 0;  // 总命中点数
 
@@ -1061,11 +1061,11 @@ void CloudHandler::mergeMapHistogram() {
         // 计算当前点与下一个点形成的线段角度
         double angle = std::atan2(map_pc->points[i].y - map_pc->points[(i+1) % map_pc->points.size()].y,
                                 map_pc->points[i].x - map_pc->points[(i+1) % map_pc->points.size()].x);
-        
+
         // 将角度转换到[0,180]区间
         angle = (angle + M_PI/2) / M_PI * 180;
         int index = floor(angle/intervalDeg);
-        
+
         // 更新直方图和总点数
         histogram[index] += mapHistogram[i];
         total_hit_points += mapHistogram[i];
@@ -1075,7 +1075,7 @@ void CloudHandler::mergeMapHistogram() {
     int max_value = 0;
     int max_index = 0;
     int total_points = 0;
-    
+
     for(size_t i = 0; i < histogram.size(); i++) {
         total_points += histogram[i];
         if(histogram[i] > max_value) {
@@ -1091,7 +1091,7 @@ void CloudHandler::mergeMapHistogram() {
                                 map_pc->points[i].x - map_pc->points[(i+1) % map_pc->points.size()].x);
         angle = (angle + M_PI/2) / M_PI * 180;
         int index = floor(angle/intervalDeg);
-        
+
         // 保存最大角度对应的非空线段索引
         if(index == max_index && mapHistogram[i] != 0) {
             mapLineIndex.push_back(i);
@@ -1103,7 +1103,7 @@ void CloudHandler::mergeMapHistogram() {
     double DSrate = corridornessDSRate(maxPercentage);  // 计算降采样率
 
     // 输出通道性指标信息
-    RCLCPP_INFO(this->get_logger(), 
+    RCLCPP_INFO(this->get_logger(),
                 "Corridor metrics - Total points: %d, Max percentage: %f, DS rate: %f",
                 total_points, maxPercentage, DSrate);
 
@@ -1121,7 +1121,7 @@ void CloudHandler::mergeMapHistogram() {
                 if(mapLineIndex[j] == int(UsefulPoints1->points[usefulIndex[i]].intensity)) {
                     find = true;
                     double distance = organizedCloudIn->points[usefulIndex[i]].intensity;
-                    
+
                     // 根据距离和降采样率处理点
                     if(distance < corridorDSmaxDist) {
                         if((int)(i/DSrate) != temp_times) {
@@ -1178,10 +1178,10 @@ void CloudHandler::mergeMapHistogram() {
 
 // 分配内存
 void CloudHandler::allocateMemory() {
-    
+
     // 添加前置检查,确保激光雷达参数有效
     if (N_SCAN <= 0 || Horizon_SCAN <= 0) {
-        RCLCPP_ERROR(get_logger(), "Invalid N_SCAN(%d) or Horizon_SCAN(%d)", 
+        RCLCPP_ERROR(get_logger(), "Invalid N_SCAN(%d) or Horizon_SCAN(%d)",
                      N_SCAN, Horizon_SCAN);
         return;
     }
@@ -1211,13 +1211,13 @@ void CloudHandler::allocateMemory() {
     // 预分配点云大小以提高性能
     potentialCeilingPoints->points.resize(N_SCAN * Horizon_SCAN);  // 基于扫描参数分配天花板点云大小
     ringMapP1->points.resize(Horizon_SCAN);  // 基于水平扫描分配环形地图大小
-    ringMapP2->points.resize(Horizon_SCAN); 
+    ringMapP2->points.resize(Horizon_SCAN);
     intersectionOnMap->points.resize(Horizon_SCAN);
     furthestRing->points.resize(Horizon_SCAN);
     transformedFurthestRing->points.resize(Horizon_SCAN);
     insidePC->points.resize(Horizon_SCAN);
     outsidePC->points.resize(Horizon_SCAN);
-    
+
     // 分配组织化点云和ICP相关点云的大小
     organizedCloudIn->points.resize(N_SCAN * Horizon_SCAN);
     organizedCloudIn64->points.resize(64 * Horizon_SCAN);  // 专门为64线激光雷达设置
@@ -1226,9 +1226,9 @@ void CloudHandler::allocateMemory() {
     UsefulPoints2->points.resize(N_SCAN * Horizon_SCAN);
 
     // 输出调试信息
-    RCLCPP_DEBUG(this->get_logger(), 
+    RCLCPP_DEBUG(this->get_logger(),
                  "Allocated pointclouds - Organized size: %lu, Intersection size: %lu",
-                 organizedCloudIn->points.size(), 
+                 organizedCloudIn->points.size(),
                  intersectionOnMap->points.size());
 }
 
@@ -1253,7 +1253,7 @@ void CloudHandler::optimizationICP() {
     // 开始ICP迭代
     for(int iteration = 0; iteration < totalIteration; iteration++) {
         auto startTime = this->now();
-        
+
         // 在每次ICP迭代开始时，函数会清空上一次迭代的数据
         averDistancePairedPoints = 0;  // 配对点的平均距离
         currentIteration = iteration;  // 当前迭代次数
@@ -1270,7 +1270,7 @@ void CloudHandler::optimizationICP() {
             RCLCPP_ERROR(this->get_logger(), "No valid points for ICP, skipping optimization");
             return;
         }
-        
+
         if (use_weight && weightSumTurkey < 1e-6) {
             RCLCPP_ERROR(this->get_logger(), "Invalid weight sum for Turkey weights");
             return;
@@ -1293,14 +1293,14 @@ void CloudHandler::optimizationICP() {
 
         // 计算变换矩阵W
         Eigen::Matrix2d W = Eigen::Matrix2d::Zero();
-        
+
         // 遍历所有ICP点对，构建变换矩阵
         for(int i = 0; i < numIcpPoints; i++) {
-            if(UsefulPoints1->points[usefulIndex[i]].x != 0 || 
+            if(UsefulPoints1->points[usefulIndex[i]].x != 0 ||
                UsefulPoints1->points[usefulIndex[i]].y != 0) {
-                
+
                 Eigen::Vector2d PCVec, MapVec;
-                
+
                 // 根据是否使用权重和是否初始化选择不同的计算方式
                 if(use_weight && initialized) {
                     // 使用原始坐标计算
@@ -1332,7 +1332,7 @@ void CloudHandler::optimizationICP() {
         Eigen::Vector2d translation = mapCenter - rotationMatrix * PCCenter;
 
         // 输出调试信息
-        RCLCPP_DEBUG(this->get_logger(), 
+        RCLCPP_DEBUG(this->get_logger(),
                      "ICP iteration %d - Translation norm: %f, Threshold: %f",
                      iteration, translation.norm(), errorLowThredCurr);
 
@@ -1365,8 +1365,8 @@ void CloudHandler::optimizationICP() {
         }
 
         // 检查收敛条件：如果平移量小于阈值且旋转角度小于阈值，则认为收敛
-        if(std::isnan(translation.norm()) || 
-           (translation.norm() < icp_stop_translation_thred && 
+        if(std::isnan(translation.norm()) ||
+           (translation.norm() < icp_stop_translation_thred &&
             acos(rotationMatrix(0,0))/M_PI*180 < icp_stop_rotation_thred)) {
             if(!bTestRescue) {
                 initialized = true;
@@ -1386,7 +1386,7 @@ void CloudHandler::optimizationICP() {
     Eigen::Matrix3d rotation3d = Eigen::Matrix3d::Identity();
     rotation3d.topLeftCorner(3,3) = robotPose.topLeftCorner(3,3).cast<double>();
     Eigen::Quaterniond quaternion(rotation3d);
-    
+
     // 设置位姿的方向信息
     pose_stamped.pose.orientation.x = quaternion.x();
     pose_stamped.pose.orientation.y = quaternion.y();
@@ -1405,7 +1405,7 @@ void CloudHandler::optimizationICP() {
 /**
  * @brief 设置手动初始位姿
  * @details 此函数用于手动设置机器人的初始位姿
- * 
+ *
  * @param yaw 机器人朝向（偏航角），单位弧度
  * @param position 机器人位置，3D向量(x,y,z)
  */
@@ -1415,24 +1415,24 @@ void CloudHandler::setManualInitialPose(double yaw, const Eigen::Vector3f& posit
     rot << cos(yaw), -sin(yaw), 0,
            sin(yaw), cos(yaw), 0,
            0, 0, 1;
-           
+
     // 设置robotPose矩阵的旋转部分
     robotPose.block<3,3>(0,0) = rot;
-    
+
     // 设置robotPose矩阵的平移部分
     robotPose.block<3,1>(0,3) = position;
-    
+
     // 标记已有手动设置的初始位姿
     hasManualInitialPose = true;
-    
-    RCLCPP_INFO(get_logger(), "手动设置初始位姿: 位置[%f, %f, %f], 偏航角[%f]", 
+
+    RCLCPP_INFO(get_logger(), "手动设置初始位姿: 位置[%f, %f, %f], 偏航角[%f]",
                 position[0], position[1], position[2], yaw);
 }
 
 /**
  * @brief 处理手动设置的初始位姿回调
  * @details 从/initialpose_agloc话题接收初始位姿消息，并设置robotPose
- * 
+ *
  * @param poseMsg 包含位姿和协方差的消息
  */
 void CloudHandler::manualInitialPoseCB(const std::shared_ptr<geometry_msgs::msg::PoseWithCovarianceStamped> poseMsg) {
@@ -1441,28 +1441,28 @@ void CloudHandler::manualInitialPoseCB(const std::shared_ptr<geometry_msgs::msg:
     position[0] = poseMsg->pose.pose.position.x;
     position[1] = poseMsg->pose.pose.position.y;
     position[2] = poseMsg->pose.pose.position.z;
-    
+
     // 从四元数中提取偏航角
     tf2::Quaternion q;
     tf2::fromMsg(poseMsg->pose.pose.orientation, q);
-    
+
     // 获取欧拉角
     double roll, pitch, yaw;
     tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
-    
+
     // 调用setManualInitialPose设置初始位姿
     setManualInitialPose(yaw, position);
-    
-    RCLCPP_INFO(get_logger(), "收到初始位姿消息，设置初始位姿: 位置[%f, %f], 偏航角[%f]", 
+
+    RCLCPP_INFO(get_logger(), "收到初始位姿消息，设置初始位姿: 位置[%f, %f], 偏航角[%f]",
                 position[0], position[1], yaw);
 }
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    
+
     // 创建CloudHandler实例
     auto cloudHandler = std::make_shared<CloudHandler>();
-    
+
     // Set logging level
     if(rcutils_logging_set_logger_level(
         cloudHandler->get_logger().get_name(),

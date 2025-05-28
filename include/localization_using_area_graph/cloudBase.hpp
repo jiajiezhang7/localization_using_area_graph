@@ -8,7 +8,7 @@
  *        Including global localization and pose tracking with clutter removal
  * @version 0.1
  * @date 2024-11-09
- * 
+ *
  * @details This class implements the base functionality for:
  *          - Point cloud processing and clutter removal
  *          - Area Graph map handling
@@ -16,14 +16,14 @@
  *          - Point-to-line ICP registration
  *          - Corridorness detection and scoring
  *          Ported from ROS1 to ROS2 maintaining full functionality
- * 
+ *
  * @note Part of the AGLoc system as described in:
  *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
  *       Published in IEEE Robotics and Automation Letters, 2023
- * 
+ *
  * @copyright Copyright (c) 2024, ShanghaiTech University
  *            All rights reserved.
- * 
+ *
  */
 #pragma once
 #ifndef _CLOUD_BASE_HPP_
@@ -37,11 +37,11 @@ public:
     // ROS2 Subscribers
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMap;               //订阅 /mapPC     --- from map_handler
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapInit;           //订阅 /mapPC_Init --- from map_handler
-    
+
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subMapAG;             //订阅 /mapPC_AG  --- 来自 topology_publisher (area_graph_data_parser)
     rclcpp::Subscription<area_graph_data_parser::msg::AGindex>::SharedPtr subAGindex;    // 订阅AG_index话题 -- 来自 topology_publisher (area_graph_data_parser)
-    
-   
+
+
 
     // 消息头部信息
     std_msgs::msg::Header cloudHeader;      // 点云数据的消息头
@@ -49,9 +49,7 @@ public:
     nav_msgs::msg::Path globalPath;         // 全局路径
 
     // ROS2 发布器
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUppestRing;          // 发布最上层激光环
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubFurthestRing;        // 发布最远激光环
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubPotentialCeiling;    // 发布潜在天花板点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubtest;                // 测试用发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOrganizedCloudIn;    // 发布组织化的输入点云
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubIntersection;        // 发布交点点云
@@ -61,7 +59,6 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints2;       // 发布有用点云2
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云（后续定位实际使用的AGMap）
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOptiPC;              // 发布优化后的点云
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径
 
     rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;               // 发布完成信号
@@ -168,7 +165,7 @@ public:
     std::vector<Eigen::Vector3f> corridorGuess;     // 走廊猜测
     std::vector<Eigen::Vector3f> roomGuess;         // 房间猜测
     static area_graph_data_parser::msg::AGindex AG_index;  // 区域图索引
-    
+
     // 计数器
     int numTotalHistogram;                          // 总直方图数
     int currentIteration;                           // 当前迭代次数
@@ -179,10 +176,10 @@ public:
     std::ofstream robotPoseTum;                     // 机器人位姿TUM格式输出流
 
 
-    
+
     // 将默认构造函数改为接受节点名的构造函数
     explicit CloudBase(const std::string& node_name);
-    
+
     // 添加虚析构函数
     virtual ~CloudBase() = default;
 
@@ -222,10 +219,8 @@ protected:
 private:
     void initializePublishers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
-        pubUppestRing = this->create_publisher<sensor_msgs::msg::PointCloud2>("uppestRing", qos);
+
         pubFurthestRing = this->create_publisher<sensor_msgs::msg::PointCloud2>("FurthestRing", qos);
-        pubPotentialCeiling = this->create_publisher<sensor_msgs::msg::PointCloud2>("potentialCeiling", qos);
         pubtest = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubtest", qos);
         pubOrganizedCloudIn = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOrganizedCloudIn", qos);
         pubIntersection = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubIntersection", qos);
@@ -235,7 +230,6 @@ private:
         pubUsefulPoints2 = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubUsefulPoints2", qos);
         pubMapPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubMapPC", qos);
         pubAGMapTransformedPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubAGMapTransformedPC", qos);
-        pubOptiPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOptiPC", qos);
         pubRobotPath = this->create_publisher<nav_msgs::msg::Path>("RobotPath", qos);
 
         pubDONEsignal = this->create_publisher<geometry_msgs::msg::Pose>("doneInit", qos);
@@ -246,12 +240,12 @@ private:
 
     void initializeSubscribers() {
         auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
-        
+
 
         subMapAG = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/mapPC_AG", qos,
-            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));         
-            
+            std::bind(&CloudBase::mapAGCB, this, std::placeholders::_1));
+
         subAGindex = this->create_subscription<area_graph_data_parser::msg::AGindex>(
             "/AGindex", qos,
             std::bind(&CloudBase::AGindexCB, this, std::placeholders::_1));
@@ -265,7 +259,7 @@ private:
         AGindexReceived = false;
         initialized = false;
         onlyOneDirection = false;
-        
+
         // Initialize counters
         mapReceivedTimes = 0;
         lastInsideIndex = -1;
@@ -274,29 +268,29 @@ private:
         numTotalHistogram = 0;
         currentIteration = 0;
         runTime = 0;
-        
+
         // Initialize metrics
         IcpPointsPercentage = 0.0;
         averDistancePairedPoints = 0.0;
-        
+
         // Initialize transformation matrices and vectors
         robotPose.setZero();
         mapCenter.setZero();
         PCCenter.setZero();
         mapCenterInitialization.setZero();
         PCCenterInitialization.setZero();
-        
+
         // Initialize scoring variables
         insideScore = 0.0;
         outsideScore = 0.0;
         insideTotalRange = 0.0;
         outsideTotalScore = 0.0;
-        
+
         // Initialize weights
         weightSumTurkey = 0.0;
         weightSumCauchy = 0.0;
         accumulateAngle = 0.0;
-        
+
         // Initialize vectors
         usefulIndex.clear();
         outsideAreaIndexRecord.clear();
