@@ -20,7 +20,7 @@ def generate_launch_description():
     # 声明参数
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='使用仿真时间'
     )
 

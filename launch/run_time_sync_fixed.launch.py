@@ -28,7 +28,7 @@ def generate_launch_description():
     # 时间同步相关参数
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='Use simulation time'
     )
 
@@ -194,22 +194,4 @@ def generate_launch_description():
             ]
         ),
 
-        # 可选：启动时间同步检查器
-        # TimerAction(
-        #     period=6.0,
-        #     actions=[
-        #         LogInfo(msg="启动时间同步检查器"),
-        #         Node(
-        #             package='localization_using_area_graph',
-        #             executable='time_sync_checker.py',
-        #             name='time_sync_checker',
-        #             parameters=[
-        #                 {'use_sim_time': LaunchConfiguration('use_sim_time')},
-        #                 {'check_duration': 30.0},
-        #                 {'time_tolerance': 0.1}
-        #             ],
-        #             output='screen',
-        #         ),
-        #     ]
-        # ),
     ])
