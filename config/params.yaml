@@ -54,19 +54,29 @@
     # Fujing's 0510 bag - 也即 seq01 在SIST1-D
         # for osmAG map, 这是拿来把mapPC_AG坐标系下的node点云转换到map_PC坐标系下，使他们有正确的坐标值
         # 对于确定的osmAG地图确定的root_node，以下参数无须改动 - root: lat = "31.17947960435" lon="121.59139728509
-        mapExtrinsicTrans: [9.8,-34.3, -16.0] 
+        # mapExtrinsicTrans: [9.8,-34.3, -16.0] 
         mapYawAngle: -81.0 # seq01
-
+        mapExtrinsicTrans: [9.8,-34.3, -16.0] 
         # for Robot pose seq01 bag， 这些参数在 setInitialPose()中被使用
                     # seq01 - [0.5, 0.15, 0.0]  yaw:10.0
                     # 95 - [4.0, -6.0, 0.0] yaw: 90.0
 
         # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值,因为不用他们了，但在仅位姿跟踪下则需要准确值   
-        initialYawAngle: 90.0 
-        initialExtrinsicTrans: [4.0, -6.0, 0.0] 
+        initialYawAngle: 90.0  # bag: 95, agile03_Mars_01
+        # initialExtrinsicTrans: [4.0, -6.0, 0.0]  # bag: 95
+        initialExtrinsicTrans: [4.18, -3.51, 0.0]  # bag: agile03_Mars_01
+        
+        # initialYawAngle: 180.0  # bag: agile03_corridor_01
+        # initialExtrinsicTrans: [8.36, 9.24, 0.0]  # bag: agile03_corridor_01
+
+        # initialYawAngle: 0.0  # bag: agile03_corridor_02
+        # initialExtrinsicTrans: [8.88, 19.31, 0.0]  # bag: agile03_corridor_02
+
+        # initialYawAngle: 270.0  # bag: agile03_corridor_03
+        # initialExtrinsicTrans: [7.95, 30.79, 0.0]  # bag: agile03_corridor_03
 
         # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: true                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
         
         # 25.2.20在测试这个模式-希望跑通 -- 2.28已跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
@@ -83,7 +93,7 @@
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
         particle_generator_radius: 6.0     # 搜索半径(米)
-        use_room_info: true               # 是否使用WiFiLocation中的room信息来过滤粒子
+        use_room_info: false               # 是否使用WiFiLocation中的room信息来过滤粒子
         # without icp initialization 
         rescue_angle_interval: 5.0
         # --------------------------------------------------------

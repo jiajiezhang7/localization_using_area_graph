@@ -32,7 +32,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_door_02',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_01',
         description='ROS2 bag文件路径'
     )
 
@@ -44,7 +44,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='true',
+        default_value='false',
         description='是否使用全局定位'
     )
 
@@ -149,7 +149,6 @@ def generate_launch_description():
             '--qw', '0.760'
         ]
     )
-    
     # 静态TF变换：map -> odom（作为初始值，后续会被动态更新）
     map_to_odom_transform = Node(
         package='tf2_ros',
@@ -223,7 +222,6 @@ def generate_launch_description():
     play_bag = ExecuteProcess(
         cmd=['ros2', 'bag', 'play',
              LaunchConfiguration('bag_file'),
-             '-s', 'mcap',
              '--clock',
              '--rate', '0.5',
              '--start-offset', LaunchConfiguration('start_offset'),
