@@ -1360,15 +1360,7 @@ void CloudInitializer::initializationICP(int insideAGIndex) {
                     translation.norm(),
                     errorLowThredCurr);
 
-        // Publish point clouds for visualization
-        sensor_msgs::msg::PointCloud2 outMsg;
-        pcl::toROSMsg(*UsefulPoints1, outMsg);
-        outMsg.header = mapHeader;
-        pubUsefulPoints1->publish(outMsg);
-
-        pcl::toROSMsg(*UsefulPoints2, outMsg);
-        outMsg.header = mapHeader;
-        pubUsefulPoints2->publish(outMsg);
+        // 移除调试可视化点云的发布，保留核心功能
 
         // Update robot pose
         Eigen::Matrix4f robotPoseOldInv = robotPose.inverse();
@@ -1538,19 +1530,7 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
         // RCLCPP_DEBUG(get_logger(), "完成处理第 %zu 个点", i);
     }
 
-    // 只有当所有处理都成功完成时才发布消息
-    try {
-        if (pubIntersection && pubIntersection.get()) {  // 添加发布器有效性检查
-            sensor_msgs::msg::PointCloud2 outMsg;
-            pcl::toROSMsg(*intersectionOnMap, outMsg);
-            outMsg.header = mapHeader;
-            pubIntersection->publish(outMsg);
-        } else {
-            RCLCPP_WARN(get_logger(), "pubIntersection is not valid, skipping publish");
-        }
-    } catch (const std::exception& e) {
-        RCLCPP_ERROR(get_logger(), "Error publishing intersection points: %s", e.what());
-    }
+    // 移除交点点云发布代码
 
     // 添加第二个循环，用于计算评分和分类点云
     // RCLCPP_INFO(get_logger(), "开始第二个循环，计算评分...");
@@ -1740,28 +1720,7 @@ void CloudInitializer::calClosestMapPoint(int inside_index) {
     // RCLCPP_INFO(get_logger(), "评分结果: 内部点=%d, 内部得分=%.2f, 外部点=%d, 外部得分=%.2f, 内部范围=%.2f",
     //             numofInsidePoints, insideScore, numofOutsidePoints, outsideScore, insideTotalRange);
 
-    // 发布内部和外部点云
-    try {
-        if(pubInsidePC && pubInsidePC.get()) {
-            sensor_msgs::msg::PointCloud2 outMsg;
-            pcl::toROSMsg(*insidePC, outMsg);
-            outMsg.header = mapHeader;
-            pubInsidePC->publish(outMsg);
-        } else {
-            RCLCPP_WARN(get_logger(), "pubInsidePC is not valid, skipping publish");
-        }
-
-        if(pubOutsidePC && pubOutsidePC.get()) {
-            sensor_msgs::msg::PointCloud2 outMsg;
-            pcl::toROSMsg(*outsidePC, outMsg);
-            outMsg.header = mapHeader;
-            pubOutsidePC->publish(outMsg);
-        } else {
-            RCLCPP_WARN(get_logger(), "pubOutsidePC is not valid, skipping publish");
-        }
-    } catch(const std::exception& e) {
-        RCLCPP_ERROR(get_logger(), "Error publishing inside/outside points: %s", e.what());
-    }
+    // 移除内部和外部点云发布代码，保留核心功能
 }
 
 bool CloudInitializer::checkWholeMap(const pcl::PointXYZI& PCPoint,

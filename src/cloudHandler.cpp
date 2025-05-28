@@ -441,10 +441,7 @@ void CloudHandler::cloudHandlerCB(
         transformed_pc_->resize(64 * Horizon_SCAN);
         pcl::transformPointCloud(*organizedCloudIn64, *transformed_pc_, robotPose);
 
-        sensor_msgs::msg::PointCloud2 wholeMsg;
-        pcl::toROSMsg(*transformed_pc_, wholeMsg);
-        wholeMsg.header = mapHeader;
-        pubTransformedWholePC->publish(wholeMsg);
+        // 移除完整变换点云发布代码，保留核心功能
 
         // 变换并发布最远环点云
         transformed_pc_->clear();
@@ -536,10 +533,7 @@ void CloudHandler::calClosestMapPoint(int inside_index) {
     }
 
     // 将计算得到的交点转换为ROS消息并发布
-    sensor_msgs::msg::PointCloud2 outMsg;
-    pcl::toROSMsg(*intersectionOnMap, outMsg);
-    outMsg.header = mapHeader;  // 使用地图坐标系的header
-    pubIntersection->publish(outMsg);  // 发布交点用于可视化
+    // 移除交点点云发布代码，保留核心功能
 }
 
 // 类似于状态监视器，把当前进程状态发布到"Things2say"话题
@@ -1341,11 +1335,7 @@ void CloudHandler::optimizationICP() {
         cloud_msg.header = mapHeader;
 
         // UsefulPoints1是源点云 --- 代表LiDAR帧点云中被筛选后的用于ICP的有效点，UsefulPoints2是目标点云 --- 来自地图
-        pcl::toROSMsg(*UsefulPoints1, cloud_msg);
-        pubUsefulPoints1->publish(cloud_msg);
-
-        pcl::toROSMsg(*UsefulPoints2, cloud_msg);
-        pubUsefulPoints2->publish(cloud_msg);
+        // 移除调试用点云发布代码，保留核心功能
 
         // 更新机器人位姿
         Eigen::Matrix4f robotPoseOldInv = robotPose.inverse();

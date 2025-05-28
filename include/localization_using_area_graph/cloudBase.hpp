@@ -52,18 +52,18 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubFurthestRing;        // 发布最远激光环
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubtest;                // 测试用发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOrganizedCloudIn;    // 发布组织化的输入点云
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubIntersection;        // 发布交点点云
+
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedPC;       // 发布变换后的点云
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubTransformedWholePC;  // 发布变换后的完整点云
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints1;       // 发布有用点云1
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubUsefulPoints2;       // 发布有用点云2
+
+
+
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云（后续定位实际使用的AGMap）
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径
 
     rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;               // 发布完成信号
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubInsidePC;            // 发布内部点云
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubOutsidePC;           // 发布外部点云
+
+
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubinfinity;          // 发布无穷远点标记
 
 
@@ -223,18 +223,18 @@ private:
         pubFurthestRing = this->create_publisher<sensor_msgs::msg::PointCloud2>("FurthestRing", qos);
         pubtest = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubtest", qos);
         pubOrganizedCloudIn = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOrganizedCloudIn", qos);
-        pubIntersection = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubIntersection", qos);
+
         pubTransformedPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubTransformedPC", qos);
-        pubTransformedWholePC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubTransformedWholePC", qos);
-        pubUsefulPoints1 = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubUsefulPoints1", qos);
-        pubUsefulPoints2 = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubUsefulPoints2", qos);
+
+
+
         pubMapPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubMapPC", qos);
         pubAGMapTransformedPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubAGMapTransformedPC", qos);
         pubRobotPath = this->create_publisher<nav_msgs::msg::Path>("RobotPath", qos);
 
         pubDONEsignal = this->create_publisher<geometry_msgs::msg::Pose>("doneInit", qos);
-        pubInsidePC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubInsidePC", qos);
-        pubOutsidePC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubOutsidePC", qos);
+
+
         pubinfinity = this->create_publisher<visualization_msgs::msg::Marker>("pubinfinity", qos);
     }
 
