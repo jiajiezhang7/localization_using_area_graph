@@ -186,3 +186,34 @@
         bAllPassageOpen: false
         bAllPassageClose: false
 
+        # ========== 里程计融合参数 ==========
+        # 基于AMCL算法思想的里程计与ICP融合配置
+        enable_odom_fusion: false               # 是否启用里程计融合
+        odom_topic: "/odom"                     # 里程计话题名称
+        odom_timeout: 0.1                       # 里程计超时时间(秒)
+
+        # 运动模型参数 (参考AMCL的运动模型)
+        odom_alpha1: 0.2                        # 旋转噪声参数1 (rot->rot)
+        odom_alpha2: 0.2                        # 旋转噪声参数2 (trans->rot)
+        odom_alpha3: 0.8                        # 平移噪声参数3 (trans->trans)
+        odom_alpha4: 0.2                        # 平移噪声参数4 (rot->trans)
+
+        # 位姿融合权重参数
+        icp_weight: 0.8                         # ICP结果权重 (0.0-1.0)
+        odom_weight: 0.2                        # 里程计预测权重 (0.0-1.0)
+        adaptive_weight: true                   # 是否启用自适应权重调整
+
+        # 多假设跟踪参数
+        enable_multi_hypothesis: false          # 是否启用多假设跟踪
+        max_hypotheses: 3                       # 最大假设数量
+        hypothesis_weight_threshold: 0.1        # 假设权重阈值
+
+        # 位姿预测参数
+        enable_pose_prediction: true            # 是否启用位姿预测
+        prediction_time_threshold: 0.05         # 预测时间阈值(秒)
+        max_prediction_distance: 1.0            # 最大预测距离(米)
+
+        # 融合算法调试参数
+        debug_fusion: false                     # 是否输出融合调试信息
+        publish_prediction: false               # 是否发布预测位姿用于可视化
+

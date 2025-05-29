@@ -6,14 +6,14 @@
 * @brief Utility functions and common definitions for Area Graph-based indoor localization
 * @version 0.1
 * @date 2024-11-09
-* 
+*
 * @details Core utilities and helper functions for AGLoc system, including:
 *          - Point type definitions
 *          - Geometric calculations
 *          - Parameter handling
 *          - Transformation utilities
 *          - Common data structures
-* 
+*
 * Main changes from ROS1 to ROS2:
 *          - Updated message types and headers
 *          - Replaced ROS1 time handling with ROS2
@@ -23,7 +23,7 @@
 *          - Replaced boost dependencies with std
 *          - Added ROS2 QoS settings
 *          - Updated visualization markers
-* 
+*
 * @implementation_details
 *        Core utility functions:
 *        - calPedal: Calculate pedal point on line
@@ -34,21 +34,21 @@
 *        - checkParallel: Check line parallelism
 *        - getPCA: Principal Component Analysis
 *        - Distance calculations
-* 
+*
 * @dependencies
 *        - ROS2 core libraries
 *        - PCL library
 *        - OpenCV
 *        - Eigen
 *        - Standard C++ libraries
-* 
+*
 * @note Part of the AGLoc system described in:
 *       "Robust Lifelong Indoor LiDAR Localization using the Area Graph"
 *       IEEE Robotics and Automation Letters, 2023
-* 
+*
 * @usage This header provides common utilities used throughout the AGLoc system
 *        Include this header in files requiring basic AGLoc functionality
-* 
+*
 * @copyright Copyright (c) 2024, ShanghaiTech University
 *            All rights reserved.
 */
@@ -72,7 +72,7 @@
 #include <image_transport/image_transport.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
-// PCL headers 
+// PCL headers
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -120,7 +120,7 @@
 #include <ceres/ceres.h>
 
 // Custom message headers
-#include "area_graph_data_parser/msg/a_gindex.hpp"  
+#include "area_graph_data_parser/msg/a_gindex.hpp"
 #include "area_graph_data_parser/msg/area_index.hpp"
 
 using namespace std;
@@ -139,8 +139,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(VelodynePointXYZIRT,
 struct HesaiPointXYZIRT {
     PCL_ADD_POINT4D
     PCL_ADD_INTENSITY
-    double timestamp; 
-    uint16_t ring;    
+    double timestamp;
+    uint16_t ring;
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
@@ -199,7 +199,7 @@ protected:
     double percentageThred;
     double averDistanceThred;
     double radiusDisthred;
-    
+
     // 多线程相关参数
     bool use_multithread;       // 是否使用多线程优化
     int max_thread_num;         // 最大线程数量
@@ -207,7 +207,7 @@ protected:
     double ceilingThred;
     double parallelThred;
     int subSample;
-    
+
     bool pause_iter;
     bool initialization_imu;
     double diff_angle_init;
@@ -233,6 +233,36 @@ protected:
     bool bAllPassageClose;
     bool bInitializationWithICP;
 
+    // ========== 里程计融合参数 ==========
+    bool enable_odom_fusion;                    // 是否启用里程计融合
+    std::string odom_topic;                     // 里程计话题名称
+    double odom_timeout;                        // 里程计超时时间
+
+    // 运动模型参数 (参考AMCL)
+    double odom_alpha1;                         // 旋转噪声参数1 (rot->rot)
+    double odom_alpha2;                         // 旋转噪声参数2 (trans->rot)
+    double odom_alpha3;                         // 平移噪声参数3 (trans->trans)
+    double odom_alpha4;                         // 平移噪声参数4 (rot->trans)
+
+    // 位姿融合权重参数
+    double icp_weight;                          // ICP结果权重
+    double odom_weight;                         // 里程计预测权重
+    bool adaptive_weight;                       // 是否启用自适应权重调整
+
+    // 多假设跟踪参数
+    bool enable_multi_hypothesis;               // 是否启用多假设跟踪
+    int max_hypotheses;                         // 最大假设数量
+    double hypothesis_weight_threshold;         // 假设权重阈值
+
+    // 位姿预测参数
+    bool enable_pose_prediction;                // 是否启用位姿预测
+    double prediction_time_threshold;           // 预测时间阈值
+    double max_prediction_distance;             // 最大预测距离
+
+    // 融合算法调试参数
+    bool debug_fusion;                          // 是否输出融合调试信息
+    bool publish_prediction;                    // 是否发布预测位姿
+
 private:
     // TF2 components
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -242,39 +272,39 @@ private:
     void get_parameters();
 
 public:
-    void calPedal(double x1, double y1, double x2, double y2, 
+    void calPedal(double x1, double y1, double x2, double y2,
                   double x3, double y3, double& x4, double& y4);
-                  
+
     pcl::PointXYZI calIntersection(pcl::PointXYZI p1, pcl::PointXYZI p2,
                                   pcl::PointXYZI p3, pcl::PointXYZI p4);
-                                  
+
     bool inBetween(pcl::PointXYZI p1, pcl::PointXYZI p2,
                    pcl::PointXYZI p3, pcl::PointXYZI p4,
                    pcl::PointXYZI* intersection);
-                   
+
     void inRay(pcl::PointXYZI p1, pcl::PointXYZI p2,
                pcl::PointXYZI p3, pcl::PointXYZI p4, bool& bOnRay);
-               
+
     void inRayGeneral(pcl::PointXYZI p1, pcl::PointXYZI p2,
                       pcl::PointXYZI p3, pcl::PointXYZI p4, bool& bOnRay);
-                      
+
     double calWeightTurkey(double r, double k, bool outside, double outsideThred);
-    
+
     double calWeightHuber(double r, double k);
-    
+
     double calWeightCauchy(double r, double k);
-    
+
     double checkParallel(pcl::PointXYZI p1, pcl::PointXYZI p2,
                         pcl::PointXYZI p3, pcl::PointXYZI p4);
-                        
+
     void getPCA(Eigen::Vector3f& eigen_values,
                 Eigen::Matrix3f& eigen_vector,
                 pcl::PointCloud<pcl::PointXYZI>::Ptr furthestRing,
                 bool& bPCA);
-                
+
     double calDistance(pcl::PointXYZI p1, pcl::PointXYZI p2);
-    
-    double calDistance2Line(pcl::PointXYZI p0, pcl::PointXYZI p1, 
+
+    double calDistance2Line(pcl::PointXYZI p0, pcl::PointXYZI p1,
                           pcl::PointXYZI p2);
 };
 

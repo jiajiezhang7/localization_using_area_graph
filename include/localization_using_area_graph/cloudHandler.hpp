@@ -15,6 +15,7 @@
 #include "utility.hpp"
 #include "cloudBase.hpp"
 #include "cloudInitializer.hpp"
+#include "odom_fusion.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -93,18 +94,43 @@ public:
     void resetParameters() override;  // 重置参数
 
 private:
+    // ========== 里程计融合相关 ==========
+    std::unique_ptr<agloc_fusion::OdomFusion> odom_fusion_;  // 里程计融合模块
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;  // 里程计订阅器
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr predicted_pose_pub_;  // 预测位姿发布器
 
+    // 融合状态变量
+    Eigen::Matrix4f last_fused_pose_;           // 上一次融合后的位姿
+    rclcpp::Time last_fusion_time_;             // 上一次融合的时间
+    bool fusion_initialized_;                   // 融合模块是否已初始化
+    double last_icp_score_;                     // 上一次ICP得分
 
     // 回调方法
     void cloudHandlerCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 处理接收到的点云数据
     void setInitialGuessFlag(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg);  // 设置初始猜测标志
     void manualInitialPoseCB(const std::shared_ptr<geometry_msgs::msg::PoseWithCovarianceStamped> poseMsg);  // 处理手动设置的初始位姿
+    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);  // 里程计回调函数
+
+    // ========== 里程计融合方法 ==========
+    void initializeOdomFusion();                                          // 初始化里程计融合模块
+    Eigen::Matrix4f applyOdomFusion(const Eigen::Matrix4f& icp_pose,     // 应用里程计融合
+                                   double icp_score,
+                                   const rclcpp::Time& timestamp);
+    double computeICPScore();                                             // 计算ICP匹配得分
+    void publishPredictedPose(const Eigen::Matrix4f& predicted_pose,     // 发布预测位姿
+                             const rclcpp::Time& timestamp);
 
     // 初始化发布器和订阅器
     void initializePublishers() {
         // 创建机器人位姿发布者
         pubRobotPose = create_publisher<geometry_msgs::msg::PoseStamped>(
             "/cloud_handler/pose", rclcpp::QoS(1).reliable());
+
+        // 如果启用位姿预测发布，创建预测位姿发布者
+        if (publish_prediction) {
+            predicted_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
+                "/cloud_handler/predicted_pose", rclcpp::QoS(1).reliable());
+        }
     }
 
     void initializeSubscribers() {
@@ -124,6 +150,13 @@ private:
         subManualInitialPose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
             "/initialpose_agloc", qos,
             std::bind(&CloudHandler::manualInitialPoseCB, this, std::placeholders::_1));
+
+        // 如果启用里程计融合，订阅里程计话题
+        if (enable_odom_fusion) {
+            odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+                odom_topic, qos,
+                std::bind(&CloudHandler::odomCallback, this, std::placeholders::_1));
+        }
     }
 
     // 初始化变量
@@ -136,6 +169,17 @@ private:
         hasGlobalPoseEstimate = false;      // 是否已从全局定位获得位姿估计
         hasManualInitialPose = false;       // 是否有手动设置的初始位姿
         globalImgTimes = 0;        // 全局图像次数
+
+        // 初始化里程计融合相关变量
+        fusion_initialized_ = false;
+        last_fused_pose_ = Eigen::Matrix4f::Identity();
+        last_fusion_time_ = this->now();
+        last_icp_score_ = 0.0;
+
+        // 如果启用里程计融合，初始化融合模块
+        if (enable_odom_fusion) {
+            initializeOdomFusion();
+        }
     }
 
 protected:

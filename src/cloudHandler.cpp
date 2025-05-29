@@ -1438,6 +1438,38 @@ void CloudHandler::optimizationICP() {
     // 发布当前位姿给AGLoc定位器
     pubRobotPose->publish(pose_stamped);
 
+    // ========== 应用里程计融合 ==========
+    if (enable_odom_fusion && fusion_initialized_) {
+        // 计算ICP得分
+        double icp_score = computeICPScore();
+
+        // 应用里程计融合
+        Eigen::Matrix4f fused_pose = applyOdomFusion(robotPose, icp_score, mapHeader.stamp);
+
+        // 更新机器人位姿为融合后的结果
+        robotPose = fused_pose;
+
+        // 重新计算位姿消息
+        pose_stamped.pose.position.x = robotPose(0,3);
+        pose_stamped.pose.position.y = robotPose(1,3);
+        pose_stamped.pose.position.z = 0;
+
+        // 重新计算四元数
+        Eigen::Matrix3d rotation3d_fused = Eigen::Matrix3d::Identity();
+        rotation3d_fused.topLeftCorner(3,3) = robotPose.topLeftCorner(3,3).cast<double>();
+        Eigen::Quaterniond quaternion_fused(rotation3d_fused);
+
+        pose_stamped.pose.orientation.x = quaternion_fused.x();
+        pose_stamped.pose.orientation.y = quaternion_fused.y();
+        pose_stamped.pose.orientation.z = quaternion_fused.z();
+        pose_stamped.pose.orientation.w = quaternion_fused.w();
+
+        if (debug_fusion) {
+            RCLCPP_DEBUG(get_logger(), "应用里程计融合: ICP得分=%.6f, 融合位姿=[%.3f, %.3f]",
+                         icp_score, robotPose(0,3), robotPose(1,3));
+        }
+    }
+
     // 将位姿添加到全局路径并发布
     globalPath.poses.push_back(pose_stamped);
     pubRobotPath->publish(globalPath);
@@ -1469,6 +1501,165 @@ void CloudHandler::setManualInitialPose(double yaw, const Eigen::Vector3f& posit
 
     RCLCPP_INFO(get_logger(), "手动设置初始位姿: 位置[%f, %f, %f], 偏航角[%f]",
                 position[0], position[1], position[2], yaw);
+}
+
+// ========== 里程计融合相关实现 ==========
+
+/**
+ * @brief 初始化里程计融合模块
+ */
+void CloudHandler::initializeOdomFusion() {
+    if (!enable_odom_fusion) {
+        return;
+    }
+
+    try {
+        odom_fusion_ = std::make_unique<agloc_fusion::OdomFusion>(this);
+        fusion_initialized_ = true;
+
+        RCLCPP_INFO(get_logger(), "里程计融合模块初始化成功");
+        RCLCPP_INFO(get_logger(), "里程计话题: %s, 超时时间: %.2f秒",
+                    odom_topic.c_str(), odom_timeout);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "里程计融合模块初始化失败: %s", e.what());
+        fusion_initialized_ = false;
+    }
+}
+
+/**
+ * @brief 里程计回调函数
+ * @param odom_msg 里程计消息
+ */
+void CloudHandler::odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg) {
+    if (!enable_odom_fusion || !fusion_initialized_ || !odom_fusion_) {
+        return;
+    }
+
+    try {
+        odom_fusion_->updateOdometry(odom_msg);
+
+        if (debug_fusion) {
+            RCLCPP_DEBUG(get_logger(), "更新里程计数据: pos=[%.3f, %.3f], vel=[%.3f, %.3f]",
+                         odom_msg->pose.pose.position.x, odom_msg->pose.pose.position.y,
+                         odom_msg->twist.twist.linear.x, odom_msg->twist.twist.angular.z);
+        }
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "处理里程计数据时出错: %s", e.what());
+    }
+}
+
+/**
+ * @brief 应用里程计融合
+ * @param icp_pose ICP优化后的位姿
+ * @param icp_score ICP匹配得分
+ * @param timestamp 当前时间戳
+ * @return 融合后的位姿
+ */
+Eigen::Matrix4f CloudHandler::applyOdomFusion(const Eigen::Matrix4f& icp_pose,
+                                             double icp_score,
+                                             const rclcpp::Time& timestamp) {
+    if (!enable_odom_fusion || !fusion_initialized_ || !odom_fusion_) {
+        return icp_pose;  // 如果未启用融合，直接返回ICP结果
+    }
+
+    try {
+        // 检查里程计数据是否有效
+        if (!odom_fusion_->isOdomValid(odom_timeout)) {
+            if (debug_fusion) {
+                RCLCPP_WARN(get_logger(), "里程计数据无效或超时，使用纯ICP结果");
+            }
+            return icp_pose;
+        }
+
+        // 基于里程计预测位姿
+        Eigen::Matrix4f predicted_pose = odom_fusion_->predictPose(last_fused_pose_, timestamp);
+
+        // 发布预测位姿（如果启用）
+        if (publish_prediction && predicted_pose_pub_) {
+            publishPredictedPose(predicted_pose, timestamp);
+        }
+
+        // 融合ICP结果与里程计预测
+        Eigen::Matrix4f fused_pose = odom_fusion_->fusePoses(icp_pose, predicted_pose, icp_score, timestamp);
+
+        // 更新多假设跟踪（如果启用）
+        if (enable_multi_hypothesis) {
+            odom_fusion_->updateHypotheses(fused_pose, icp_score, timestamp);
+
+            // 获取最佳假设
+            auto best_hypothesis = odom_fusion_->getBestHypothesis();
+            if (best_hypothesis.weight > hypothesis_weight_threshold) {
+                fused_pose = best_hypothesis.pose;
+            }
+        }
+
+        // 更新状态
+        last_fused_pose_ = fused_pose;
+        last_fusion_time_ = timestamp;
+        last_icp_score_ = icp_score;
+
+        if (debug_fusion) {
+            double pos_diff = (icp_pose.block<3,1>(0,3) - predicted_pose.block<3,1>(0,3)).norm();
+            RCLCPP_DEBUG(get_logger(), "位姿融合完成: ICP-预测差=%.3f, ICP得分=%.6f", pos_diff, icp_score);
+        }
+
+        return fused_pose;
+
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(get_logger(), "位姿融合时出错: %s", e.what());
+        return icp_pose;  // 出错时返回ICP结果
+    }
+}
+
+/**
+ * @brief 计算ICP匹配得分
+ * @return ICP得分 (0.0-1.0)
+ */
+double CloudHandler::computeICPScore() {
+    if (numIcpPoints == 0) {
+        return 0.0;
+    }
+
+    // 基于有效ICP点数和权重计算得分
+    double point_ratio = static_cast<double>(numIcpPoints) / (N_SCAN * Horizon_SCAN);
+    double weight_score = use_weight ? (weightSumTurkey / numIcpPoints) : 1.0;
+
+    // 综合得分：点数比例 * 权重得分
+    double score = point_ratio * weight_score;
+
+    // 限制在[0, 1]范围内
+    return std::max(0.0, std::min(1.0, score));
+}
+
+/**
+ * @brief 发布预测位姿用于可视化
+ * @param predicted_pose 预测的位姿
+ * @param timestamp 时间戳
+ */
+void CloudHandler::publishPredictedPose(const Eigen::Matrix4f& predicted_pose,
+                                       const rclcpp::Time& timestamp) {
+    if (!predicted_pose_pub_) {
+        return;
+    }
+
+    geometry_msgs::msg::PoseStamped pose_msg;
+    pose_msg.header.stamp = timestamp;
+    pose_msg.header.frame_id = "map";
+
+    // 设置位置
+    pose_msg.pose.position.x = predicted_pose(0,3);
+    pose_msg.pose.position.y = predicted_pose(1,3);
+    pose_msg.pose.position.z = predicted_pose(2,3);
+
+    // 设置方向
+    Eigen::Matrix3f rot = predicted_pose.block<3,3>(0,0);
+    Eigen::Quaternionf q(rot);
+    pose_msg.pose.orientation.x = q.x();
+    pose_msg.pose.orientation.y = q.y();
+    pose_msg.pose.orientation.z = q.z();
+    pose_msg.pose.orientation.w = q.w();
+
+    predicted_pose_pub_->publish(pose_msg);
 }
 
 /**

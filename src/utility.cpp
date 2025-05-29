@@ -6,7 +6,7 @@
  * @brief Implementation of utility functions defined in utility.hpp
  * @version 0.1
  * @date 2024-11-09
- * 
+ *
  * @details This file implements the utility functions declared in utility.hpp, focusing on:
  *
  * 1. Parameter Management Implementation:
@@ -17,7 +17,7 @@
  * 2. Geometric Calculations Implementation:
  *    - Optimized implementation of pedal point calculation
  *    - Efficient line intersection algorithms
- *    - Robust ray tracing with proper boundary checks  
+ *    - Robust ray tracing with proper boundary checks
  *    - Vector operations with error handling
  *
  * 3. Weight Function Implementations:
@@ -27,7 +27,7 @@
  *    - Distance-based weight calculations
  *
  * 4. Point Cloud Processing:
- *    - Efficient point cloud coordinate transformations  
+ *    - Efficient point cloud coordinate transformations
  *    - Point filtering and validation
  *    - Distance and angle calculations optimized for performance
  *
@@ -45,7 +45,7 @@
  * - Critical geometric calculations optimized for speed
  * - Parameter access cached where possible
  * - Memory allocation minimized in frequently called functions
- * 
+ *
  * @maintenance_notes
  * - Parameter handling may need updates for new ROS2 features
  * - Geometric calculations tested with standard test cases
@@ -57,8 +57,8 @@
 
 #include "localization_using_area_graph/utility.hpp"
 
-ParamServer::ParamServer(const std::string& node_name) 
-    : Node(node_name), 
+ParamServer::ParamServer(const std::string& node_name)
+    : Node(node_name),
     tf_buffer_(std::make_unique<tf2_ros::Buffer>(this->get_clock())),
     tf_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_buffer_))
 {
@@ -128,7 +128,37 @@ void ParamServer::declare_parameters() {
     this->declare_parameter("bAllPassageOpen", false);
     this->declare_parameter("bAllPassageClose", false);
     this->declare_parameter("bInitializationWithICP", false);
-    
+
+    // ========== 里程计融合参数声明 ==========
+    this->declare_parameter("enable_odom_fusion", false);
+    this->declare_parameter("odom_topic", "/odom");
+    this->declare_parameter("odom_timeout", 0.1);
+
+    // 运动模型参数
+    this->declare_parameter("odom_alpha1", 0.2);
+    this->declare_parameter("odom_alpha2", 0.2);
+    this->declare_parameter("odom_alpha3", 0.8);
+    this->declare_parameter("odom_alpha4", 0.2);
+
+    // 位姿融合权重参数
+    this->declare_parameter("icp_weight", 0.8);
+    this->declare_parameter("odom_weight", 0.2);
+    this->declare_parameter("adaptive_weight", true);
+
+    // 多假设跟踪参数
+    this->declare_parameter("enable_multi_hypothesis", false);
+    this->declare_parameter("max_hypotheses", 3);
+    this->declare_parameter("hypothesis_weight_threshold", 0.1);
+
+    // 位姿预测参数
+    this->declare_parameter("enable_pose_prediction", true);
+    this->declare_parameter("prediction_time_threshold", 0.05);
+    this->declare_parameter("max_prediction_distance", 1.0);
+
+    // 融合算法调试参数
+    this->declare_parameter("debug_fusion", false);
+    this->declare_parameter("publish_prediction", false);
+
     // 多线程参数
     this->declare_parameter("use_multithread", true);
     this->declare_parameter("max_thread_num", 8);
@@ -155,7 +185,7 @@ void ParamServer::get_parameters() {
         initialExtTrans = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
             extTransVFloat.data(), 3, 1);
     }
-    
+
     if(!mapextTransV.empty()) {
         std::vector<float> mapextTransVFloat(mapextTransV.begin(), mapextTransV.end());
         mapExtTrans = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(
@@ -164,7 +194,7 @@ void ParamServer::get_parameters() {
 
     this->get_parameter("initialYawAngle", initialYawAngle);
     this->get_parameter("mapYawAngle", mapYawAngle);
-    
+
     // Get error threshold parameters
     this->get_parameter("errorUpThredInit", errorUpThredInit);
     this->get_parameter("errorLowThredInit", errorLowThredInit);
@@ -207,7 +237,37 @@ void ParamServer::get_parameters() {
     this->get_parameter("bAllPassageOpen", bAllPassageOpen);
     this->get_parameter("bAllPassageClose", bAllPassageClose);
     this->get_parameter("bInitializationWithICP", bInitializationWithICP);
-    
+
+    // ========== 里程计融合参数获取 ==========
+    this->get_parameter("enable_odom_fusion", enable_odom_fusion);
+    this->get_parameter("odom_topic", odom_topic);
+    this->get_parameter("odom_timeout", odom_timeout);
+
+    // 运动模型参数
+    this->get_parameter("odom_alpha1", odom_alpha1);
+    this->get_parameter("odom_alpha2", odom_alpha2);
+    this->get_parameter("odom_alpha3", odom_alpha3);
+    this->get_parameter("odom_alpha4", odom_alpha4);
+
+    // 位姿融合权重参数
+    this->get_parameter("icp_weight", icp_weight);
+    this->get_parameter("odom_weight", odom_weight);
+    this->get_parameter("adaptive_weight", adaptive_weight);
+
+    // 多假设跟踪参数
+    this->get_parameter("enable_multi_hypothesis", enable_multi_hypothesis);
+    this->get_parameter("max_hypotheses", max_hypotheses);
+    this->get_parameter("hypothesis_weight_threshold", hypothesis_weight_threshold);
+
+    // 位姿预测参数
+    this->get_parameter("enable_pose_prediction", enable_pose_prediction);
+    this->get_parameter("prediction_time_threshold", prediction_time_threshold);
+    this->get_parameter("max_prediction_distance", max_prediction_distance);
+
+    // 融合算法调试参数
+    this->get_parameter("debug_fusion", debug_fusion);
+    this->get_parameter("publish_prediction", publish_prediction);
+
     // 获取多线程参数
     this->get_parameter("use_multithread", use_multithread);
     this->get_parameter("max_thread_num", max_thread_num);
@@ -215,11 +275,11 @@ void ParamServer::get_parameters() {
 
 void ParamServer::calPedal(double x1, double y1, double x2, double y2,
                            double x3, double y3, double& x4, double& y4) {
-    x4 = (x1*x1*x3 - 2*x1*x2*x3 - x1*y1*y2 + x1*y1*y3 + x1*y2*y2 
+    x4 = (x1*x1*x3 - 2*x1*x2*x3 - x1*y1*y2 + x1*y1*y3 + x1*y2*y2
           - x1*y2*y3 + x2*x2*x3 + x2*y1*y1 - x2*y1*y2 - x2*y1*y3 + x2*y2*y3)
          /(x1*x1 - 2*x1*x2 + x2*x2 + y1*y1 - 2*y1*y2 + y2*y2);
-         
-    y4 = (x1*x1*y2 - x1*x2*y1 - x1*x2*y2 + x1*x3*y1 - x1*x3*y2 + x2*x2*y1 
+
+    y4 = (x1*x1*y2 - x1*x2*y1 - x1*x2*y2 + x1*x3*y1 - x1*x3*y2 + x2*x2*y1
           - x2*x3*y1 + x2*x3*y2 + y1*y1*y3 - 2*y1*y2*y3 + y2*y2*y3)
          /(x1*x1 - 2*x1*x2 + x2*x2 + y1*y1 - 2*y1*y2 + y2*y2);
 }
@@ -227,18 +287,18 @@ void ParamServer::calPedal(double x1, double y1, double x2, double y2,
 pcl::PointXYZI ParamServer::calIntersection(pcl::PointXYZI p1, pcl::PointXYZI p2,
                                            pcl::PointXYZI p3, pcl::PointXYZI p4) {
     pcl::PointXYZI intersection;
-    intersection.x = (p3.y*p4.x*p2.x - p4.y*p3.x*p2.x - p3.y*p4.x*p1.x 
-                     + p4.y*p3.x*p1.x - p1.y*p2.x*p4.x + p2.y*p1.x*p4.x 
+    intersection.x = (p3.y*p4.x*p2.x - p4.y*p3.x*p2.x - p3.y*p4.x*p1.x
+                     + p4.y*p3.x*p1.x - p1.y*p2.x*p4.x + p2.y*p1.x*p4.x
                      + p1.y*p2.x*p3.x - p2.y*p1.x*p3.x)
-                    /(p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y 
+                    /(p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y
                       - p2.x*p4.y + p2.x*p3.y + p1.x*p4.y - p1.x*p3.y);
-                      
-    intersection.y = (-p3.y*p4.x*p2.y + p4.y*p3.x*p2.y + p3.y*p4.x*p1.y 
-                     - p4.y*p3.x*p1.y + p1.y*p2.x*p4.y - p1.y*p2.x*p3.y 
+
+    intersection.y = (-p3.y*p4.x*p2.y + p4.y*p3.x*p2.y + p3.y*p4.x*p1.y
+                     - p4.y*p3.x*p1.y + p1.y*p2.x*p4.y - p1.y*p2.x*p3.y
                      - p2.y*p1.x*p4.y + p2.y*p1.x*p3.y)
-                    /(p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y 
+                    /(p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y
                       - p2.y*p4.x + p2.y*p3.x + p1.y*p4.x - p1.y*p3.x);
-                      
+
     intersection.z = p1.z;
     return intersection;
 }
@@ -246,16 +306,16 @@ pcl::PointXYZI ParamServer::calIntersection(pcl::PointXYZI p1, pcl::PointXYZI p2
 bool ParamServer::inBetween(pcl::PointXYZI p1, pcl::PointXYZI p2,
                            pcl::PointXYZI p3, pcl::PointXYZI p4,
                            pcl::PointXYZI* intersection) {
-    if((p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y 
+    if((p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y
         + p2.x*p3.y + p1.x*p4.y - p1.x*p3.y) != 0 &&
-       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x 
+       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x
         + p2.y*p3.x + p1.y*p4.x - p1.y*p3.x) != 0) {
 
         pcl::PointXYZI intersection_ = calIntersection(p1, p2, p3, p4);
         double innerproduct = (intersection_.x - p1.x) * (p2.x - p1.x) +
                             (intersection_.y - p1.y) * (p2.y - p1.y);
 
-        if(innerproduct >= 0 && 
+        if(innerproduct >= 0 &&
            ((p4.x <= intersection_.x && intersection_.x <= p3.x) ||
             (p3.x <= intersection_.x && intersection_.x <= p4.x))) {
             *intersection = intersection_;
@@ -269,11 +329,11 @@ void ParamServer::inRay(pcl::PointXYZI p1, pcl::PointXYZI p2,
                        pcl::PointXYZI p3, pcl::PointXYZI p4, bool& bOnRay) {
     bOnRay = false;
     double distance = std::sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y));
-    
+
     if((distance > lidarMinRange && distance < lidarMaxRange) &&
-       (p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y 
+       (p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y
         + p2.x*p3.y + p1.x*p4.y - p1.x*p3.y) != 0 &&
-       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x 
+       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x
         + p2.y*p3.x + p1.y*p4.x - p1.y*p3.x) != 0) {
 
         pcl::PointXYZI intersection_ = calIntersection(p1, p2, p3, p4);
@@ -292,9 +352,9 @@ void ParamServer::inRay(pcl::PointXYZI p1, pcl::PointXYZI p2,
 void ParamServer::inRayGeneral(pcl::PointXYZI p1, pcl::PointXYZI p2,
                               pcl::PointXYZI p3, pcl::PointXYZI p4, bool& bOnRay) {
     bOnRay = false;
-    if((p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y 
+    if((p4.x*p2.y - p4.x*p1.y - p3.x*p2.y + p3.x*p1.y - p2.x*p4.y
         + p2.x*p3.y + p1.x*p4.y - p1.x*p3.y) != 0 &&
-       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x 
+       (p4.y*p2.x - p4.y*p1.x - p3.y*p2.x + p1.x*p3.y - p2.y*p4.x
         + p2.y*p3.x + p1.y*p4.x - p1.y*p3.x) != 0) {
 
         pcl::PointXYZI intersection_ = calIntersection(p1, p2, p3, p4);

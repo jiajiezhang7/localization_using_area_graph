@@ -114,6 +114,7 @@ add_executable(cloud_handler
   src/cloudInitializer_multithread.cpp
   src/cloudInitializer_thread_safe.cpp
   src/cloudInitializer_pose_evaluation.cpp
+  src/odom_fusion.cpp
 )
 
 target_link_libraries(cloud_handler
@@ -124,6 +125,7 @@ target_link_libraries(cloud_handler
   ${message_filters_LIBRARIES}
   OpenMP::OpenMP_CXX
   tf2_geometry_msgs::tf2_geometry_msgs
+  tf2_eigen::tf2_eigen
 )
 
 
@@ -162,6 +164,7 @@ foreach(target
     visualization_msgs
     tf2
     tf2_ros
+    tf2_eigen
     tf2_geometry_msgs
     cv_bridge
     image_transport
