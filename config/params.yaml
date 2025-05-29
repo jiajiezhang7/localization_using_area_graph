@@ -51,11 +51,10 @@
 
         # -------------------------------
 
-    # Fujing's 0510 bag - 也即 seq01 在SIST1-D
-        # for osmAG map, 这是拿来把mapPC_AG坐标系下的node点云转换到map_PC坐标系下，使他们有正确的坐标值
+        # 以下参数已经不必再修改,因为mapAGCB将直接从tf: map->AGmap中读取参数
+        # for osmAG map, 这是拿来把mapPC_AG坐标系下的node点云转换到map坐标系下，使他们有正确的坐标值
         # 对于确定的osmAG地图确定的root_node，以下参数无须改动 - root: lat = "31.17947960435" lon="121.59139728509
-        # mapExtrinsicTrans: [9.8,-34.3, -16.0]
-        mapYawAngle: -81.0 # seq01
+        mapYawAngle: -81.0 
         mapExtrinsicTrans: [9.8,-34.3, -16.0]
         # for Robot pose seq01 bag， 这些参数在 setInitialPose()中被使用
                     # seq01 - [0.5, 0.15, 0.0]  yaw:10.0

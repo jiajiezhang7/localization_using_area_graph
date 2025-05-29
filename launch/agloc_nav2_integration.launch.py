@@ -38,7 +38,7 @@ def generate_launch_description():
 
     osm_file_arg = DeclareLaunchArgument(
         'osm_file',
-        default_value=os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_F2_All_Sec.osm'),
+        default_value=os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_SEM_fixid_biggestever.osm'),
         description='区域图OSM文件路径'
     )
 

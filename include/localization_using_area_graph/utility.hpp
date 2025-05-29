@@ -264,12 +264,13 @@ protected:
     bool publish_prediction;                    // 是否发布预测位姿
 
 private:
+    void declare_parameters();
+    void get_parameters();
+
+protected:
     // TF2 components
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-
-    void declare_parameters();
-    void get_parameters();
 
 public:
     void calPedal(double x1, double y1, double x2, double y2,

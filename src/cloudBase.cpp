@@ -206,13 +206,44 @@ void CloudBase::mapAGCB(const sensor_msgs::msg::PointCloud2::SharedPtr laserClou
         return;
     }
 
-    // 构建地图变换矩阵
-    Eigen::Matrix4f mapPose = Eigen::Matrix4f::Zero();
-    Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
-
-    transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
-    transform_initial.rotate(Eigen::AngleAxisf(mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
-    mapPose = transform_initial.matrix();
+    // 从TF中获取map到AGmap的变换关系，而不是从参数中获取
+    Eigen::Matrix4f mapPose = Eigen::Matrix4f::Identity();
+    try {
+        // 查询最新的map到AGmap的变换关系
+        geometry_msgs::msg::TransformStamped transformStamped;
+        transformStamped = tf_buffer_->lookupTransform("map", "AGmap", tf2::TimePointZero);
+        
+        // 从TransformStamped中提取变换信息
+        Eigen::Vector3f translation;
+        translation.x() = transformStamped.transform.translation.x;
+        translation.y() = transformStamped.transform.translation.y;
+        translation.z() = transformStamped.transform.translation.z;
+        
+        Eigen::Quaternionf rotation(
+            transformStamped.transform.rotation.w,
+            transformStamped.transform.rotation.x,
+            transformStamped.transform.rotation.y,
+            transformStamped.transform.rotation.z
+        );
+        
+        // 构建变换矩阵
+        Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+        transform.translation() = translation;
+        transform.rotate(rotation);
+        mapPose = transform.matrix();
+        
+        RCLCPP_INFO(this->get_logger(), "Map->AGmap transform retrieved from TF: [%f, %f, %f]", 
+                   translation.x(), translation.y(), translation.z());
+    } catch (const tf2::TransformException& ex) {
+        RCLCPP_ERROR(this->get_logger(), "Could not transform map to AGmap: %s", ex.what());
+        RCLCPP_WARN(this->get_logger(), "Falling back to default parameters for map transformation");
+        
+        // 如果TF失败，回退到参数中的值（保持兼容性）
+        Eigen::Affine3f transform_initial = Eigen::Affine3f::Identity();
+        transform_initial.translation() << mapExtTrans[0], mapExtTrans[1], mapExtTrans[2];
+        transform_initial.rotate(Eigen::AngleAxisf(mapYawAngle/180.0*M_PI, Eigen::Vector3f::UnitZ()));
+        mapPose = transform_initial.matrix();
+    }
 
     // 对点云进行坐标变换
     try {
