@@ -20,8 +20,8 @@ def generate_launch_description():
     # 声明参数
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='false',
-        description='使用仿真时间'
+        default_value='true',
+        description='使用仿真时间，不然rosbag中的tf: odom->base_link无法被读取 - 因为它的时间戳是rosbag中记录时的系统时间'
     )
 
     use_bag_arg = DeclareLaunchArgument(
