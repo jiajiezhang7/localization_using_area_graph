@@ -32,7 +32,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_01',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_corridor_409',
         description='ROS2 bag文件路径'
     )
 

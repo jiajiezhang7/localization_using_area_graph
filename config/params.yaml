@@ -94,7 +94,7 @@
         particle_generator_step: 2.0       # 粒子采样步长
         particle_generator_radius: 5.0     # 搜索半径(米)
         use_room_info: true               # 是否使用WiFiLocation中的room信息来过滤粒子
-        boundary_filter_threshold: 1.0     # 边界过滤阈值（米），粒子距离边界小于此值时被过滤
+        boundary_filter_threshold: 0.5     # 边界过滤阈值（米），粒子距离边界小于此值时被过滤
         # without icp initialization
         rescue_angle_interval: 5.0
         # --------------------------------------------------------

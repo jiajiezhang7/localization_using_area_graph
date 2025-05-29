@@ -12,7 +12,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/95',
+        default_value='/home/jay/AGLoc_ws/rosbag/97',
         description='Path to ROS2 bag file'
     )
 
@@ -21,7 +21,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='false',
+        default_value='true',
         description='Whether to use global localization'
     )
 
@@ -169,7 +169,7 @@ def generate_launch_description():
                             'use_sim_time': LaunchConfiguration('use_sim_time'),
                             'bag_path': LaunchConfiguration('bag_file'),
                             'use_true_ap_positions': False,
-                            'wait_for_robotpose': False,
+                            'wait_for_robotpose': True,
                         }
                     ],
                     condition=IfCondition(LaunchConfiguration('use_global_localization')),
