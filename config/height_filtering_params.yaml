@@ -1,0 +1,27 @@
+# ========== 跨楼层高度过滤参数配置 ==========
+# 该配置文件用于配置AGLoc系统的跨楼层高度过滤功能
+# 与动态楼层加载功能完全兼容
+
+# 基础高度过滤参数
+enable_height_filtering: true          # 是否启用高度过滤功能
+floor_height: 8.0                      # 单层楼高度（米）
+height_tolerance: 1.0                  # 高度容差（米）
+floor_change_threshold: 4.0            # 楼层切换检测阈值（米）
+enable_floor_detection: true           # 是否启用楼层自动检测
+debug_height_filtering: false          # 是否输出高度过滤调试信息
+
+# 楼层配置说明：
+# - floor_height: 定义每层楼的标准高度，用于计算楼层编号
+# - height_tolerance: 机器人高度与区域高度匹配时的容差范围
+# - floor_change_threshold: TF变换中Z值变化超过此阈值时认为发生楼层切换
+# - enable_floor_detection: 启用后系统会自动监测楼层变化并更新状态
+
+# 使用示例：
+# 1. 单楼层环境：设置 enable_height_filtering: false
+# 2. 多楼层环境：设置 enable_height_filtering: true，调整 floor_height 和 height_tolerance
+# 3. 调试模式：设置 debug_height_filtering: true 查看详细过滤信息
+
+# 兼容性说明：
+# - 该配置与现有的跨楼层动态加载功能完全兼容
+# - TF监听逻辑保持不变，高度过滤作为额外的安全检查
+# - 可以通过 enable_height_filtering 开关随时启用/禁用功能

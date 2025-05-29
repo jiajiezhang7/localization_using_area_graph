@@ -31,6 +31,7 @@
 
 #include "utility.hpp"
 #include <mutex> // 添加互斥锁头文件
+#include <chrono> // 添加时间相关头文件
 
 class CloudBase : public ParamServer {
 public:
@@ -166,6 +167,13 @@ public:
     std::vector<Eigen::Vector3f> roomGuess;         // 房间猜测
     static area_graph_data_parser::msg::AGindex AG_index;  // 区域图索引
 
+    // ========== 跨楼层高度过滤状态变量 ==========
+    double current_floor_z_offset_;                 // 当前楼层Z偏移量（从TF获取）
+    int current_floor_number_;                      // 当前楼层编号
+    double last_floor_z_offset_;                    // 上一次的楼层Z偏移量
+    bool floor_changed_;                            // 楼层是否发生变化
+    std::chrono::steady_clock::time_point last_floor_check_time_;  // 上次楼层检查时间
+
     // 计数器
     int numTotalHistogram;                          // 总直方图数
     int currentIteration;                           // 当前迭代次数
@@ -194,6 +202,15 @@ public:
     void setEveryFrame();
 
     bool areaInsideChecking(const Eigen::Matrix4f& robotPose, int areaStartIndex);
+
+    // ========== 跨楼层高度过滤相关函数 ==========
+    bool areaInsideCheckingWithHeight(const Eigen::Matrix4f& robotPose, int areaStartIndex);
+    bool isAreaHeightCompatible(double robotHeight, int areaStartIndex);
+    void updateFloorState(double tf_z_offset);
+    int calculateFloorNumber(double z_offset);
+    bool detectFloorChange(double current_z_offset);
+    void resetFloorState();
+
     // VIRTUAL functions
     virtual void calClosestMapPoint(int inside_index) = 0;
     virtual bool checkMap(int ring, int horizonIndex, int& last_index, double& minDist, int inside_index) = 0;
@@ -303,6 +320,13 @@ private:
         Vec_pedaly.clear();
         corridorGuess.clear();
         roomGuess.clear();
+
+        // ========== 初始化楼层状态变量 ==========
+        current_floor_z_offset_ = 0.0;
+        current_floor_number_ = 1;
+        last_floor_z_offset_ = 0.0;
+        floor_changed_ = false;
+        last_floor_check_time_ = std::chrono::steady_clock::now();
     }
 };
 #endif

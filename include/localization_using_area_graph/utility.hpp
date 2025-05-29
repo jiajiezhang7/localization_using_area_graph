@@ -263,6 +263,14 @@ protected:
     bool debug_fusion;                          // 是否输出融合调试信息
     bool publish_prediction;                    // 是否发布预测位姿
 
+    // ========== 跨楼层高度过滤参数 ==========
+    bool enable_height_filtering;               // 是否启用高度过滤
+    double floor_height;                        // 单层楼高度（米）
+    double height_tolerance;                    // 高度容差（米）
+    double floor_change_threshold;              // 楼层切换检测阈值（米）
+    bool enable_floor_detection;                // 是否启用楼层自动检测
+    bool debug_height_filtering;                // 高度过滤调试信息
+
 private:
     void declare_parameters();
     void get_parameters();

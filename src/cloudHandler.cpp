@@ -91,7 +91,12 @@ void CloudHandler::gettingInsideWhichArea() {
         // 检查新区域的开始
         if((int)map_pc->points[i].intensity % 3 == 0) {
             // intensity % 3 == 0 --> Area的起始点
-            binside = areaInsideChecking(robotPose, i);
+            // ========== 使用带高度过滤的区域判断 ==========
+            if (enable_height_filtering) {
+                binside = areaInsideCheckingWithHeight(robotPose, i);
+            } else {
+                binside = areaInsideChecking(robotPose, i);
+            }
             temp++;
         }
 

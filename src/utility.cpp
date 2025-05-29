@@ -162,6 +162,14 @@ void ParamServer::declare_parameters() {
     // 多线程参数
     this->declare_parameter("use_multithread", true);
     this->declare_parameter("max_thread_num", 8);
+
+    // ========== 跨楼层高度过滤参数声明 ==========
+    this->declare_parameter("enable_height_filtering", true);
+    this->declare_parameter("floor_height", 8.0);                    // 单层楼高度（米）
+    this->declare_parameter("height_tolerance", 1.0);                // 高度容差（米）
+    this->declare_parameter("floor_change_threshold", 4.0);          // 楼层切换检测阈值（米）
+    this->declare_parameter("enable_floor_detection", true);         // 启用楼层自动检测
+    this->declare_parameter("debug_height_filtering", false);        // 高度过滤调试信息
 }
 
 void ParamServer::get_parameters() {
@@ -271,6 +279,14 @@ void ParamServer::get_parameters() {
     // 获取多线程参数
     this->get_parameter("use_multithread", use_multithread);
     this->get_parameter("max_thread_num", max_thread_num);
+
+    // ========== 跨楼层高度过滤参数获取 ==========
+    this->get_parameter("enable_height_filtering", enable_height_filtering);
+    this->get_parameter("floor_height", floor_height);
+    this->get_parameter("height_tolerance", height_tolerance);
+    this->get_parameter("floor_change_threshold", floor_change_threshold);
+    this->get_parameter("enable_floor_detection", enable_floor_detection);
+    this->get_parameter("debug_height_filtering", debug_height_filtering);
 }
 
 void ParamServer::calPedal(double x1, double y1, double x2, double y2,
