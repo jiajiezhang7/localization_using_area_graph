@@ -76,7 +76,7 @@
         # initialExtrinsicTrans: [7.95, 30.79, 0.0]  # bag: agile03_corridor_03
 
         # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bRescueRobot: true                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
         
         # 25.2.20在测试这个模式-希望跑通 -- 2.28已跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位
@@ -92,8 +92,8 @@
 
         # 添加particle_generator参数
         particle_generator_step: 2.0       # 粒子采样步长
-        particle_generator_radius: 6.0     # 搜索半径(米)
-        use_room_info: false               # 是否使用WiFiLocation中的room信息来过滤粒子
+        particle_generator_radius: 5.0     # 搜索半径(米)
+        use_room_info: true               # 是否使用WiFiLocation中的room信息来过滤粒子
         # without icp initialization 
         rescue_angle_interval: 5.0
         # --------------------------------------------------------
@@ -167,7 +167,7 @@
 
         bOnlyScoreParticles: false
         # 控制体素滤波器的降采样程度，若要减小降采样程度 - 保留更多点，则需要减小scoreDownsampleRate的值
-        scoreDownsampleRate: 0.2
+        scoreDownsampleRate: 0.1
 
         # only for testing
         bResultChecking: false

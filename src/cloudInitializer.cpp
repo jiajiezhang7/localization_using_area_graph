@@ -252,7 +252,7 @@ void CloudInitializer::rescueRobot() {
                     static_cast<int>((1.0 - static_cast<double>(sparse_particles.size()) / corridorGuess.size()) * 100));
 
         // 第二步：粗粒度角度搜索 - 使用较大角度步长
-        const size_t coarse_try_time = static_cast<size_t>(360/12); // 使用12度的角度步长
+        const size_t coarse_try_time = static_cast<size_t>(360/6); // 使用6度的角度步长（从12度改进）
         auto organizedCloudInDS = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
 
         // Downsample point cloud - 体素滤波器降采样
@@ -285,7 +285,7 @@ void CloudInitializer::rescueRobot() {
         second_best_sparse_area_id = -1;
 
         // 对稀疏采样的粒子执行粗粒度角度搜索
-        RCLCPP_INFO(this->get_logger(), "开始粗粒度角度搜索，角度步长: 12度");
+        RCLCPP_INFO(this->get_logger(), "开始粗粒度角度搜索，角度步长: 6度");
 
         // 按Area对稀疏粒子进行分组
         std::map<int, std::vector<size_t>> sparse_area_particles;
@@ -337,11 +337,11 @@ void CloudInitializer::rescueRobot() {
                     outsideTotalScore = 0;
                     turkeyScore = 0;
 
-                    // 使用粗粒度角度步长(12度)
+                    // 使用粗粒度角度步长(6度)
                     Eigen::Vector3f tempinitialExtTrans;
                     tempinitialExtTrans << sparse_particles[particle_idx][0], sparse_particles[particle_idx][1], 0;
-                    // 计算当前角度 (12度步长)
-                    int current_angle = static_cast<int>(std::fmod(initialYawAngle + i * 12.0, 360.0));
+                    // 计算当前角度 (6度步长)
+                    int current_angle = static_cast<int>(std::fmod(initialYawAngle + i * 6.0, 360.0));
                     setInitialPose(current_angle, tempinitialExtTrans);
 
                 // RCLCPP_DEBUG(this->get_logger(), "robotPose矩阵:\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f\n%.2f %.2f %.2f %.2f",
@@ -409,8 +409,29 @@ void CloudInitializer::rescueRobot() {
                                    << "outside_total:" << outsideTotalScore << ","
                                    << "turkey_score:" << turkeyScore << std::endl;
                 }
-                // 计算当前角度的评分
-                double current_score = 1.0/(insideScore + outsideScore);
+                // 计算当前角度的评分 - 提升数值精度和边缘位姿处理
+                long double base_score = 1.0L/(static_cast<long double>(insideScore) + static_cast<long double>(outsideScore));
+
+                // 添加边缘位姿惩罚因子
+                long double edge_penalty = 1.0L;
+                if (numofInsidePoints > 0 && numofOutsidePoints > 0) {
+                    // 计算内外点比例，理想情况下应该有更多内部点
+                    long double inside_ratio = static_cast<long double>(numofInsidePoints) /
+                                             (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
+
+                    // 如果内部点比例过低（接近通道边缘），应用惩罚
+                    if (inside_ratio < 0.7L) {
+                        edge_penalty = inside_ratio / 0.7L; // 线性惩罚
+                    }
+
+                    // 额外考虑Turkey评分的稳定性
+                    if (turkeyScore > 0) {
+                        long double turkey_bonus = std::min(1.2L, 1.0L + turkeyScore / 1000.0L);
+                        edge_penalty *= turkey_bonus;
+                    }
+                }
+
+                double current_score = static_cast<double>(base_score * edge_penalty);
                 angle_scores[i] = current_score;
 
                 // 更新该粒子的最佳角度
@@ -451,8 +472,10 @@ void CloudInitializer::rescueRobot() {
                 pubCurrentMaxRobotPose->publish(pose_max_stamped);
 
                 RCLCPP_INFO(this->get_logger(),
-                    "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.6f",
-                    robotPose(0,3), robotPose(1,3), current_angle, current_score);
+                    "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.8f (基础=%.8f, 边缘惩罚=%.3f, 内部点=%d, 外部点=%d)",
+                    robotPose(0,3), robotPose(1,3), current_angle, current_score,
+                    static_cast<double>(base_score), static_cast<double>(edge_penalty),
+                    numofInsidePoints, numofOutsidePoints);
                 if (current_score <= best_sparse_score) {
                     // 添加调试信息
                     RCLCPP_DEBUG(this->get_logger(),
@@ -482,7 +505,7 @@ void CloudInitializer::rescueRobot() {
                 RCLCPP_DEBUG(this->get_logger(),
                     "粒子 %zu (x=%.2f, y=%.2f, area=%d) 在粗角度搜索中的最佳角度: %d度, 评分: %.6f",
                     particle_idx, sparse_particles[particle_idx][0], sparse_particles[particle_idx][1], area_id,
-                    static_cast<int>(std::fmod(initialYawAngle + best_angle_idx * 12.0, 360.0)),
+                    static_cast<int>(std::fmod(initialYawAngle + best_angle_idx * 6.0, 360.0)),
                     best_particle_score);
             }
 
@@ -554,7 +577,7 @@ void CloudInitializer::rescueRobot() {
         RCLCPP_INFO(this->get_logger(), "局部精细搜索留下了 %zu 个粒子 (含双峰候选)", local_particles.size());
 
         // 使用更小的角度步长进行精细搜索
-        const size_t fine_try_time = static_cast<size_t>(360/5); // 使用5度的角度步长
+        const size_t fine_try_time = static_cast<size_t>(360/3); // 使用3度的角度步长（从5度改进）
 
 
 
@@ -573,19 +596,19 @@ void CloudInitializer::rescueRobot() {
 
             if (particle_idx == 0) {
                 // 对于最佳粒子，在其最佳角度附近搜索
-                int best_angle_idx_fine = static_cast<int>(best_sparse_angle / 5.0f);
-                start_angle_idx = std::max(0, best_angle_idx_fine - 6);
-                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, best_angle_idx_fine + 6);
+                int best_angle_idx_fine = static_cast<int>(best_sparse_angle / 3.0f);
+                start_angle_idx = std::max(0, best_angle_idx_fine - 10);
+                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, best_angle_idx_fine + 10);
             } else if (particle_idx == 1) {
                 // 对于第二最佳候选，在其最佳角度附近搜索
-                int second_angle_idx_fine = static_cast<int>(second_best_sparse_angle / 5.0f);
-                start_angle_idx = std::max(0, second_angle_idx_fine - 6);
-                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, second_angle_idx_fine + 6);
+                int second_angle_idx_fine = static_cast<int>(second_best_sparse_angle / 3.0f);
+                start_angle_idx = std::max(0, second_angle_idx_fine - 10);
+                end_angle_idx = std::min(static_cast<int>(fine_try_time) - 1, second_angle_idx_fine + 10);
                 RCLCPP_INFO(this->get_logger(),
                     "双峰验证: 精细搜索第二候选，区域=%d, 角度范围=[%d, %d]",
                     second_best_sparse_area_id,
-                    start_angle_idx * 5,
-                    end_angle_idx * 5);
+                    start_angle_idx * 3,
+                    end_angle_idx * 3);
             } else {
                 // 对于其他局部粒子，进行全角度搜索
                 start_angle_idx = 0;
@@ -618,7 +641,7 @@ void CloudInitializer::rescueRobot() {
                 // 设置初始位姿
                 Eigen::Vector3f tempinitialExtTrans;
                 tempinitialExtTrans << local_particles[particle_idx][0], local_particles[particle_idx][1], 0;
-                float current_angle = std::fmod(initialYawAngle + angle_idx * 5.0, 360.0); // 使用5度步长
+                float current_angle = std::fmod(initialYawAngle + angle_idx * 3.0, 360.0); // 使用3度步长
                 setInitialPose(static_cast<int>(current_angle), tempinitialExtTrans);
 
                 // Transform point cloud
@@ -659,7 +682,7 @@ void CloudInitializer::rescueRobot() {
                         Eigen::Vector3d eulerAngle = quaternion.matrix().eulerAngles(1,2,0);
                         result_angle = eulerAngle[1]/M_PI*180;
                     } else {
-                        result_angle = static_cast<int>(std::fmod(initialYawAngle + angle_idx * 5.0, 360.0));
+                        result_angle = static_cast<int>(std::fmod(initialYawAngle + angle_idx * 3.0, 360.0));
                     }
 
                     initialized = false;
@@ -680,8 +703,29 @@ void CloudInitializer::rescueRobot() {
                                        << "turkey_score:" << turkeyScore << std::endl;
                     }
 
-                    // 计算当前角度的评分
-                    double current_score = 1.0/(insideScore + outsideScore);
+                    // 计算当前角度的评分 - 提升数值精度和边缘位姿处理
+                    long double base_score = 1.0L/(static_cast<long double>(insideScore) + static_cast<long double>(outsideScore));
+
+                    // 添加边缘位姿惩罚因子
+                    long double edge_penalty = 1.0L;
+                    if (numofInsidePoints > 0 && numofOutsidePoints > 0) {
+                        // 计算内外点比例，理想情况下应该有更多内部点
+                        long double inside_ratio = static_cast<long double>(numofInsidePoints) /
+                                                 (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
+
+                        // 如果内部点比例过低（接近通道边缘），应用惩罚
+                        if (inside_ratio < 0.7L) {
+                            edge_penalty = inside_ratio / 0.7L; // 线性惩罚
+                        }
+
+                        // 额外考虑Turkey评分的稳定性
+                        if (turkeyScore > 0) {
+                            long double turkey_bonus = std::min(1.2L, 1.0L + turkeyScore / 1000.0L);
+                            edge_penalty *= turkey_bonus;
+                        }
+                    }
+
+                    double current_score = static_cast<double>(base_score * edge_penalty);
 
                     // 更新该粒子的最佳角度
                     if(particle_best_angle_idx == -1 || current_score > particle_best_score) {
@@ -703,9 +747,11 @@ void CloudInitializer::rescueRobot() {
                         pubCurrentMaxRobotPose->publish(pose_max_stamped);
 
                         RCLCPP_INFO(this->get_logger(),
-                            "精细搜索更新最佳位姿: x=%.2f, y=%.2f, 角度=%d度, 评分=%.6f",
+                            "精细搜索更新最佳位姿: x=%.2f, y=%.2f, 角度=%d度, 评分=%.8f (基础=%.8f, 边缘惩罚=%.3f, 内部点=%d, 外部点=%d)",
                             robotPose(0,3), robotPose(1,3),
-                            static_cast<int>(result_angle), current_score);
+                            static_cast<int>(result_angle), current_score,
+                            static_cast<double>(base_score), static_cast<double>(edge_penalty),
+                            numofInsidePoints, numofOutsidePoints);
                     }
                     else {
                         // 添加调试信息
@@ -738,7 +784,7 @@ void CloudInitializer::rescueRobot() {
                 RCLCPP_DEBUG(this->get_logger(),
                     "局部粒子 %zu (x=%.2f, y=%.2f) 的最佳角度: %d度, 评分: %.6f",
                     particle_idx, local_particles[particle_idx][0], local_particles[particle_idx][1],
-                    static_cast<int>(std::fmod(initialYawAngle + particle_best_angle_idx * 5.0, 360.0)),
+                    static_cast<int>(std::fmod(initialYawAngle + particle_best_angle_idx * 3.0, 360.0)),
                     particle_best_score);
             }
 

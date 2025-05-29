@@ -211,12 +211,16 @@ void CloudHandler::cloudHandlerCB(
         return;
     }
 
-    // 打印当前状态
-    RCLCPP_DEBUG(get_logger(), "当前状态: bRescueRobot=%s, isRescueFinished=%s, initialized=%s, hasGlobalPoseEstimate=%s",
+    // 打印当前状态 - 增强调试信息
+    RCLCPP_INFO(get_logger(), "📊 系统状态: bRescueRobot=%s, isRescueFinished=%s, initialized=%s, hasGlobalPoseEstimate=%s",
                 bRescueRobot ? "true" : "false",
                 cloudInitializer->isRescueFinished ? "true" : "false",
                 initialized ? "true" : "false",
                 hasGlobalPoseEstimate ? "true" : "false");
+
+    // 添加错误阈值状态信息
+    RCLCPP_DEBUG(get_logger(), "错误阈值: errorUpThred=%.1f, errorLowThred=%.1f, errorUpThredCurr=%.1f, errorLowThredCurr=%.1f",
+                errorUpThred, errorLowThred, errorUpThredCurr, errorLowThredCurr);
 
     // 准备新帧的处理
     setEveryFrame();
@@ -343,9 +347,11 @@ void CloudHandler::cloudHandlerCB(
 
             pubRobotPose->publish(pose_msg);
 
-            // 关闭救援模式
+            // 关闭救援模式，但不重置isRescueFinished，让下一帧进入位姿跟踪
             bRescueRobot = false;
-            cloudInitializer->isRescueFinished = false;
+
+            // 设置全局定位完成标志，让下一帧使用全局定位结果
+            hasGlobalPoseEstimate = true;
 
             // 取消对粒子消息的订阅，防止再次触发rescueRobot
             cloudInitializer->subInitialGuess.reset();
@@ -353,6 +359,8 @@ void CloudHandler::cloudHandlerCB(
             subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudHandler::setInitialGuessFlag,
                                      this, std::placeholders::_1));
+
+            RCLCPP_INFO(get_logger(), "全局定位完成，下一帧将开始位姿跟踪");
             return;
         }
 
@@ -377,16 +385,26 @@ void CloudHandler::cloudHandlerCB(
         else if(hasGlobalPoseEstimate) {
             // 使用全局定位的结果
             robotPose = cloudInitializer->MaxRobotPose;
-            errorUpThred = 3;
+
+            // 重要修复：设置合适的跟踪阈值，而非硬编码的3
+            errorUpThred = 1.5;  // 稍微宽松一点，便于从全局定位过渡到精确跟踪
+            errorLowThred = 1.0;
+
+            // 重要修复：标记系统已初始化，启用正常的跟踪模式
+            initialized = true;
+
+            // 重要修复：重置isRescueFinished，防止重复使用全局定位结果
+            cloudInitializer->isRescueFinished = false;
 
             cloudInitializer->subInitialGuess = create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/none", 10, std::bind(&CloudInitializer::getInitialExtGuess,
                                      cloudInitializer.get(),
                                      std::placeholders::_1));
 
-            RCLCPP_DEBUG(get_logger(), "SETTING ERRORUPTHRED=3");
-            RCLCPP_INFO(get_logger(), "使用全局定位结果作为初始位姿: [%f, %f]",
+            RCLCPP_INFO(get_logger(), "使用全局定位结果作为初始位姿: [%f, %f], 系统已初始化，开始位姿跟踪",
                          robotPose(0,3), robotPose(1,3));
+            RCLCPP_INFO(get_logger(), "跟踪阈值设置: errorUpThred=%.1f, errorLowThred=%.1f",
+                         errorUpThred, errorLowThred);
 
             hasGlobalPoseEstimate = false;
         } else {
@@ -1026,13 +1044,30 @@ void CloudHandler::filterUsefulPoints() {
     RCLCPP_DEBUG(this->get_logger(), "Number of ICP points: %d", numIcpPoints);
     RCLCPP_DEBUG(this->get_logger(), "Turkey weight sum: %f", weightSumTurkey);
 
+    // 增强的位姿跟踪失败检测
     if (numIcpPoints == 0) {
-        RCLCPP_WARN(this->get_logger(), "No valid ICP points found! This may cause tracking failure.");
+        RCLCPP_ERROR(this->get_logger(), "❌ 位姿跟踪失败: 没有找到有效的ICP点!");
+
+        // 如果是从全局定位刚切换过来，可能需要调整阈值
+        if (initialized && errorUpThred < 2.0) {
+            RCLCPP_WARN(this->get_logger(), "尝试放宽误差阈值以恢复跟踪...");
+            errorUpThred = std::min(errorUpThred * 1.5, 3.0);
+            errorLowThred = std::min(errorLowThred * 1.2, 1.5);
+            RCLCPP_INFO(this->get_logger(), "调整后阈值: errorUpThred=%.1f, errorLowThred=%.1f",
+                         errorUpThred, errorLowThred);
+        }
         return;
     }
 
     if (weightSumTurkey < 1e-6) {
         RCLCPP_WARN(this->get_logger(), "Turkey weight sum is too small: %f", weightSumTurkey);
+    }
+
+    // 检测跟踪质量
+    if (numIcpPoints < 10) {
+        RCLCPP_WARN(this->get_logger(), "⚠️  跟踪质量较差: ICP点数量过少 (%d < 10)", numIcpPoints);
+    } else if (numIcpPoints > 50) {
+        RCLCPP_INFO(this->get_logger(), "✅ 跟踪质量良好: ICP点数量充足 (%d)", numIcpPoints);
     }
 }
 
@@ -1357,11 +1392,28 @@ void CloudHandler::optimizationICP() {
         // 检查收敛条件：如果平移量小于阈值且旋转角度小于阈值，则认为收敛
         if(std::isnan(translation.norm()) ||
            (translation.norm() < icp_stop_translation_thred &&
-            acos(rotationMatrix(0,0))/M_PI*180 < icp_stop_rotation_thred)) {
+            acos(std::abs(rotationMatrix(0,0)))/M_PI*180 < icp_stop_rotation_thred)) {
             if(!bTestRescue) {
                 initialized = true;
+                RCLCPP_DEBUG(get_logger(), "ICP收敛: 平移=%.4f, 旋转=%.2f度, 迭代次数=%d",
+                           translation.norm(),
+                           acos(std::abs(rotationMatrix(0,0)))/M_PI*180,
+                           iteration + 1);
             }
             break;
+        }
+
+        // 添加发散检测
+        if(translation.norm() > 5.0) {
+            RCLCPP_WARN(get_logger(), "⚠️  ICP可能发散: 平移量过大 (%.2f > 5.0)", translation.norm());
+            // 如果是刚从全局定位切换过来，可能需要更多迭代
+            if(iteration < 3) {
+                RCLCPP_INFO(get_logger(), "继续迭代以稳定位姿...");
+                continue;
+            } else {
+                RCLCPP_ERROR(get_logger(), "❌ ICP发散，停止迭代");
+                break;
+            }
         }
     }
 
