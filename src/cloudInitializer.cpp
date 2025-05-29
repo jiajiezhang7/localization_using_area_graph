@@ -409,26 +409,66 @@ void CloudInitializer::rescueRobot() {
                                    << "outside_total:" << outsideTotalScore << ","
                                    << "turkey_score:" << turkeyScore << std::endl;
                 }
-                // 计算当前角度的评分 - 提升数值精度和边缘位姿处理
+                // 计算当前角度的评分 - 强化边缘位姿检测和惩罚
                 long double base_score = 1.0L/(static_cast<long double>(insideScore) + static_cast<long double>(outsideScore));
 
-                // 添加边缘位姿惩罚因子
+                // 强化边缘位姿惩罚机制
                 long double edge_penalty = 1.0L;
+                bool is_edge_pose = false;
+
                 if (numofInsidePoints > 0 && numofOutsidePoints > 0) {
                     // 计算内外点比例，理想情况下应该有更多内部点
                     long double inside_ratio = static_cast<long double>(numofInsidePoints) /
                                              (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
 
-                    // 如果内部点比例过低（接近通道边缘），应用惩罚
-                    if (inside_ratio < 0.7L) {
-                        edge_penalty = inside_ratio / 0.7L; // 线性惩罚
+                    // 强化边缘检测：提高阈值到0.8，使用指数惩罚
+                    if (inside_ratio < 0.8L) {
+                        is_edge_pose = true;
+                        // 使用指数惩罚而非线性惩罚，更严厉
+                        long double ratio_penalty = std::pow(inside_ratio / 0.8L, 2.0L);
+                        edge_penalty *= ratio_penalty;
+
+                        // 对于极端边缘位姿（内部点比例<0.5），应用额外严厉惩罚
+                        if (inside_ratio < 0.5L) {
+                            edge_penalty *= 0.1L; // 额外90%惩罚
+                        }
                     }
 
-                    // 额外考虑Turkey评分的稳定性
-                    if (turkeyScore > 0) {
-                        long double turkey_bonus = std::min(1.2L, 1.0L + turkeyScore / 1000.0L);
-                        edge_penalty *= turkey_bonus;
+                    // 检查几何一致性：如果外部点过多，可能是错误位姿
+                    if (numofOutsidePoints > numofInsidePoints * 1.5) {
+                        is_edge_pose = true;
+                        edge_penalty *= 0.3L; // 70%惩罚
                     }
+
+                    // Turkey评分一致性检查：如果Turkey评分过低，说明匹配质量差
+                    if (turkeyScore > 0) {
+                        long double turkey_ratio = turkeyScore / (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
+                        if (turkey_ratio < 2.0L) { // Turkey评分平均值过低
+                            is_edge_pose = true;
+                            edge_penalty *= 0.5L; // 50%惩罚
+                        }
+
+                        // 只有在Turkey评分足够高时才给予加分
+                        if (turkey_ratio > 5.0L && !is_edge_pose) {
+                            long double turkey_bonus = std::min(1.1L, 1.0L + turkey_ratio / 100.0L);
+                            edge_penalty *= turkey_bonus;
+                        }
+                    }
+
+                    // 距离一致性检查：如果平均距离过大，说明匹配质量差
+                    long double avg_inside_score = static_cast<long double>(insideScore) / static_cast<long double>(numofInsidePoints);
+                    long double avg_outside_score = static_cast<long double>(outsideScore) / static_cast<long double>(numofOutsidePoints);
+
+                    if (avg_inside_score > 1.0L || avg_outside_score > 1.5L) {
+                        is_edge_pose = true;
+                        edge_penalty *= 0.4L; // 60%惩罚
+                    }
+                }
+
+                // 如果没有内部点，这肯定是错误位姿
+                if (numofInsidePoints == 0) {
+                    is_edge_pose = true;
+                    edge_penalty = 0.01L; // 99%惩罚
                 }
 
                 double current_score = static_cast<double>(base_score * edge_penalty);
@@ -472,10 +512,10 @@ void CloudInitializer::rescueRobot() {
                 pubCurrentMaxRobotPose->publish(pose_max_stamped);
 
                 RCLCPP_INFO(this->get_logger(),
-                    "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.8f (基础=%.8f, 边缘惩罚=%.3f, 内部点=%d, 外部点=%d)",
+                    "粗搜索阶段最佳猜测: x=%.2f, y=%.2f, yaw=%d, 评分=%.8f (基础=%.8f, 边缘惩罚=%.4f, 内部点=%d, 外部点=%d, 边缘位姿=%s)",
                     robotPose(0,3), robotPose(1,3), current_angle, current_score,
                     static_cast<double>(base_score), static_cast<double>(edge_penalty),
-                    numofInsidePoints, numofOutsidePoints);
+                    numofInsidePoints, numofOutsidePoints, is_edge_pose ? "是" : "否");
                 if (current_score <= best_sparse_score) {
                     // 添加调试信息
                     RCLCPP_DEBUG(this->get_logger(),
@@ -703,25 +743,96 @@ void CloudInitializer::rescueRobot() {
                                        << "turkey_score:" << turkeyScore << std::endl;
                     }
 
-                    // 计算当前角度的评分 - 提升数值精度和边缘位姿处理
+                    // 计算当前角度的评分 - 强化边缘位姿检测和惩罚
                     long double base_score = 1.0L/(static_cast<long double>(insideScore) + static_cast<long double>(outsideScore));
 
-                    // 添加边缘位姿惩罚因子
+                    // 强化边缘位姿惩罚机制
                     long double edge_penalty = 1.0L;
+                    bool is_edge_pose = false;
+
                     if (numofInsidePoints > 0 && numofOutsidePoints > 0) {
                         // 计算内外点比例，理想情况下应该有更多内部点
                         long double inside_ratio = static_cast<long double>(numofInsidePoints) /
                                                  (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
 
-                        // 如果内部点比例过低（接近通道边缘），应用惩罚
-                        if (inside_ratio < 0.7L) {
-                            edge_penalty = inside_ratio / 0.7L; // 线性惩罚
+                        // 强化边缘检测：提高阈值到0.8，使用指数惩罚
+                        if (inside_ratio < 0.8L) {
+                            is_edge_pose = true;
+                            // 使用指数惩罚而非线性惩罚，更严厉
+                            long double ratio_penalty = std::pow(inside_ratio / 0.8L, 2.0L);
+                            edge_penalty *= ratio_penalty;
+
+                            // 对于极端边缘位姿（内部点比例<0.5），应用额外严厉惩罚
+                            if (inside_ratio < 0.5L) {
+                                edge_penalty *= 0.1L; // 额外90%惩罚
+                            }
                         }
 
-                        // 额外考虑Turkey评分的稳定性
+                        // 检查几何一致性：如果外部点过多，可能是错误位姿
+                        if (numofOutsidePoints > numofInsidePoints * 1.5) {
+                            is_edge_pose = true;
+                            edge_penalty *= 0.3L; // 70%惩罚
+                        }
+
+                        // Turkey评分一致性检查：如果Turkey评分过低，说明匹配质量差
                         if (turkeyScore > 0) {
-                            long double turkey_bonus = std::min(1.2L, 1.0L + turkeyScore / 1000.0L);
-                            edge_penalty *= turkey_bonus;
+                            long double turkey_ratio = turkeyScore / (static_cast<long double>(numofInsidePoints) + static_cast<long double>(numofOutsidePoints));
+                            if (turkey_ratio < 2.0L) { // Turkey评分平均值过低
+                                is_edge_pose = true;
+                                edge_penalty *= 0.5L; // 50%惩罚
+                            }
+
+                            // 只有在Turkey评分足够高时才给予加分
+                            if (turkey_ratio > 5.0L && !is_edge_pose) {
+                                long double turkey_bonus = std::min(1.1L, 1.0L + turkey_ratio / 100.0L);
+                                edge_penalty *= turkey_bonus;
+                            }
+                        }
+
+                        // 距离一致性检查：如果平均距离过大，说明匹配质量差
+                        long double avg_inside_score = static_cast<long double>(insideScore) / static_cast<long double>(numofInsidePoints);
+                        long double avg_outside_score = static_cast<long double>(outsideScore) / static_cast<long double>(numofOutsidePoints);
+
+                        if (avg_inside_score > 1.0L || avg_outside_score > 1.5L) {
+                            is_edge_pose = true;
+                            edge_penalty *= 0.4L; // 60%惩罚
+                        }
+                    }
+
+                    // 如果没有内部点，这肯定是错误位姿
+                    if (numofInsidePoints == 0) {
+                        is_edge_pose = true;
+                        edge_penalty = 0.01L; // 99%惩罚
+                    }
+
+                    // 额外的几何合理性检查：检查位姿是否过于接近Area边界
+                    // 通过检查机器人位置到Area中心的距离来判断
+                    if (numofInsidePoints > 0 && numofOutsidePoints > 0) {
+                        // 计算内部点的重心，作为Area中心的近似
+                        double center_x = 0.0, center_y = 0.0;
+                        int valid_inside_points = 0;
+
+                        for (int i = 0; i < transformed_pc->points.size(); i++) {
+                            if (insidePC->points[i].x != 0 || insidePC->points[i].y != 0) {
+                                center_x += insidePC->points[i].x;
+                                center_y += insidePC->points[i].y;
+                                valid_inside_points++;
+                            }
+                        }
+
+                        if (valid_inside_points > 0) {
+                            center_x /= valid_inside_points;
+                            center_y /= valid_inside_points;
+
+                            // 计算机器人位置到内部点重心的距离
+                            double dist_to_center = std::sqrt(std::pow(robotPose(0,3) - center_x, 2) +
+                                                             std::pow(robotPose(1,3) - center_y, 2));
+
+                            // 如果机器人距离内部点重心过远，可能位于边缘
+                            if (dist_to_center > 3.0) { // 3米阈值
+                                is_edge_pose = true;
+                                edge_penalty *= 0.2L; // 80%惩罚
+                            }
                         }
                     }
 
@@ -747,11 +858,11 @@ void CloudInitializer::rescueRobot() {
                         pubCurrentMaxRobotPose->publish(pose_max_stamped);
 
                         RCLCPP_INFO(this->get_logger(),
-                            "精细搜索更新最佳位姿: x=%.2f, y=%.2f, 角度=%d度, 评分=%.8f (基础=%.8f, 边缘惩罚=%.3f, 内部点=%d, 外部点=%d)",
+                            "精细搜索更新最佳位姿: x=%.2f, y=%.2f, 角度=%d度, 评分=%.8f (基础=%.8f, 边缘惩罚=%.4f, 内部点=%d, 外部点=%d, 边缘位姿=%s)",
                             robotPose(0,3), robotPose(1,3),
                             static_cast<int>(result_angle), current_score,
                             static_cast<double>(base_score), static_cast<double>(edge_penalty),
-                            numofInsidePoints, numofOutsidePoints);
+                            numofInsidePoints, numofOutsidePoints, is_edge_pose ? "是" : "否");
                     }
                     else {
                         // 添加调试信息

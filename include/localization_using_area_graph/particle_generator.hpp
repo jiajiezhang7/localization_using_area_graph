@@ -45,10 +45,11 @@ private:
     double radius_;           // search radius 搜索半径
     bool bRescueRobot_;      // rescue robot mode flag
     bool use_room_info_;      // 是否使用room信息来过滤粒子
+    double boundary_filter_threshold_;  // 边界过滤阈值（米），粒子距离边界小于此值时被过滤
     static constexpr size_t INVALID_AREA_ID = std::numeric_limits<size_t>::max();
     size_t room_area_id_{INVALID_AREA_ID};    // room坐标所在的Area ID
     std::vector<std::vector<Eigen::Vector2d>> AGmaps_; // Area Graph map data
-    
+
     // Publishers & Subscribers
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr particle_pub_;        // 发布采样得到的
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr viz_particle_pub_;    // 发布可视化粒子
@@ -58,14 +59,14 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;       // 订阅雷达点云话题
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr agmap_sub_;       // 订阅 ag_map (/pubAGMapTransformedPC)
     rclcpp::Subscription<rss::msg::WifiLocation>::SharedPtr wifi_sub_;
-    
+
     // WiFi定位结果
     std::mutex wifi_mutex_;
     rss::msg::WifiLocation::SharedPtr latest_wifi_location_;
     bool received_wifi_location_{false};  // 标记是否收到过WiFi定位结果
     bool latest_lidar_received_{false};  // 标记是否收到过激光雷达数据
     bool particles_published_{false};  // 标记是否已经发布过粒子
-    
+
     // root node的经纬度
     double root_longitude_;
     double root_latitude_;
@@ -73,15 +74,17 @@ private:
     // 地图变换参数
     std::array<double, 3> map_extrinsic_trans_;  // AGmap到map的平移变换
     double map_yaw_angle_;  // AGmap到map的旋转角度（弧度）
-    
+
     // Callbacks
     void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void agmapCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void wifiCallback(const rss::msg::WifiLocation::SharedPtr msg);
-    
+
     // Utility functions
     void generateParticles(const rclcpp::Time& stamp, const std::array<double, 2>& wifi_center);
     bool checkIntersection(const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& polygon);
+    bool isNearAreaBoundary(const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& polygon, double threshold);
+    double distanceToPolygonBoundary(const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& polygon);
     void publishWifiCenterMarker(const rclcpp::Time& stamp, double x, double y);
     void publishRoomMarker(const rclcpp::Time& stamp, double x, double y);
 
