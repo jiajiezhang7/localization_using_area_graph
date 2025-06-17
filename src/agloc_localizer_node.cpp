@@ -174,7 +174,7 @@ void AGLocLocalizerNode::agloc_pose_callback(const geometry_msgs::msg::PoseStamp
   // 根据提供的参数：x=0.34058, y=0, z=0.3465, qz=0.70710678, qw=0.70710678
   tf2::Transform T_lidar_base;
   tf2::Vector3 translation(-0.34058, 0.0, -0.3465); // 注意这里取反，因为我们需要从雷达到base_link
-  tf2::Quaternion rotation(0.0, 0.0, -0.70710678, 0.70710678); // 同样取反
+  tf2::Quaternion rotation(0.0, 0.0, -0.70710678, 0.70710678); // 同样取反  0.0, 0.0, -0.70710678, 0.70710678
   rotation.normalize();
   T_lidar_base.setOrigin(translation);
   T_lidar_base.setRotation(rotation);

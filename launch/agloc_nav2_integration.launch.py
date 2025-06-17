@@ -32,19 +32,19 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_corridor_409',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_01',
         description='ROS2 bag文件路径'
     )
 
     osm_file_arg = DeclareLaunchArgument(
         'osm_file',
-        default_value=os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_SEM_fixid_biggestever.osm'),
+        default_value=os.path.join(topology_pkg_dir, 'data', 'fix_id', 'SIST1_F2_All_Sec.osm'),
         description='区域图OSM文件路径'
     )
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='true',
+        default_value='false',
         description='是否使用全局定位'
     )
 
