@@ -271,6 +271,11 @@ protected:
     bool enable_floor_detection;                // 是否启用楼层自动检测
     bool debug_height_filtering;                // 高度过滤调试信息
 
+    // ========== 地理坐标转换参数 ==========
+    double root_longitude;                      // 参考经度
+    double root_latitude;                       // 参考纬度
+    double robot_level;                         // 机器人所在楼层/层级
+
 private:
     void declare_parameters();
     void get_parameters();

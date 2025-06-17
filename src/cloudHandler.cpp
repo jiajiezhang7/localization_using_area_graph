@@ -13,6 +13,9 @@
  *            All rights reserved.
  */
 #include "localization_using_area_graph/cloudHandler.hpp"
+#include "localization_using_area_graph/geo_transform.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 #include "localization_using_area_graph/utility.hpp"
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -1478,6 +1481,10 @@ void CloudHandler::optimizationICP() {
     // 将位姿添加到全局路径并发布
     globalPath.poses.push_back(pose_stamped);
     pubRobotPath->publish(globalPath);
+
+    // 创建并发布地理坐标路径
+    publishRobotPathGeo(pose_stamped);
+
     saveTUMTraj(pose_stamped);  // 保存轨迹到TUM格式文件
 }
 
@@ -1665,6 +1672,51 @@ void CloudHandler::publishPredictedPose(const Eigen::Matrix4f& predicted_pose,
     pose_msg.pose.orientation.w = q.w();
 
     predicted_pose_pub_->publish(pose_msg);
+}
+
+/**
+ * @brief 发布地理坐标路径
+ * @param pose_stamped 当前位姿
+ */
+void CloudHandler::publishRobotPathGeo(const geometry_msgs::msg::PoseStamped& pose_stamped) {
+    // 将局部坐标转换为地理坐标
+    double map_x = pose_stamped.pose.position.x;
+    double map_y = pose_stamped.pose.position.y;
+    
+    // 获取yaw角（从四元数转换）
+    tf2::Quaternion quat(pose_stamped.pose.orientation.x,
+                        pose_stamped.pose.orientation.y,
+                        pose_stamped.pose.orientation.z,
+                        pose_stamped.pose.orientation.w);
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+
+    // 使用地理坐标转换工具
+    std::array<double, 3> map_extrinsic_trans = {mapExtTrans.x(), mapExtTrans.y(), mapExtTrans.z()};
+    double map_yaw_angle = mapYawAngle * M_PI / 180.0;  // 转换为弧度
+
+    GeoCoordinate geo_pos = geo_transform::mapToGeographic(
+        map_x, map_y, root_longitude, root_latitude, map_extrinsic_trans, map_yaw_angle);
+
+    // 创建地理坐标位姿消息
+    localization_using_area_graph::msg::RobotPoseGeo pose_geo;
+    pose_geo.header = pose_stamped.header;  // 保持一致的时间戳
+    pose_geo.longitude = geo_pos.longitude;
+    pose_geo.latitude = geo_pos.latitude;
+    pose_geo.level = robot_level;
+    pose_geo.yaw = yaw;
+
+    // 添加到全局地理坐标路径
+    globalPathGeo.poses.push_back(pose_geo);
+    globalPathGeo.header = pose_stamped.header;  // 保持一致的时间戳
+
+    // 发布地理坐标路径
+    pubRobotPathLonLat->publish(globalPathGeo);
+
+    if (debug_fusion) {
+        RCLCPP_DEBUG(get_logger(), "发布地理坐标位姿: [%.8f, %.8f, %.1f] yaw=%.3f",
+                     geo_pos.longitude, geo_pos.latitude, robot_level, yaw);
+    }
 }
 
 /**

@@ -170,6 +170,11 @@ void ParamServer::declare_parameters() {
     this->declare_parameter("floor_change_threshold", 4.0);          // 楼层切换检测阈值（米）
     this->declare_parameter("enable_floor_detection", true);         // 启用楼层自动检测
     this->declare_parameter("debug_height_filtering", false);        // 高度过滤调试信息
+
+    // ========== 地理坐标转换参数声明 ==========
+    this->declare_parameter("root_long", 0.0);                      // 参考经度
+    this->declare_parameter("root_lat", 0.0);                       // 参考纬度
+    this->declare_parameter("robot_level", 1.0);                    // 机器人所在楼层/层级
 }
 
 void ParamServer::get_parameters() {
@@ -287,6 +292,11 @@ void ParamServer::get_parameters() {
     this->get_parameter("floor_change_threshold", floor_change_threshold);
     this->get_parameter("enable_floor_detection", enable_floor_detection);
     this->get_parameter("debug_height_filtering", debug_height_filtering);
+
+    // ========== 地理坐标转换参数获取 ==========
+    this->get_parameter("root_long", root_longitude);
+    this->get_parameter("root_lat", root_latitude);
+    this->get_parameter("robot_level", robot_level);
 }
 
 void ParamServer::calPedal(double x1, double y1, double x2, double y2,

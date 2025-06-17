@@ -8,6 +8,7 @@
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
@@ -28,6 +29,8 @@
   <depend>area_graph_data_parser</depend>
   <depend>message_filters</depend>
   <depend>rss</depend>
+  <depend>rosidl_default_generators</depend>
+  <depend>rosidl_default_runtime</depend>
   
   <!-- New dependencies for refactored nodes -->
   <depend>yaml-cpp</depend>
@@ -40,6 +43,8 @@
   <depend>nav2_util</depend>
   <depend>nav2_msgs</depend>
   <depend>nav2_common</depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <export>
     <build_type>ament_cmake</build_type>

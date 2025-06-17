@@ -30,6 +30,9 @@
 #define _CLOUD_BASE_HPP_
 
 #include "utility.hpp"
+#include "geo_transform.hpp"  // 添加地理坐标转换工具
+#include "localization_using_area_graph/msg/robot_pose_geo.hpp"
+#include "localization_using_area_graph/msg/robot_path_geo.hpp"
 #include <mutex> // 添加互斥锁头文件
 #include <chrono> // 添加时间相关头文件
 
@@ -48,6 +51,7 @@ public:
     std_msgs::msg::Header cloudHeader;      // 点云数据的消息头
     std_msgs::msg::Header mapHeader;        // 地图数据的消息头
     nav_msgs::msg::Path globalPath;         // 全局路径
+    localization_using_area_graph::msg::RobotPathGeo globalPathGeo;  // 全局地理坐标路径
 
     // ROS2 发布器
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubFurthestRing;        // 发布最远激光环
@@ -61,6 +65,7 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMapPC;               // 发布地图点云（后续定位实际使用的AGMap）
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubAGMapTransformedPC;  // 发布变换后的AG地图点云
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubRobotPath;                     // 发布机器人路径
+    rclcpp::Publisher<localization_using_area_graph::msg::RobotPathGeo>::SharedPtr pubRobotPathLonLat;  // 发布地理坐标路径
 
     rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr pubDONEsignal;               // 发布完成信号
 
@@ -248,6 +253,7 @@ private:
         pubMapPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubMapPC", qos);
         pubAGMapTransformedPC = this->create_publisher<sensor_msgs::msg::PointCloud2>("pubAGMapTransformedPC", qos);
         pubRobotPath = this->create_publisher<nav_msgs::msg::Path>("RobotPath", qos);
+        pubRobotPathLonLat = this->create_publisher<localization_using_area_graph::msg::RobotPathGeo>("RobotPathLonLat", qos);
 
         pubDONEsignal = this->create_publisher<geometry_msgs::msg::Pose>("doneInit", qos);
 

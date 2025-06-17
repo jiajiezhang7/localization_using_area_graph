@@ -38,6 +38,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_default_runtime REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -67,6 +69,14 @@ find_package(PCL REQUIRED COMPONENTS
   sample_consensus
   segmentation
 )
+
+# Add message files
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/RobotPoseGeo.msg"
+  "msg/RobotPathGeo.msg"
+  DEPENDENCIES geometry_msgs std_msgs
+)
+
 # Include directories
 include_directories(
   include
@@ -170,6 +180,7 @@ foreach(target
     image_transport
     area_graph_data_parser
     OpenCV  # 添加这一行
+    rosidl_default_runtime
   )
 endforeach()
 
@@ -198,6 +209,12 @@ target_link_libraries(agloc_localizer_node
   ${PCL_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+
+# Ensure messages are generated before building executables
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(cloud_handler "${cpp_typesupport_target}")
+target_link_libraries(particle_generator "${cpp_typesupport_target}")
+target_link_libraries(agloc_localizer_node "${cpp_typesupport_target}")
 
 # AGLoc已不再是插件，不需要安装plugins.xml
 

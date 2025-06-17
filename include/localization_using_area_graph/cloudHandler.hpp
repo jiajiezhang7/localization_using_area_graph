@@ -119,6 +119,7 @@ private:
     double computeICPScore();                                             // 计算ICP匹配得分
     void publishPredictedPose(const Eigen::Matrix4f& predicted_pose,     // 发布预测位姿
                              const rclcpp::Time& timestamp);
+    void publishRobotPathGeo(const geometry_msgs::msg::PoseStamped& pose_stamped);  // 发布地理坐标路径
 
     // 初始化发布器和订阅器
     void initializePublishers() {
