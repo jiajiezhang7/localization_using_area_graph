@@ -12,7 +12,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Jun-15-fast_track_1',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Jun-23-wifi_SIST-D-2-3',
         description='Path to ROS2 bag file'
     )
 
@@ -21,14 +21,14 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='false',
+        default_value='true',
         description='Whether to use global localization'
     )
 
     # 时间同步相关参数
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='Use simulation time'
     )
 

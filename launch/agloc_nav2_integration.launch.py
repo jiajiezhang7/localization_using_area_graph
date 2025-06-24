@@ -32,7 +32,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Mars_01',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Jun-23-wifi_SIST-D-2-2',
         description='ROS2 bag文件路径'
     )
 
@@ -44,7 +44,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='false',
+        default_value='true',
         description='是否使用全局定位'
     )
 
