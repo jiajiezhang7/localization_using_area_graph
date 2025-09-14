@@ -12,7 +12,7 @@ def generate_launch_description():
 
     bag_file_arg = DeclareLaunchArgument(
         'bag_file',
-        default_value='/home/jay/AGLoc_ws/rosbag/agile03_Jun-23-wifi_SIST-D-2-3',
+        default_value='/home/jay/AGLoc_ws/rosbag/agile03_corridor_409',
         description='Path to ROS2 bag file'
     )
 
@@ -21,7 +21,7 @@ def generate_launch_description():
 
     use_global_localization_arg = DeclareLaunchArgument(
         'use_global_localization',
-        default_value='true',
+        default_value='false',
         description='Whether to use global localization'
     )
 

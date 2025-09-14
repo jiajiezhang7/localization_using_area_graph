@@ -61,9 +61,9 @@
 
 
         # 在开启全局定位下（模式1和模式2），以下可以是个垃圾值,因为不用他们了，但在仅位姿跟踪下则需要准确值
-        initialYawAngle: 90.0  # bag: 95, agile03_Mars_01
-        # # initialExtrinsicTrans: [4.0, -6.0, 0.0]  # bag: 95
-        initialExtrinsicTrans: [4.18, -3.51, 0.0]  # bag: agile03_Mars_01
+        # initialYawAngle: 90.0  # bag: 95, agile03_Mars_01
+        # # # initialExtrinsicTrans: [4.0, -6.0, 0.0]  # bag: 95
+        # initialExtrinsicTrans: [4.18, -3.51, 0.0]  # bag: agile03_Mars_01
 
         # initialYawAngle: 180.0  # bag: agile03_corridor_01
         # initialExtrinsicTrans: [8.36, 9.24, 0.0]  # bag: agile03_corridor_01
@@ -74,16 +74,22 @@
         # initialYawAngle: 270.0  # bag: agile03_corridor_03
         # initialExtrinsicTrans: [7.95, 30.79, 0.0]  # bag: agile03_corridor_03
 
-        # initialYawAngle: 180.0  # bag: agile03_Mars_door_01
+        # initialYawAngle: 90.0  # bag: agile03_Mars_door_01
         # initialExtrinsicTrans: [1.4, 4.55, 0.0]  # bag: agile03_Mars_door_01
 
-        # initialYawAngle: 150.0  # bag: agile03_Jun-18-wifi_SIST-D-2
+        # initialYawAngle: 90.0      # bag: agile03_Mars_door_02 (failed)
+        # initialExtrinsicTrans: [2.31, -9.47, 0.0]   # bag: agile03_Mars_door_02
+
+        initialYawAngle: 180.0      # bag: agile03_corridor_409 
+        initialExtrinsicTrans: [8.65, 9.82, 0.0]   # bag: agile03_corridor_409
+
+        # initialYawAngle: 150.0  # bag: agile03_Jun-18-wifi_SIST-D-2 （过门failed)
         # initialExtrinsicTrans: [2.38, -6.97, 0.0]  # bag: agile03_Jun-18-wifi_SIST-D-2
 
 
         
         # 是否全局定位+位姿跟踪（模式2）
-        bRescueRobot: true                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
+        bRescueRobot: false                  # 是否启用全局定位 （true则同时需要启particle_generator节点）- (如果不启用则直接读入params中的位姿)
 
         # 25.2.20在测试这个模式-希望跑通 -- 2.28已跑通
         # 是否测试全局定位效果（模式1） --- 每帧点云都用来执行全局定位

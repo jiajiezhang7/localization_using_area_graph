@@ -74,8 +74,8 @@ Visualization Manager:
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
-      Line Style: Lines
-      Line Width: 0.029999999329447746
+      Line Style: Billboards
+      Line Width: 0.30000001192092896
       Name: Path
       Offset:
         X: 0
@@ -101,9 +101,29 @@ Visualization Manager:
         AGmap:
           Value: true
         All Enabled: false
-        PandarQT:
+        base_link:
+          Value: true
+        fr_left_link:
+          Value: true
+        fr_right_link:
+          Value: true
+        fr_steer_left_link:
+          Value: true
+        fr_steer_right_link:
+          Value: true
+        front_steer_link:
+          Value: true
+        hesai_lidar:
           Value: true
         map:
+          Value: true
+        odom:
+          Value: true
+        re_left_link:
+          Value: true
+        re_right_link:
+          Value: true
+        rear_wheel_link:
           Value: true
         world:
           Value: false
@@ -116,8 +136,6 @@ Visualization Manager:
         world:
           map:
             AGmap:
-              {}
-            PandarQT:
               {}
       Update Interval: 0
       Value: true
@@ -198,9 +216,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 648
+      Max Intensity: 789
       Min Color: 0; 0; 0
-      Min Intensity: 633
+      Min Intensity: 691
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -323,7 +341,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        wifi_center: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -336,7 +354,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        global_localization: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -349,7 +367,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        global_localization: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -396,7 +414,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        room_position: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -451,25 +469,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 52.85414123535156
+      Distance: 74.25627136230469
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.24269437789917
-        Y: -7.228365421295166
+        X: 4.81311559677124
+        Y: -0.2610672116279602
         Z: -4.169893741607666
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 1.3197965621948242
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.2081711292266846
+      Yaw: 3.173170566558838
     Saved: ~
 Window Geometry:
   Displays:
@@ -487,5 +505,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1920
-  X: 0
-  Y: 240
+  X: 709
+  Y: 183
